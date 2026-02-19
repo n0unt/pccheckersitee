@@ -11,7 +11,7 @@ import sqlite3, hashlib, secrets, string, datetime, json, os
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production-plz")
 
-DB = "pcchecker.db"
+DB = os.environ.get("DATABASE_URL", "/tmp/pcchecker.db")
 
 # ── DB Setup ─────────────────────────────────────────────────
 def get_db():
