@@ -413,6 +413,9 @@ def api_pins():
     db.close()
     return jsonify([dict(r) for r in rows])
 
-if __name__ == "__main__":
+# Call init_db at module level so gunicorn picks it up
+with app.app_context():
     init_db()
+
+if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
