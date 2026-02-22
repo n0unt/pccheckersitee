@@ -20,7 +20,7 @@
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
 /* Ambient background */
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 100% 60% at 10% 0%, rgba(0,245,160,0.03) 0%,transparent 50%),radial-gradient(ellipse 80% 80% at 90% 100%, rgba(77,159,255,0.03) 0%,transparent 50%);pointer-events:none;z-index:0;}
-.shell{display:flex;height:100vh;position:relative;z-index:1;}
+.shell{display:flex;height:calc(100vh - 44px);position:relative;z-index:1;}
 
 /* ── Sidebar ── */
 .sidebar{width:var(--side);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
@@ -145,9 +145,35 @@ td.dim{color:var(--fg2);font-size:11px;}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:4px;}
+/* Site-wide top nav */
+.site-nav{height:44px;background:rgba(8,11,16,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;z-index:200;position:relative;}
+.site-brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--fg);}
+.site-brand-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;}
+.site-nav-links{display:flex;align-items:center;gap:20px;margin-left:20px;}
+.site-nav-links a{color:var(--fg2);text-decoration:none;font-size:12px;transition:color 0.15s;}
+.site-nav-links a:hover{color:var(--fg);}
+.site-nav-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.nav-user{font-size:12px;color:var(--fg2);}
+.nav-signout{font-size:12px;color:var(--fg3);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:7px;transition:all 0.15s;}
+.nav-signout:hover{color:var(--red);border-color:rgba(255,77,109,0.3);}
+/* Adjust shell height to account for top nav */
+.shell{height:calc(100vh - 44px);}
 </style>
 </head>
 <body>
+<header class="site-nav">
+  <a href="/" class="site-brand"><div class="brand-mark" style="width:26px;height:26px;border-radius:8px;font-size:11px">L</div><span class="site-brand-name">Lite</span></a>
+  <div class="site-nav-links">
+    <a href="/">Home</a>
+    <a href="/download">Download</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <div class="site-nav-right">
+    <span class="nav-user">{{ user.username }}</span>
+    <a href="/logout" class="nav-signout">Sign out</a>
+  </div>
+</header>
 <div class="shell">
 <nav class="sidebar">
   <div class="sidebar-top">
