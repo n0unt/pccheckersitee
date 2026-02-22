@@ -1,18 +1,70 @@
 """
-PC Checker - Web Dashboard
-Flask + PostgreSQL backend for OFL/FFL forensic scan results
+PC Checker - Web Dashboard v2
+Flask + PostgreSQL + Discord OAuth2
 """
-
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, abort
 from functools import wraps
 import psycopg2, psycopg2.extras
-import hashlib, secrets, string, datetime, json, os
+import hashlib, secrets, string, datetime, json, os, urllib.request, urllib.parse, urllib.error, ssl
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production-plz")
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production")
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DATABASE_URL        = os.environ.get("DATABASE_URL", "")
+DISCORD_CLIENT_ID   = os.environ.get("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
+DISCORD_BOT_TOKEN   = os.environ.get("DISCORD_BOT_TOKEN", "")
+DISCORD_REDIRECT    = os.environ.get("DISCORD_REDIRECT", "https://pccheckersitee-production.up.railway.app/auth/discord/callback")
 
+# Role IDs
+ROLE_LITE = "1475015141882855424"
+ROLE_UFF  = "1475022240754962452"
+ROLE_FFL  = "1475022200095510621"
+
+# Guild ID — bot must be in this server
+DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "")
+
+# ── SSL context ──────────────────────────────────────────────
+def _ssl_ctx():
+    ctx = ssl._create_unverified_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+def _discord_get(path, token=None, bot=False):
+    url = f"https://discord.com/api/v10{path}"
+    headers = {"Content-Type": "application/json"}
+    if bot:
+        headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
+    elif token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try: return json.loads(e.read().decode())
+        except: return {}
+    except Exception:
+        return {}
+
+def _discord_post(path, data, token=None, bot=False):
+    url = f"https://discord.com/api/v10{path}"
+    payload = urllib.parse.urlencode(data).encode() if isinstance(data, dict) and not token and not bot else json.dumps(data).encode()
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    if bot:
+        headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+            return r.status, json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try: return e.code, json.loads(e.read().decode())
+        except: return e.code, {}
+    except Exception as ex:
+        return 0, {"error": str(ex)}
+
+# ── DB ───────────────────────────────────────────────────────
 def get_db():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
@@ -25,53 +77,66 @@ def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
 def gen_pin():
-    chars = string.ascii_uppercase + string.digits
-    return "".join(secrets.choice(chars) for _ in range(8))
+    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
 def row_to_dict(row, cur):
     if row is None: return None
-    cols = [desc[0] for desc in cur.description]
-    return dict(zip(cols, row))
+    return dict(zip([d[0] for d in cur.description], row))
 
 def rows_to_dicts(rows, cur):
-    cols = [desc[0] for desc in cur.description]
-    return [dict(zip(cols, row)) for row in rows]
+    cols = [d[0] for d in cur.description]
+    return [dict(zip(cols, r)) for r in rows]
 
 def init_db():
     conn = get_db(); cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'pending',
-        leagues TEXT NOT NULL DEFAULT '', created TEXT NOT NULL)""")
+        id SERIAL PRIMARY KEY, discord_id TEXT UNIQUE,
+        username TEXT NOT NULL, avatar TEXT DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'pending',
+        leagues TEXT NOT NULL DEFAULT '',
+        created TEXT NOT NULL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS pins (
         id SERIAL PRIMARY KEY, pin TEXT UNIQUE NOT NULL,
         league TEXT NOT NULL, agent_id INTEGER NOT NULL,
-        used INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL, expires TEXT NOT NULL)""")
+        used INTEGER NOT NULL DEFAULT 0,
+        created TEXT NOT NULL, expires TEXT NOT NULL,
+        scan_id INTEGER DEFAULT NULL,
+        finished_at TEXT DEFAULT NULL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS scans (
-        id SERIAL PRIMARY KEY, league TEXT NOT NULL, pc_user TEXT NOT NULL,
-        verdict TEXT NOT NULL, total_hits INTEGER NOT NULL DEFAULT 0,
-        roblox_accs TEXT NOT NULL DEFAULT '[]', report_json TEXT NOT NULL DEFAULT '{}',
+        id SERIAL PRIMARY KEY, league TEXT NOT NULL,
+        pc_user TEXT NOT NULL, verdict TEXT NOT NULL,
+        total_hits INTEGER NOT NULL DEFAULT 0,
+        roblox_accs TEXT NOT NULL DEFAULT '[]',
+        report_json TEXT NOT NULL DEFAULT '{}',
         pin_used TEXT, submitted TEXT NOT NULL)""")
-    pw = hash_pw("123456")
-    cur.execute("SELECT id FROM users WHERE username=%s", ("ars",))
-    if not cur.fetchone():
-        cur.execute("INSERT INTO users (username,password,role,leagues,created) VALUES (%s,%s,'owner','UFF,FFL',%s)",
-                    ("ars", pw, now()))
+    # Seed fallback owner (for non-Discord login)
+    try:
+        cur.execute("SELECT id FROM users WHERE username=%s AND discord_id IS NULL", ("ars",))
+        if not cur.fetchone():
+            cur.execute("INSERT INTO users (discord_id,username,role,leagues,created) VALUES (NULL,%s,'owner','UFF,FFL',%s)",
+                        ("ars", now()))
+    except Exception: pass
+    # Auto-cleanup old pins (>3 days)
+    try:
+        cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("DELETE FROM pins WHERE created < %s AND used=0", (cutoff,))
+    except Exception: pass
     conn.commit(); cur.close(); conn.close()
 
+# ── Auth ─────────────────────────────────────────────────────
 def login_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user_id" not in session: return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return wrapper
+    def w(*a, **k):
+        if "user_id" not in session: return redirect(url_for("login_page"))
+        return f(*a, **k)
+    return w
 
 def owner_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        if session.get("role") != "owner": abort(403)
-        return f(*args, **kwargs)
-    return wrapper
+    def w(*a, **k):
+        if session.get("role") not in ("owner", "admin"): abort(403)
+        return f(*a, **k)
+    return w
 
 def get_user():
     if "user_id" not in session: return None
@@ -81,74 +146,188 @@ def get_user():
     cur.close(); conn.close()
     return row
 
+def get_user_leagues(user):
+    return [l.strip() for l in (user.get("leagues") or "").split(",") if l.strip()]
+
+def can_access_league(user, league):
+    if user["role"] in ("owner", "admin"): return True
+    return league in get_user_leagues(user)
+
+# ── Discord OAuth ─────────────────────────────────────────────
+@app.route("/auth/discord")
+def discord_auth():
+    state = secrets.token_hex(16)
+    session["oauth_state"] = state
+    params = urllib.parse.urlencode({
+        "client_id": DISCORD_CLIENT_ID,
+        "redirect_uri": DISCORD_REDIRECT,
+        "response_type": "code",
+        "scope": "identify guilds.members.read",
+        "state": state,
+    })
+    return redirect(f"https://discord.com/api/oauth2/authorize?{params}")
+
+@app.route("/auth/discord/callback")
+def discord_callback():
+    code  = request.args.get("code")
+    state = request.args.get("state")
+    if not code or state != session.get("oauth_state"):
+        return redirect(url_for("login_page") + "?error=state_mismatch")
+
+    # Exchange code for token
+    status, token_data = _discord_post("/oauth2/token", {
+        "client_id": DISCORD_CLIENT_ID,
+        "client_secret": DISCORD_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": DISCORD_REDIRECT,
+    })
+    if status != 200 or "access_token" not in token_data:
+        return redirect(url_for("login_page") + "?error=token_failed")
+
+    access_token = token_data["access_token"]
+
+    # Get Discord user
+    discord_user = _discord_get("/users/@me", token=access_token)
+    if not discord_user.get("id"):
+        return redirect(url_for("login_page") + "?error=user_failed")
+
+    discord_id  = discord_user["id"]
+    username    = discord_user.get("username", "Unknown")
+    avatar      = discord_user.get("avatar", "")
+
+    # Check guild roles via bot
+    role        = "pending"
+    leagues     = ""
+    if DISCORD_GUILD_ID and DISCORD_BOT_TOKEN:
+        member = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
+        member_roles = member.get("roles", [])
+        if ROLE_LITE in member_roles:
+            role = "admin"
+        if ROLE_UFF in member_roles:
+            leagues += "UFF,"
+        if ROLE_FFL in member_roles:
+            leagues += "FFL,"
+        # Owner override
+        if ROLE_LITE in member_roles and ROLE_UFF in member_roles and ROLE_FFL in member_roles:
+            role = "owner"
+        leagues = leagues.rstrip(",")
+        if not leagues and role == "admin":
+            leagues = "UFF,FFL"
+    
+    if role == "pending":
+        return redirect(url_for("login_page") + "?error=no_access")
+
+    # Upsert user
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE discord_id=%s", (discord_id,))
+    existing = cur.fetchone()
+    if existing:
+        cur.execute("UPDATE users SET username=%s, avatar=%s, role=%s, leagues=%s WHERE discord_id=%s",
+                    (username, avatar, role, leagues, discord_id))
+        user_id = existing[0]
+    else:
+        cur.execute("INSERT INTO users (discord_id,username,avatar,role,leagues,created) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                    (discord_id, username, avatar, role, leagues, now()))
+        user_id = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+
+    session["user_id"] = user_id
+    session["username"] = username
+    session["role"] = role
+    session["leagues"] = leagues
+    session["avatar"] = f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar}.png" if avatar else ""
+    return redirect(url_for("dashboard"))
+
+# ── Pages ────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return redirect(url_for("dashboard") if "user_id" in session else url_for("login"))
+    return redirect(url_for("dashboard") if "user_id" in session else url_for("login_page"))
 
-@app.route("/login", methods=["GET","POST"])
-def login():
-    error = None
-    if request.method == "POST":
-        u = request.form.get("username","").strip()
-        p = request.form.get("password","").strip()
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username=%s AND password=%s", (u, hash_pw(p)))
-        user = row_to_dict(cur.fetchone(), cur)
-        cur.close(); conn.close()
-        if user:
-            if user["role"] == "pending": error = "Your account is pending approval."
-            else:
-                session["user_id"] = user["id"]; session["username"] = user["username"]
-                session["role"] = user["role"]; session["leagues"] = user["leagues"]
-                return redirect(url_for("dashboard"))
-        else: error = "Invalid username or password."
-    return render_template("login.html", error=error)
-
-@app.route("/register", methods=["GET","POST"])
-def register():
-    error = None; success = None
-    if request.method == "POST":
-        u = request.form.get("username","").strip()
-        p = request.form.get("password","").strip()
-        l = request.form.get("league","").strip()
-        if not u or not p or not l: error = "All fields required."
-        elif len(p) < 6: error = "Password must be at least 6 characters."
-        else:
-            conn = get_db(); cur = conn.cursor()
-            try:
-                cur.execute("INSERT INTO users (username,password,role,leagues,created) VALUES (%s,%s,%s,%s,%s)",
-                            (u, hash_pw(p), "pending", l, now()))
-                conn.commit(); success = "Account created! Wait for owner approval."
-            except psycopg2.IntegrityError: conn.rollback(); error = "Username already taken."
-            finally: cur.close(); conn.close()
-    return render_template("register.html", error=error, success=success)
+@app.route("/login")
+def login_page():
+    error = request.args.get("error")
+    errors = {
+        "no_access": "You don't have the required Discord role to access this.",
+        "token_failed": "Discord login failed. Try again.",
+        "state_mismatch": "Security error. Try again.",
+        "user_failed": "Could not fetch your Discord profile.",
+    }
+    return render_template("login.html", error=errors.get(error))
 
 @app.route("/logout")
 def logout():
-    session.clear(); return redirect(url_for("login"))
+    session.clear()
+    return redirect(url_for("login_page"))
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
     user = get_user()
-    return render_template("dashboard.html", user=user, role=user["role"],
-                           leagues=[l.strip() for l in user["leagues"].split(",") if l.strip()])
+    return render_template("dashboard.html", user=user,
+                           role=user["role"],
+                           leagues=get_user_leagues(user))
 
+@app.route("/results/<pin>")
+@login_required
+def results_page(pin):
+    user = get_user()
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT * FROM pins WHERE pin=%s", (pin.upper(),))
+    pin_row = row_to_dict(cur.fetchone(), cur)
+    if not pin_row: cur.close(); conn.close(); abort(404)
+    if not can_access_league(user, pin_row["league"]): abort(403)
+    scan = None
+    if pin_row.get("scan_id"):
+        cur.execute("SELECT * FROM scans WHERE id=%s", (pin_row["scan_id"],))
+        scan = row_to_dict(cur.fetchone(), cur)
+        if scan and scan.get("report_json"):
+            scan["report"] = json.loads(scan["report_json"])
+        if scan and scan.get("roblox_accs"):
+            scan["roblox_accounts"] = json.loads(scan["roblox_accs"])
+    cur.close(); conn.close()
+    return render_template("results.html", pin=pin_row, scan=scan, user=user)
+
+# ── API: Stats ───────────────────────────────────────────────
+@app.route("/api/stats")
+@login_required
+def api_stats():
+    user = get_user(); conn = get_db(); cur = conn.cursor()
+    if user["role"] in ("owner", "admin"):
+        cur.execute("SELECT COUNT(*) FROM scans"); total = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CHEATER'"); cheater = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS'"); susp = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CLEAN'"); clean = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE league='UFF'"); uff_c = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE league='FFL'"); ffl_c = cur.fetchone()[0]
+    else:
+        allowed = get_user_leagues(user)
+        ph = ",".join(["%s"]*len(allowed))
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league IN ({ph})", allowed); total = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CHEATER' AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS' AND league IN ({ph})", allowed); susp = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CLEAN' AND league IN ({ph})", allowed); clean = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='UFF' AND league IN ({ph})", allowed); uff_c = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='FFL' AND league IN ({ph})", allowed); ffl_c = cur.fetchone()[0]
+    cur.close(); conn.close()
+    return jsonify({"total":total,"cheater":cheater,"suspicious":susp,"clean":clean,"uff":uff_c,"ffl":ffl_c})
+
+# ── API: Scans ───────────────────────────────────────────────
 @app.route("/api/scans")
 @login_required
 def api_scans():
     user = get_user(); lf = request.args.get("league","")
     conn = get_db(); cur = conn.cursor()
-    if user["role"] == "owner":
+    if user["role"] in ("owner","admin"):
         if lf and lf != "ALL": cur.execute("SELECT * FROM scans WHERE league=%s ORDER BY submitted DESC LIMIT 100",(lf,))
         else: cur.execute("SELECT * FROM scans ORDER BY submitted DESC LIMIT 100")
     else:
-        allowed = [l.strip() for l in user["leagues"].split(",")]
+        allowed = get_user_leagues(user)
+        if not allowed: cur.close(); conn.close(); return jsonify([])
         if lf and lf in allowed: cur.execute("SELECT * FROM scans WHERE league=%s ORDER BY submitted DESC LIMIT 100",(lf,))
-        elif not lf:
+        else:
             ph = ",".join(["%s"]*len(allowed))
             cur.execute(f"SELECT * FROM scans WHERE league IN ({ph}) ORDER BY submitted DESC LIMIT 100", allowed)
-        else: cur.close(); conn.close(); return jsonify([])
     rows = rows_to_dicts(cur.fetchall(), cur); cur.close(); conn.close()
     return jsonify([{"id":r["id"],"league":r["league"],"pc_user":r["pc_user"],"verdict":r["verdict"],
                      "total_hits":r["total_hits"],"roblox_accs":json.loads(r["roblox_accs"]),
@@ -161,44 +340,20 @@ def api_scan_detail(scan_id):
     cur.execute("SELECT * FROM scans WHERE id=%s",(scan_id,))
     row = row_to_dict(cur.fetchone(), cur); cur.close(); conn.close()
     if not row: abort(404)
-    allowed = [l.strip() for l in user["leagues"].split(",")]
-    if user["role"] != "owner" and row["league"] not in allowed: abort(403)
+    if not can_access_league(user, row["league"]): abort(403)
     return jsonify({"id":row["id"],"league":row["league"],"pc_user":row["pc_user"],
                     "verdict":row["verdict"],"total_hits":row["total_hits"],
                     "roblox_accs":json.loads(row["roblox_accs"]),
                     "report":json.loads(row["report_json"]),
                     "pin_used":row["pin_used"],"submitted":row["submitted"]})
 
-@app.route("/api/stats")
-@login_required
-def api_stats():
-    user = get_user(); conn = get_db(); cur = conn.cursor()
-    if user["role"] == "owner":
-        cur.execute("SELECT COUNT(*) FROM scans"); total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CHEATER'"); cheater = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS'"); susp = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CLEAN'"); clean = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE league='UFF'"); uff_c = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE league='FFL'"); ffl_c = cur.fetchone()[0]
-    else:
-        allowed = [l.strip() for l in user["leagues"].split(",")]
-        ph = ",".join(["%s"]*len(allowed))
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league IN ({ph})",allowed); total = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CHEATER' AND league IN ({ph})",allowed); cheater = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS' AND league IN ({ph})",allowed); susp = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CLEAN' AND league IN ({ph})",allowed); clean = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='UFF' AND league IN ({ph})",allowed); uff_c = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='FFL' AND league IN ({ph})",allowed); ffl_c = cur.fetchone()[0]
-    cur.close(); conn.close()
-    return jsonify({"total":total,"cheater":cheater,"suspicious":susp,"clean":clean,"uff":uff_c,"ffl":ffl_c})
-
+# ── API: Pins ────────────────────────────────────────────────
 @app.route("/api/pins/generate", methods=["POST"])
 @login_required
 def api_gen_pin():
     user = get_user(); data = request.json or {}
     league = data.get("league","").upper()
-    allowed = [l.strip() for l in user["leagues"].split(",")]
-    if league not in allowed and user["role"] != "owner": return jsonify({"error":"Not authorized"}),403
+    if not can_access_league(user, league): return jsonify({"error":"Not authorized"}),403
     if not league: return jsonify({"error":"League required"}),400
     pin = gen_pin()
     expires = (datetime.datetime.utcnow()+datetime.timedelta(hours=4)).strftime("%Y-%m-%d %H:%M:%S")
@@ -206,7 +361,8 @@ def api_gen_pin():
     cur.execute("INSERT INTO pins (pin,league,agent_id,used,created,expires) VALUES (%s,%s,%s,0,%s,%s)",
                 (pin,league,user["id"],now(),expires))
     conn.commit(); cur.close(); conn.close()
-    return jsonify({"pin":pin,"league":league,"expires":expires})
+    return jsonify({"pin":pin,"league":league,"expires":expires,
+                    "results_url": f"/results/{pin}"})
 
 @app.route("/api/pins/validate", methods=["POST"])
 def api_validate_pin():
@@ -233,21 +389,41 @@ def api_submit_scan():
     cur.execute("SELECT * FROM pins WHERE pin=%s AND used=0",(pin,))
     pin_row = row_to_dict(cur.fetchone(), cur)
     if not pin_row: cur.close(); conn.close(); return jsonify({"error":"Invalid PIN"}),401
-    cur.execute("UPDATE pins SET used=1 WHERE pin=%s",(pin,))
     cur.execute("""INSERT INTO scans (league,pc_user,verdict,total_hits,roblox_accs,report_json,pin_used,submitted)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (league or pin_row["league"], data.get("pc_user","unknown"), data.get("verdict","UNKNOWN"),
-                 data.get("total_hits",0), json.dumps(data.get("roblox_accounts",[])),
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (league or pin_row["league"], data.get("pc_user","unknown"),
+                 data.get("verdict","UNKNOWN"), data.get("total_hits",0),
+                 json.dumps(data.get("roblox_accounts",[])),
                  json.dumps(data.get("report",{})), pin, now()))
+    scan_id = cur.fetchone()[0]
+    cur.execute("UPDATE pins SET used=1, scan_id=%s, finished_at=%s WHERE pin=%s",
+                (scan_id, now(), pin))
     conn.commit(); cur.close(); conn.close()
-    return jsonify({"ok":True})
+    return jsonify({"ok":True,"scan_id":scan_id})
 
+@app.route("/api/pins")
+@login_required
+def api_pins():
+    user = get_user(); conn = get_db(); cur = conn.cursor()
+    if user["role"] in ("owner","admin"):
+        cur.execute("""SELECT p.*,u.username as agent FROM pins p
+                       JOIN users u ON p.agent_id=u.id
+                       ORDER BY p.created DESC LIMIT 100""")
+    else:
+        cur.execute("""SELECT p.*,u.username as agent FROM pins p
+                       JOIN users u ON p.agent_id=u.id
+                       WHERE p.agent_id=%s ORDER BY p.created DESC LIMIT 100""",
+                    (user["id"],))
+    rows = rows_to_dicts(cur.fetchall(), cur); cur.close(); conn.close()
+    return jsonify(rows)
+
+# ── API: Admin ───────────────────────────────────────────────
 @app.route("/api/admin/users")
 @login_required
 @owner_required
 def api_admin_users():
     conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT id,username,role,leagues,created FROM users ORDER BY created DESC")
+    cur.execute("SELECT id,discord_id,username,avatar,role,leagues,created FROM users ORDER BY created DESC")
     rows = rows_to_dicts(cur.fetchall(), cur); cur.close(); conn.close()
     return jsonify(rows)
 
@@ -270,18 +446,6 @@ def api_admin_delete_user(uid):
     cur.execute("DELETE FROM users WHERE id=%s",(uid,))
     conn.commit(); cur.close(); conn.close()
     return jsonify({"ok":True})
-
-@app.route("/api/pins")
-@login_required
-def api_pins():
-    user = get_user(); conn = get_db(); cur = conn.cursor()
-    if user["role"] == "owner":
-        cur.execute("SELECT p.*,u.username as agent FROM pins p JOIN users u ON p.agent_id=u.id ORDER BY p.created DESC LIMIT 50")
-    else:
-        cur.execute("SELECT p.*,u.username as agent FROM pins p JOIN users u ON p.agent_id=u.id WHERE p.agent_id=%s ORDER BY p.created DESC LIMIT 50",
-                    (user["id"],))
-    rows = rows_to_dicts(cur.fetchall(), cur); cur.close(); conn.close()
-    return jsonify(rows)
 
 with app.app_context():
     init_db()
