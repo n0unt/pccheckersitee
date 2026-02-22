@@ -235,25 +235,36 @@ def discord_callback():
     avatar      = discord_user.get("avatar", "")
 
     # Check guild roles via bot
-    role        = "pending"
-    leagues     = ""
+    role         = "pending"
+    leagues      = ""
+    bot_error    = None
     if DISCORD_GUILD_ID and DISCORD_BOT_TOKEN:
         member = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
+        bot_error = member.get("code") or member.get("error")
         member_roles = member.get("roles", [])
+
+        # ROLE_LITE = owner/dev role → full owner access
         if ROLE_LITE in member_roles:
-            role = "admin"
+            role    = "owner"
+            leagues = "UFF,FFL"
+
+        # UFF or FFL role = regular agent access
         if ROLE_UFF in member_roles:
             leagues += "UFF,"
+            if role == "pending": role = "agent"
         if ROLE_FFL in member_roles:
             leagues += "FFL,"
-        # Owner override
-        if ROLE_LITE in member_roles and ROLE_UFF in member_roles and ROLE_FFL in member_roles:
-            role = "owner"
-        leagues = leagues.rstrip(",")
-        if not leagues and role == "admin":
-            leagues = "UFF,FFL"
-    
+            if role == "pending": role = "agent"
+
+        leagues = leagues.strip(",")
+
+    # If bot failed to reach Discord (bot not in server / missing intent),
+    # log the error and allow the login but flag it
     if role == "pending":
+        if bot_error:
+            app.logger.error(f"Bot member lookup failed for {discord_id}: {bot_error}")
+            # Still block — but show a more helpful error
+            return redirect(url_for("login_page") + f"?error=no_access&detail={urllib.parse.quote(str(bot_error))}")
         return redirect(url_for("login_page") + "?error=no_access")
 
     # Upsert user
@@ -503,7 +514,7 @@ def download_page():
         meta = json.loads(row[0]) if row else {}
         cur.close(); conn.close()
     except Exception: pass
-    has_exe = bool(meta.get("b64",""))
+    has_exe = bool(meta.get("b64") or meta.get("url"))
     user = get_user() if "user_id" in session else None
     return render_template("download.html",
                            has_exe=has_exe,
@@ -569,6 +580,25 @@ def download_exe():
     fname = meta.get("filename","LiteScanner.exe")
     return Response(data, mimetype="application/octet-stream",
                     headers={"Content-Disposition":f"attachment; filename={fname}"})
+
+
+@app.route("/debug/discord/<discord_id>")
+@login_required
+@owner_required
+def debug_discord(discord_id):
+    """Owner-only: check what roles the bot sees for a Discord user."""
+    member = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
+    bot_self = _discord_get("/users/@me", bot=True)
+    return jsonify({
+        "guild_id": DISCORD_GUILD_ID,
+        "bot_user": bot_self.get("username"),
+        "bot_id":   bot_self.get("id"),
+        "member":   member,
+        "roles_found": member.get("roles",[]),
+        "ROLE_LITE_match": ROLE_LITE in member.get("roles",[]),
+        "ROLE_UFF_match":  ROLE_UFF  in member.get("roles",[]),
+        "ROLE_FFL_match":  ROLE_FFL  in member.get("roles",[]),
+    })
 
 with app.app_context():
     init_db()
