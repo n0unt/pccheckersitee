@@ -34,7 +34,10 @@ def _ssl_ctx():
 
 def _discord_get(path, token=None, bot=False):
     url = f"https://discord.com/api/v10{path}"
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+    }
     if bot:
         headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
     elif token:
@@ -53,11 +56,18 @@ def _discord_post(path, data, token=None, bot=False):
     url = f"https://discord.com/api/v10{path}"
     if bot:
         payload = json.dumps(data).encode()
-        headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
+            "Content-Type": "application/json",
+            "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+        }
     else:
         # OAuth2 token exchange must be form-encoded
         payload = urllib.parse.urlencode(data).encode()
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+        }
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
