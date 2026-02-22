@@ -257,22 +257,33 @@ def send_website(results, pin):
     """Submit scan results to the web dashboard."""
     try:
         url = WEBSITE_URL.rstrip("/") + "/api/submit"
-        # Use the rich report dict if available, otherwise build it
-        report = results.get("report") or {
-            "shellbag_hits":  results.get("shellbag_hits",0),
-            "bam_hits":       results.get("bam_hits",0),
-            "prefetch_hits":  results.get("prefetch_hits",0),
-            "appcompat_hits": results.get("appcompat_hits",0),
-            "cheat_hits":     results.get("cheat_hits",0),
-            "yara_hits":      results.get("yara_hits",0),
-            "unsigned_count": len(results.get("unsigned_hits",[])) if isinstance(results.get("unsigned_hits"),list) else 0,
-            "sysmain_hits":   results.get("sysmain_hits",0),
-            "sysmain_autofail": results.get("sysmain_autofail",False),
-            "discord_accounts": results.get("discord_accounts",[]),
-            "fastflags":      results.get("fastflag_hits",[]),
-            "full_report":    results.get("full_report",""),
-        }
-        status, body = _make_request(url, {
+
+        # Build report — cap full_report at 50kb to keep payload manageable
+        full_rep = results.get("full_report","")
+        if len(full_rep) > 50000:
+            full_rep = full_rep[:50000] + "\n[truncated]"
+
+        report = results.get("report") or {}
+        # Always ensure key fields are present
+        report.setdefault("shellbag_hits",  results.get("shellbag_hits",0))
+        report.setdefault("bam_hits",       results.get("bam_hits",0))
+        report.setdefault("prefetch_hits",  results.get("prefetch_hits",0))
+        report.setdefault("appcompat_hits", results.get("appcompat_hits",0))
+        report.setdefault("cheat_hits",     results.get("cheat_hits",0))
+        report.setdefault("yara_hits",      results.get("yara_hits",0))
+        report.setdefault("sysmain_hits",   results.get("sysmain_hits",0))
+        report.setdefault("sysmain_autofail", results.get("sysmain_autofail",False))
+        report.setdefault("discord_accounts", results.get("discord_accounts",[]))
+        report.setdefault("fastflags",      results.get("fastflag_hits",[]) or [])
+        report["full_report"] = full_rep
+
+        # Truncate raw text fields inside report too
+        for key in ("shellbags_raw","bam_raw","prefetch_raw","appcompat_raw",
+                    "roblox_raw","cheat_raw","unsigned_raw","recycle_raw","sysmain_raw"):
+            if key in report and isinstance(report[key], str) and len(report[key]) > 8000:
+                report[key] = report[key][:8000] + "\n[truncated]"
+
+        payload = {
             "pin":             pin,
             "league":          results.get("league","?"),
             "pc_user":         current_user(),
@@ -280,8 +291,13 @@ def send_website(results, pin):
             "total_hits":      results.get("total_hits",0),
             "roblox_accounts": results.get("roblox_accounts",[]),
             "report":          report,
-        }, timeout=30)
-        return status == 200, body.get("error","")
+        }
+
+        status, body = _make_request(url, payload, timeout=45)
+        if status == 200:
+            return True, ""
+        else:
+            return False, f"HTTP {status}: {body.get('error', str(body)[:80])}"
     except Exception as e:
         return False, str(e)
 
