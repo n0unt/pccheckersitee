@@ -4,135 +4,147 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lite — Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0e1117;--bg2:#161b22;--bg3:#1c2333;--bg4:#21262d;
-  --bdr:#30363d;--bdr2:#3d444d;
-  --fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
-  --green:#2aff8f;--green-dim:rgba(42,255,143,0.15);
-  --red:#f85149;--red-dim:rgba(248,81,73,0.12);
-  --amber:#e3b341;--amber-dim:rgba(227,179,65,0.12);
-  --blue:#58a6ff;--side:220px;
+  --bg:#080b10;--surface:#0f1420;--surface2:#131925;--surface3:#1a2235;--surface4:#1f2840;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);--border3:rgba(255,255,255,0.04);
+  --fg:#f0f4ff;--fg2:#8892a4;--fg3:#3d4a5c;
+  --green:#00f5a0;--green-glow:rgba(0,245,160,0.12);--green-dim:rgba(0,245,160,0.08);
+  --red:#ff4d6d;--red-dim:rgba(255,77,109,0.08);
+  --amber:#ffb830;--amber-dim:rgba(255,184,48,0.08);
+  --blue:#4d9fff;--blue-dim:rgba(77,159,255,0.08);
+  --side:230px;
 }
-html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif;overflow:hidden;}
-.shell{display:flex;height:100vh;}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
+/* Ambient background */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 100% 60% at 10% 0%, rgba(0,245,160,0.03) 0%,transparent 50%),radial-gradient(ellipse 80% 80% at 90% 100%, rgba(77,159,255,0.03) 0%,transparent 50%);pointer-events:none;z-index:0;}
+.shell{display:flex;height:100vh;position:relative;z-index:1;}
 
-/* Sidebar */
-.sidebar{width:var(--side);background:var(--bg2);border-right:1px solid var(--bdr);display:flex;flex-direction:column;flex-shrink:0;}
-.sidebar-top{padding:16px;border-bottom:1px solid var(--bdr);}
+/* ── Sidebar ── */
+.sidebar{width:var(--side);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.sidebar-top{padding:18px 16px;border-bottom:1px solid var(--border);}
 .brand{display:flex;align-items:center;gap:10px;}
-.brand-icon{width:30px;height:30px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;flex-shrink:0;}
-.brand-name{font-size:14px;font-weight:700;color:var(--fg);}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--green),#00c97a);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#000;box-shadow:0 0 16px var(--green-glow);flex-shrink:0;}
+.brand-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
 .brand-sub{font-size:10px;color:var(--fg2);}
-.nav{flex:1;padding:8px 0;overflow-y:auto;}
-.nav-section{font-size:10px;font-weight:600;letter-spacing:0.08em;color:var(--fg3);text-transform:uppercase;padding:12px 16px 4px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:13px;color:var(--fg2);cursor:pointer;transition:all 0.1s;border-left:2px solid transparent;user-select:none;}
-.nav-item:hover{color:var(--fg);background:var(--bg3);}
-.nav-item.active{color:var(--green);background:var(--green-dim);border-left-color:var(--green);}
-.nav-item .ico{font-size:14px;width:16px;text-align:center;}
-.sidebar-foot{padding:12px 16px;border-top:1px solid var(--bdr);}
-.user-chip{display:flex;align-items:center;gap:8px;}
-.user-av{width:28px;height:28px;border-radius:50%;background:var(--bg4);border:1px solid var(--bdr2);overflow:hidden;flex-shrink:0;}
+.nav{flex:1;padding:10px 8px;overflow-y:auto;}
+.nav-sect{font-size:9px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--fg3);padding:10px 8px 4px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;font-size:13px;color:var(--fg2);cursor:pointer;transition:all 0.15s;user-select:none;margin-bottom:1px;}
+.nav-item:hover{color:var(--fg);background:var(--surface3);}
+.nav-item.active{color:var(--green);background:var(--green-dim);}
+.nav-icon{font-size:13px;width:16px;text-align:center;opacity:0.7;}
+.nav-item.active .nav-icon{opacity:1;}
+.sidebar-foot{padding:12px 10px;border-top:1px solid var(--border);}
+.user-row{display:flex;align-items:center;gap:9px;}
+.user-av{width:30px;height:30px;border-radius:50%;background:var(--surface3);border:1px solid var(--border2);overflow:hidden;flex-shrink:0;}
 .user-av img{width:100%;height:100%;object-fit:cover;}
-.user-av-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--fg2);}
-.user-name{font-size:12px;font-weight:500;}
+.user-av-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--green);}
+.user-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .user-role{font-size:10px;color:var(--fg2);}
-.logout{margin-left:auto;color:var(--fg3);font-size:18px;text-decoration:none;transition:color 0.1s;}
-.logout:hover{color:var(--red);}
+.logout-btn{margin-left:auto;background:none;border:none;color:var(--fg3);font-size:16px;cursor:pointer;padding:4px;border-radius:6px;transition:color 0.15s;text-decoration:none;display:flex;align-items:center;}
+.logout-btn:hover{color:var(--red);}
 
-/* Content */
+/* ── Main ── */
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-.topbar{height:48px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0;}
-.page-title{font-size:14px;font-weight:600;}
-.page-badge{font-size:10px;font-weight:600;letter-spacing:0.06em;padding:2px 8px;background:var(--bg4);border:1px solid var(--bdr2);color:var(--fg2);}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.filter-sel{background:var(--bg3);border:1px solid var(--bdr);color:var(--fg);font-family:'Inter',sans-serif;font-size:11px;padding:5px 10px;outline:none;cursor:pointer;}
-
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0;}
+.page-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
+.page-tag{font-size:9px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--surface3);border:1px solid var(--border2);color:var(--fg2);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.filter-sel{background:var(--surface3);border:1px solid var(--border2);border-radius:8px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 10px;outline:none;cursor:pointer;}
 .main{flex:1;overflow-y:auto;padding:24px;}
 .panel{display:none;}
 .panel.active{display:block;}
 
-/* Stats */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.stat-card{background:var(--bg2);border:1px solid var(--bdr);padding:16px 18px;position:relative;overflow:hidden;}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
-.stat-card.red::before{background:var(--red);}
-.stat-card.amber::before{background:var(--amber);}
-.stat-card.green::before{background:var(--green);}
-.stat-card.blue::before{background:var(--blue);}
-.stat-label{font-size:10px;font-weight:600;letter-spacing:0.06em;color:var(--fg2);text-transform:uppercase;margin-bottom:8px;}
-.stat-num{font-size:28px;font-weight:700;letter-spacing:-0.02em;}
-.stat-sub{font-size:10px;color:var(--fg3);margin-top:3px;}
+/* ── Stats ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color 0.2s;}
+.stat-card:hover{border-color:var(--border2);}
+.stat-glow{position:absolute;top:0;left:0;right:0;height:1px;}
+.stat-card.red .stat-glow{background:linear-gradient(90deg,transparent,var(--red),transparent);}
+.stat-card.amber .stat-glow{background:linear-gradient(90deg,transparent,var(--amber),transparent);}
+.stat-card.green .stat-glow{background:linear-gradient(90deg,transparent,var(--green),transparent);}
+.stat-card.blue .stat-glow{background:linear-gradient(90deg,transparent,var(--blue),transparent);}
+.stat-label{font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg2);margin-bottom:10px;}
+.stat-num{font-family:'Syne',sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.02em;}
+.stat-card.red .stat-num{color:var(--red);}
+.stat-card.amber .stat-num{color:var(--amber);}
+.stat-card.green .stat-num{color:var(--green);}
+.stat-card.blue .stat-num{color:var(--fg);}
+.stat-sub{font-size:10px;color:var(--fg3);margin-top:4px;}
 
-/* League split */
-.league-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
-.league-card{background:var(--bg2);border:1px solid var(--bdr);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
-.league-name{font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--fg2);text-transform:uppercase;}
-.league-count{font-size:24px;font-weight:700;color:var(--fg);}
+/* ── League cards ── */
+.league-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.league-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;}
+.league-label{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg2);margin-bottom:4px;}
+.league-count{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;}
 
-/* Section */
-.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+/* ── Section ── */
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .section-title{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg2);}
+.btn-sm{background:var(--surface3);border:1px solid var(--border2);border-radius:8px;color:var(--fg2);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 12px;cursor:pointer;transition:all 0.15s;}
+.btn-sm:hover{color:var(--fg);border-color:var(--border2);}
 
-/* Table */
-.table-wrap{background:var(--bg2);border:1px solid var(--bdr);overflow:hidden;}
+/* ── Table ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
 table{width:100%;border-collapse:collapse;}
-thead th{text-align:left;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg2);padding:9px 14px;border-bottom:1px solid var(--bdr);background:var(--bg3);}
-tbody tr{border-bottom:1px solid var(--bdr);cursor:pointer;transition:background 0.08s;}
+thead th{text-align:left;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg3);padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border3);cursor:pointer;transition:background 0.1s;}
 tbody tr:last-child{border-bottom:none;}
-tbody tr:hover{background:var(--bg3);}
-td{padding:11px 14px;font-size:12px;color:var(--fg);}
-td.mono{font-family:monospace;font-size:11px;}
+tbody tr:hover{background:var(--surface2);}
+td{padding:12px 16px;font-size:12px;}
+td.mono{font-family:'DM Mono',monospace;font-size:11px;}
 td.dim{color:var(--fg2);font-size:11px;}
 
-/* Verdict pills */
-.vp{display:inline-block;font-size:10px;font-weight:600;letter-spacing:0.04em;padding:2px 8px;text-transform:uppercase;}
-.vp.CHEATER{color:var(--red);background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);}
-.vp.SUSPICIOUS{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(227,179,65,0.3);}
-.vp.CLEAN{color:var(--green);background:var(--green-dim);border:1px solid rgba(42,255,143,0.3);}
-.vp.UNKNOWN{color:var(--fg2);background:var(--bg4);border:1px solid var(--bdr);}
+/* ── Verdict pills ── */
+.vp{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;padding:3px 10px;border-radius:20px;}
+.vp::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.vp.CHEATER{color:var(--red);background:var(--red-dim);border:1px solid rgba(255,77,109,0.2);}
+.vp.CHEATER::before{background:var(--red);box-shadow:0 0 4px var(--red);}
+.vp.SUSPICIOUS{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(255,184,48,0.2);}
+.vp.SUSPICIOUS::before{background:var(--amber);}
+.vp.CLEAN{color:var(--green);background:var(--green-dim);border:1px solid rgba(0,245,160,0.2);}
+.vp.CLEAN::before{background:var(--green);box-shadow:0 0 4px var(--green);}
+.vp.UNKNOWN{color:var(--fg2);background:var(--surface3);border:1px solid var(--border);}
+.vp.UNKNOWN::before{background:var(--fg3);}
 
-/* PIN panel */
-.pin-gen-card{background:var(--bg2);border:1px solid var(--bdr);padding:24px;margin-bottom:20px;max-width:480px;}
-.pin-gen-title{font-size:14px;font-weight:600;margin-bottom:4px;}
-.pin-gen-sub{font-size:12px;color:var(--fg2);margin-bottom:16px;}
+/* ── PIN panel ── */
+.pin-gen-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px;max-width:520px;}
+.pin-gen-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;}
+.pin-gen-sub{font-size:12px;color:var(--fg2);line-height:1.6;margin-bottom:18px;}
 .pin-row{display:flex;gap:8px;}
-.league-sel,.btn-input{background:var(--bg3);border:1px solid var(--bdr);color:var(--fg);font-family:'Inter',sans-serif;font-size:12px;padding:8px 12px;outline:none;cursor:pointer;flex:1;}
-.btn{background:var(--green);color:#000;border:none;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:8px 16px;cursor:pointer;transition:opacity 0.1s;white-space:nowrap;}
-.btn:hover{opacity:0.85;}
-.btn-ghost{background:transparent;color:var(--fg2);border:1px solid var(--bdr);font-family:'Inter',sans-serif;font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.1s;}
-.btn-ghost:hover{color:var(--fg);border-color:var(--bdr2);}
-.pin-result{margin-top:16px;display:none;}
+.pin-sel{background:var(--surface3);border:1px solid var(--border2);border-radius:10px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:12px;padding:9px 12px;outline:none;cursor:pointer;flex:1;}
+.btn-primary{background:var(--green);color:#000;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;padding:9px 18px;cursor:pointer;transition:all 0.15s;white-space:nowrap;box-shadow:0 0 20px var(--green-glow);}
+.btn-primary:hover{opacity:0.9;transform:translateY(-1px);}
+.pin-result{margin-top:18px;display:none;animation:rise 0.3s cubic-bezier(0.16,1,0.3,1);}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .pin-result.show{display:block;}
-.pin-code-wrap{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
-.pin-code{font-family:monospace;font-size:24px;font-weight:700;letter-spacing:0.18em;color:var(--green);background:var(--bg3);border:1px solid rgba(42,255,143,0.3);padding:12px 18px;}
-.copy-btn{background:var(--bg4);border:1px solid var(--bdr);color:var(--fg2);font-size:11px;padding:8px 12px;cursor:pointer;transition:all 0.1s;font-family:'Inter',sans-serif;}
+.pin-display{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.pin-code{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;letter-spacing:0.2em;color:var(--green);background:var(--green-dim);border:1px solid rgba(0,245,160,0.2);border-radius:12px;padding:12px 20px;text-shadow:0 0 20px rgba(0,245,160,0.4);}
+.copy-btn{background:var(--surface3);border:1px solid var(--border2);border-radius:10px;color:var(--fg2);font-family:'DM Sans',sans-serif;font-size:11px;padding:9px 14px;cursor:pointer;transition:all 0.15s;}
 .copy-btn:hover{color:var(--fg);}
-.pin-meta{font-size:11px;color:var(--fg2);}
-.pin-link{font-size:11px;color:var(--blue);margin-top:4px;}
-.pin-link a{color:var(--blue);text-decoration:none;}
+.pin-meta{font-size:11px;color:var(--fg2);line-height:1.8;}
+.pin-link a{color:var(--blue);text-decoration:none;font-size:11px;}
 .pin-link a:hover{text-decoration:underline;}
-.used-tag{font-size:10px;font-weight:600;padding:2px 7px;border:1px solid var(--bdr);color:var(--fg3);}
-.used-tag.active{color:var(--green);border-color:rgba(42,255,143,0.3);background:var(--green-dim);}
-.used-tag.used{color:var(--fg3);border-color:var(--bdr);}
+.status-pill{display:inline-block;font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;}
+.status-pill.active{color:var(--green);background:var(--green-dim);border:1px solid rgba(0,245,160,0.2);}
+.status-pill.used{color:var(--fg3);background:var(--surface3);border:1px solid var(--border);}
 
-/* Admin */
-.user-role-sel{background:var(--bg3);border:1px solid var(--bdr);color:var(--fg);font-family:'Inter',sans-serif;font-size:11px;padding:3px 7px;outline:none;}
-.act-btn{background:transparent;border:none;color:var(--fg2);font-family:'Inter',sans-serif;font-size:11px;cursor:pointer;padding:3px 8px;transition:color 0.1s;}
-.act-btn:hover{color:var(--fg);}
-.act-btn.del:hover{color:var(--red);}
-.avatar-sm{width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;}
+/* ── Admin ── */
+.role-sel{background:var(--surface3);border:1px solid var(--border);border-radius:7px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 8px;outline:none;}
+.action-btn{background:none;border:none;color:var(--fg2);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;padding:3px 8px;border-radius:6px;transition:all 0.1s;}
+.action-btn:hover{color:var(--fg);background:var(--surface3);}
+.action-btn.del:hover{color:var(--red);}
+.av-sm{width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:6px;}
 
-/* Toast */
-.toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--fg);font-size:12px;padding:10px 16px;z-index:200;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none;}
-.toast.show{opacity:1;transform:translateY(0);}
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface3);border:1px solid var(--border2);border-radius:12px;color:var(--fg);font-size:12px;padding:10px 16px;z-index:999;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,0.3);}
+.toast.show{opacity:1;transform:none;}
 
-/* Scrollbar */
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--bg4);}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:4px;}
 </style>
 </head>
 <body>
@@ -140,37 +152,35 @@ td.dim{color:var(--fg2);font-size:11px;}
 <nav class="sidebar">
   <div class="sidebar-top">
     <div class="brand">
-      <div class="brand-icon">L</div>
+      <div class="brand-mark">L</div>
       <div><div class="brand-name">Lite</div><div class="brand-sub">Forensic Portal</div></div>
     </div>
   </div>
   <div class="nav">
-    <div class="nav-section">Overview</div>
-    <div class="nav-item active" onclick="switchPanel('overview',this)"><span class="ico">◈</span> Dashboard</div>
-    <div class="nav-section">Leagues</div>
-    <div class="nav-item" onclick="switchPanel('uff',this)"><span class="ico">◉</span> UFF Scans</div>
-    <div class="nav-item" onclick="switchPanel('ffl',this)"><span class="ico">◉</span> FFL Scans</div>
+    <div class="nav-sect">Overview</div>
+    <div class="nav-item active" onclick="go('overview',this)"><span class="nav-icon">⬡</span> Dashboard</div>
+    <div class="nav-sect">Leagues</div>
+    <div class="nav-item" onclick="go('uff',this)"><span class="nav-icon">◉</span> UFF Scans</div>
+    <div class="nav-item" onclick="go('ffl',this)"><span class="nav-icon">◉</span> FFL Scans</div>
     {% if role in ('owner','admin') %}
-    <div class="nav-item" onclick="switchPanel('all',this)"><span class="ico">◈</span> All Scans</div>
+    <div class="nav-item" onclick="go('all',this)"><span class="nav-icon">⬡</span> All Scans</div>
     {% endif %}
-    <div class="nav-section">Tools</div>
-    <div class="nav-item" onclick="switchPanel('pins',this)"><span class="ico">◉</span> PIN Manager</div>
+    <div class="nav-sect">Tools</div>
+    <div class="nav-item" onclick="go('pins',this)"><span class="nav-icon">◈</span> PIN Manager</div>
     {% if role in ('owner','admin') %}
-    <div class="nav-section">Admin</div>
-    <div class="nav-item" onclick="switchPanel('admin',this)"><span class="ico">◉</span> Users</div>
+    <div class="nav-sect">Admin</div>
+    <div class="nav-item" onclick="go('admin',this)"><span class="nav-icon">◈</span> Users</div>
     {% endif %}
   </div>
   <div class="sidebar-foot">
-    <div class="user-chip">
+    <div class="user-row">
       <div class="user-av">
-        {% if session.get('avatar') %}
-        <img src="{{ session.get('avatar') }}" alt="">
-        {% else %}
-        <div class="user-av-placeholder">{{ user.username[0].upper() }}</div>
-        {% endif %}
+        {% set av = session.get('avatar','') if session else '' %}
+        {% if av %}<img src="{{ av }}" alt="">
+        {% else %}<div class="user-av-ph">{{ user.username[0].upper() }}</div>{% endif %}
       </div>
-      <div><div class="user-name">{{ user.username }}</div><div class="user-role">{{ user.role }}</div></div>
-      <a href="/logout" class="logout" title="Sign out">↪</a>
+      <div style="min-width:0"><div class="user-name">{{ user.username }}</div><div class="user-role">{{ user.role }}</div></div>
+      <a href="/logout" class="logout-btn" title="Sign out">↪</a>
     </div>
   </div>
 </nav>
@@ -178,10 +188,10 @@ td.dim{color:var(--fg2);font-size:11px;}
 <div class="content">
   <div class="topbar">
     <div class="page-title" id="page-title">Dashboard</div>
-    <div class="page-badge" id="page-badge">OVERVIEW</div>
+    <div class="page-tag" id="page-tag">OVERVIEW</div>
     <div class="topbar-right">
-      <select class="filter-sel" id="global-filter" onchange="applyFilter()">
-        <option value="ALL">All Leagues</option>
+      <select class="filter-sel" id="lf" onchange="applyFilter()">
+        <option value="">All Leagues</option>
         <option value="UFF">UFF</option>
         <option value="FFL">FFL</option>
       </select>
@@ -193,39 +203,39 @@ td.dim{color:var(--fg2);font-size:11px;}
     <!-- OVERVIEW -->
     <div class="panel active" id="panel-overview">
       <div class="stats-row">
-        <div class="stat-card red"><div class="stat-label">Cheaters</div><div class="stat-num" id="s-cheater">—</div><div class="stat-sub">Flagged</div></div>
-        <div class="stat-card amber"><div class="stat-label">Suspicious</div><div class="stat-num" id="s-susp">—</div><div class="stat-sub">Needs review</div></div>
-        <div class="stat-card green"><div class="stat-label">Clean</div><div class="stat-num" id="s-clean">—</div><div class="stat-sub">No findings</div></div>
-        <div class="stat-card blue"><div class="stat-label">Total Scans</div><div class="stat-num" id="s-total">—</div><div class="stat-sub">All time</div></div>
+        <div class="stat-card red"><div class="stat-glow"></div><div class="stat-label">Cheaters</div><div class="stat-num" id="s-cheater">—</div><div class="stat-sub">Total flagged</div></div>
+        <div class="stat-card amber"><div class="stat-glow"></div><div class="stat-label">Suspicious</div><div class="stat-num" id="s-susp">—</div><div class="stat-sub">Needs review</div></div>
+        <div class="stat-card green"><div class="stat-glow"></div><div class="stat-label">Clean</div><div class="stat-num" id="s-clean">—</div><div class="stat-sub">No findings</div></div>
+        <div class="stat-card blue"><div class="stat-glow"></div><div class="stat-label">Total</div><div class="stat-num" id="s-total">—</div><div class="stat-sub">All scans</div></div>
       </div>
       {% if role in ('owner','admin') %}
-      <div class="league-split">
-        <div class="league-card"><div><div class="league-name">UFF</div><div style="font-size:11px;color:var(--fg2);margin-top:2px;">Total scans</div></div><div class="league-count" id="s-uff">—</div></div>
-        <div class="league-card"><div><div class="league-name">FFL</div><div style="font-size:11px;color:var(--fg2);margin-top:2px;">Total scans</div></div><div class="league-count" id="s-ffl">—</div></div>
+      <div class="league-row">
+        <div class="league-card"><div><div class="league-label">UFF</div><div style="font-size:11px;color:var(--fg2)">Total scans</div></div><div class="league-count" id="s-uff">—</div></div>
+        <div class="league-card"><div><div class="league-label">FFL</div><div style="font-size:11px;color:var(--fg2)">Total scans</div></div><div class="league-count" id="s-ffl">—</div></div>
       </div>
       {% endif %}
       <div class="section-head"><div class="section-title">Recent Scans</div></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>PC User</th><th>League</th><th>Verdict</th><th>Hits</th><th>Roblox</th><th>Submitted</th><th>Results</th></tr></thead>
-        <tbody id="overview-tbody"><tr><td colspan="7" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <thead><tr><th>PC User</th><th>League</th><th>Verdict</th><th>Hits</th><th>Roblox Accounts</th><th>Submitted</th><th>Results</th></tr></thead>
+        <tbody id="overview-tbody"><tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
 
     <!-- UFF -->
     <div class="panel" id="panel-uff">
-      <div class="section-head"><div class="section-title">UFF — Scan Results</div></div>
+      <div class="section-head"><div class="section-title">UFF Scan Results</div></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>PC User</th><th>Verdict</th><th>Hits</th><th>Roblox</th><th>Submitted</th><th>Results</th></tr></thead>
-        <tbody id="uff-tbody"><tr><td colspan="6" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <thead><tr><th>PC User</th><th>Verdict</th><th>Hits</th><th>Roblox Accounts</th><th>Submitted</th><th>Results</th></tr></thead>
+        <tbody id="uff-tbody"><tr><td colspan="6" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
 
     <!-- FFL -->
     <div class="panel" id="panel-ffl">
-      <div class="section-head"><div class="section-title">FFL — Scan Results</div></div>
+      <div class="section-head"><div class="section-title">FFL Scan Results</div></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>PC User</th><th>Verdict</th><th>Hits</th><th>Roblox</th><th>Submitted</th><th>Results</th></tr></thead>
-        <tbody id="ffl-tbody"><tr><td colspan="6" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <thead><tr><th>PC User</th><th>Verdict</th><th>Hits</th><th>Roblox Accounts</th><th>Submitted</th><th>Results</th></tr></thead>
+        <tbody id="ffl-tbody"><tr><td colspan="6" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
 
@@ -234,8 +244,8 @@ td.dim{color:var(--fg2);font-size:11px;}
     <div class="panel" id="panel-all">
       <div class="section-head"><div class="section-title">All Scans — Admin View</div></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>PC User</th><th>League</th><th>Verdict</th><th>Hits</th><th>Roblox</th><th>Submitted</th><th>Results</th></tr></thead>
-        <tbody id="all-tbody"><tr><td colspan="7" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <thead><tr><th>PC User</th><th>League</th><th>Verdict</th><th>Hits</th><th>Roblox Accounts</th><th>Submitted</th><th>Results</th></tr></thead>
+        <tbody id="all-tbody"><tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
     {% endif %}
@@ -243,16 +253,14 @@ td.dim{color:var(--fg2);font-size:11px;}
     <!-- PINS -->
     <div class="panel" id="panel-pins">
       <div class="pin-gen-card">
-        <div class="pin-gen-title">Generate scan PIN</div>
-        <div class="pin-gen-sub">Create a one-time PIN to give to the player being screenshared. Expires in 4 hours, deleted after 3 days.</div>
+        <div class="pin-gen-title">Generate Scan PIN</div>
+        <div class="pin-gen-sub">One-time PIN for the player being screenshared. Expires after 4 hours, auto-deleted after 3 days.</div>
         <div class="pin-row">
-          <select class="league-sel" id="pin-league">
-            {% for l in leagues %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
-          </select>
-          <button class="btn" onclick="generatePin()">Generate PIN</button>
+          <select class="pin-sel" id="pin-league">{% for l in leagues %}<option value="{{ l }}">{{ l }}</option>{% endfor %}</select>
+          <button class="btn-primary" onclick="genPin()">Generate PIN</button>
         </div>
         <div class="pin-result" id="pin-result">
-          <div class="pin-code-wrap">
+          <div class="pin-display">
             <div class="pin-code" id="pin-code">————————</div>
             <button class="copy-btn" onclick="copyPin()">Copy</button>
           </div>
@@ -260,13 +268,10 @@ td.dim{color:var(--fg2);font-size:11px;}
           <div class="pin-link" id="pin-link"></div>
         </div>
       </div>
-      <div class="section-head">
-        <div class="section-title">PIN History</div>
-        <button class="btn-ghost" onclick="loadPins()">Refresh</button>
-      </div>
+      <div class="section-head"><div class="section-title">PIN History</div><button class="btn-sm" onclick="loadPins()">Refresh</button></div>
       <div class="table-wrap"><table>
         <thead><tr><th>PIN</th><th>League</th><th>Status</th><th>Agent</th><th>Created</th><th>Expires</th><th>Finished</th><th>Results</th></tr></thead>
-        <tbody id="pins-tbody"><tr><td colspan="8" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <tbody id="pins-tbody"><tr><td colspan="8" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
 
@@ -276,7 +281,7 @@ td.dim{color:var(--fg2);font-size:11px;}
       <div class="section-head"><div class="section-title">User Management</div></div>
       <div class="table-wrap"><table>
         <thead><tr><th>User</th><th>Discord ID</th><th>Role</th><th>Leagues</th><th>Joined</th><th>Actions</th></tr></thead>
-        <tbody id="admin-tbody"><tr><td colspan="6" style="padding:30px;text-align:center;color:var(--fg2)">Loading…</td></tr></tbody>
+        <tbody id="admin-tbody"><tr><td colspan="6" style="padding:32px;text-align:center;color:var(--fg3)">Loading…</td></tr></tbody>
       </table></div>
     </div>
     {% endif %}
@@ -284,115 +289,98 @@ td.dim{color:var(--fg2);font-size:11px;}
   </div>
 </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
 const ROLE = "{{ role }}";
 const LEAGUES = {{ leagues | tojson }};
-let currentPanel = 'overview';
 let lastPin = '';
-
-const PAGE_INFO = {
-  overview:['Dashboard','OVERVIEW'],uff:['UFF Scans','UFF'],
-  ffl:['FFL Scans','FFL'],all:['All Scans','ADMIN'],
-  pins:['PIN Manager','TOOLS'],admin:['User Management','ADMIN'],
+const INFO = {
+  overview:['Dashboard','OVERVIEW'],uff:['UFF Scans','UFF'],ffl:['FFL Scans','FFL'],
+  all:['All Scans','ADMIN'],pins:['PIN Manager','TOOLS'],admin:['Users','ADMIN']
 };
 
-function switchPanel(key, el) {
+function go(key, el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('panel-'+key).classList.add('active');
   if(el) el.classList.add('active');
-  currentPanel = key;
-  const [t,b] = PAGE_INFO[key]||[key,key];
-  document.getElementById('page-title').textContent = t;
-  document.getElementById('page-badge').textContent = b;
+  const [t,b]=INFO[key]||[key,key];
+  document.getElementById('page-title').textContent=t;
+  document.getElementById('page-tag').textContent=b;
   if(key==='overview'){loadStats();loadScans('overview','');}
   else if(key==='uff') loadScans('uff','UFF');
   else if(key==='ffl') loadScans('ffl','FFL');
   else if(key==='all') loadScans('all','');
-  else if(key==='pins'){loadPins();}
+  else if(key==='pins') loadPins();
   else if(key==='admin') loadAdmin();
 }
 
 function applyFilter(){
-  const v = document.getElementById('global-filter').value;
+  const v=document.getElementById('lf').value;
   loadStats();
-  if(currentPanel==='overview') loadScans('overview', v==='ALL'?'':v);
-  else if(currentPanel==='all') loadScans('all', v==='ALL'?'':v);
+  loadScans('overview',v);
 }
 
 async function loadStats(){
-  const r = await fetch('/api/stats');
-  const d = await r.json();
-  document.getElementById('s-cheater').textContent = d.cheater;
-  document.getElementById('s-susp').textContent = d.suspicious;
-  document.getElementById('s-clean').textContent = d.clean;
-  document.getElementById('s-total').textContent = d.total;
+  const d=await(await fetch('/api/stats')).json();
+  document.getElementById('s-cheater').textContent=d.cheater;
+  document.getElementById('s-susp').textContent=d.suspicious;
+  document.getElementById('s-clean').textContent=d.clean;
+  document.getElementById('s-total').textContent=d.total;
   if(ROLE==='owner'||ROLE==='admin'){
-    document.getElementById('s-uff').textContent = d.uff;
-    document.getElementById('s-ffl').textContent = d.ffl;
+    document.getElementById('s-uff').textContent=d.uff;
+    document.getElementById('s-ffl').textContent=d.ffl;
   }
 }
 
-async function loadScans(panel, league){
-  const url = '/api/scans'+(league?`?league=${league}`:'');
-  const r = await fetch(url);
-  const scans = await r.json();
-  const isAll = panel==='overview'||panel==='all';
-  const tid = panel==='overview'?'overview-tbody':panel+'-tbody';
-  const tbody = document.getElementById(tid);
-  if(!tbody) return;
+async function loadScans(panel,league){
+  const url='/api/scans'+(league?'?league='+league:'');
+  const scans=await(await fetch(url)).json();
+  const isAll=panel==='overview'||panel==='all';
+  const tbody=document.getElementById(panel+'-tbody');
+  if(!tbody)return;
   if(!scans.length){
-    tbody.innerHTML=`<tr><td colspan="${isAll?7:6}" style="padding:30px;text-align:center;color:var(--fg2)">No scans yet</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="${isAll?7:6}" style="padding:32px;text-align:center;color:var(--fg3)">No scans yet</td></tr>`;
     return;
   }
-  tbody.innerHTML = scans.map(s=>{
-    const accs=(s.roblox_accs||[]).join(', ')||'—';
-    const lg = isAll?`<td class="mono">${esc(s.league)}</td>`:'';
-    return `<tr>
+  tbody.innerHTML=scans.map(s=>{
+    const accs=(s.roblox_accs||[]).map(a=>typeof a==='object'?a.username:a).join(', ')||'—';
+    const lg=isAll?`<td class="mono">${esc(s.league)}</td>`:'';
+    return`<tr>
       <td class="mono">${esc(s.pc_user)}</td>${lg}
       <td><span class="vp ${s.verdict}">${s.verdict}</span></td>
-      <td class="mono" style="color:${s.total_hits>0?'var(--red)':'var(--fg2)'}">${s.total_hits}</td>
-      <td class="dim" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(accs)}</td>
+      <td class="mono" style="color:${s.total_hits>0?'var(--red)':'var(--fg3)'}">${s.total_hits}</td>
+      <td class="dim" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(accs)}">${esc(accs)}</td>
       <td class="dim">${s.submitted}</td>
       <td>${s.pin_used?`<a href="/results/${s.pin_used}" style="color:var(--blue);font-size:11px;text-decoration:none" target="_blank">View →</a>`:'<span style="color:var(--fg3);font-size:11px">—</span>'}</td>
     </tr>`;
   }).join('');
 }
 
-async function generatePin(){
-  const league = document.getElementById('pin-league').value;
-  const r = await fetch('/api/pins/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({league})});
-  const d = await r.json();
+async function genPin(){
+  const league=document.getElementById('pin-league').value;
+  const d=await(await fetch('/api/pins/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({league})})).json();
   if(d.pin){
-    lastPin = d.pin;
-    document.getElementById('pin-code').textContent = d.pin;
-    document.getElementById('pin-meta').textContent = `League: ${d.league}  ·  Expires: ${d.expires} UTC  ·  One-time use`;
-    document.getElementById('pin-link').innerHTML = `Results page: <a href="/results/${d.pin}" target="_blank">/results/${d.pin}</a>`;
+    lastPin=d.pin;
+    document.getElementById('pin-code').textContent=d.pin;
+    document.getElementById('pin-meta').innerHTML=`League: <strong>${d.league}</strong> &nbsp;·&nbsp; Expires: ${d.expires} UTC &nbsp;·&nbsp; One-time use`;
+    document.getElementById('pin-link').innerHTML=`Results: <a href="/results/${d.pin}" target="_blank">/results/${d.pin}</a>`;
     document.getElementById('pin-result').classList.add('show');
-    loadPins();
-    showToast('PIN generated');
-  } else { showToast('Error: '+(d.error||'unknown')); }
+    loadPins(); showToast('PIN generated ✓');
+  } else showToast('Error: '+(d.error||'unknown'));
 }
 
-function copyPin(){
-  navigator.clipboard.writeText(lastPin).then(()=>showToast('Copied!'));
-}
+function copyPin(){ navigator.clipboard.writeText(lastPin).then(()=>showToast('Copied!')); }
 
 async function loadPins(){
-  const r = await fetch('/api/pins');
-  const pins = await r.json();
-  const tbody = document.getElementById('pins-tbody');
-  if(!pins.length){
-    tbody.innerHTML='<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--fg2)">No PINs yet</td></tr>';
-    return;
-  }
-  tbody.innerHTML = pins.map(p=>`<tr>
-    <td class="mono" style="letter-spacing:0.12em;color:var(--green)">${p.pin}</td>
+  const pins=await(await fetch('/api/pins')).json();
+  const tbody=document.getElementById('pins-tbody');
+  if(!pins.length){ tbody.innerHTML='<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--fg3)">No PINs yet</td></tr>'; return; }
+  tbody.innerHTML=pins.map(p=>`<tr>
+    <td class="mono" style="color:var(--green);letter-spacing:0.14em">${p.pin}</td>
     <td class="mono">${p.league}</td>
-    <td><span class="used-tag ${p.used?'used':'active'}">${p.used?'USED':'ACTIVE'}</span></td>
+    <td><span class="status-pill ${p.used?'used':'active'}">${p.used?'USED':'ACTIVE'}</span></td>
     <td class="dim">${esc(p.agent||'—')}</td>
     <td class="dim">${p.created}</td>
     <td class="dim">${p.expires}</td>
@@ -402,42 +390,25 @@ async function loadPins(){
 }
 
 async function loadAdmin(){
-  const r = await fetch('/api/admin/users');
-  const users = await r.json();
-  const tbody = document.getElementById('admin-tbody');
-  tbody.innerHTML = users.map(u=>`<tr>
-    <td>${u.avatar?`<img src="https://cdn.discordapp.com/avatars/${u.discord_id}/${u.avatar}.png" class="avatar-sm">`:''}${esc(u.username)}</td>
+  const users=await(await fetch('/api/admin/users')).json();
+  const tbody=document.getElementById('admin-tbody');
+  tbody.innerHTML=users.map(u=>`<tr>
+    <td>${u.avatar?`<img src="https://cdn.discordapp.com/avatars/${u.discord_id}/${u.avatar}.png" class="av-sm">`:''}${esc(u.username)}</td>
     <td class="mono dim">${u.discord_id||'—'}</td>
-    <td><select class="user-role-sel" onchange="updateUser(${u.id},'role',this.value)">
-      <option ${u.role==='pending'?'selected':''}>pending</option>
-      <option ${u.role==='agent'?'selected':''}>agent</option>
-      <option ${u.role==='admin'?'selected':''}>admin</option>
-      <option ${u.role==='owner'?'selected':''}>owner</option>
+    <td><select class="role-sel" onchange="updUser(${u.id},'role',this.value)">
+      ${['pending','agent','admin','owner'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
     </select></td>
-    <td><input style="background:var(--bg3);border:1px solid var(--bdr);color:var(--fg);font-family:'Inter',sans-serif;font-size:11px;padding:3px 8px;outline:none;width:90px" value="${esc(u.leagues)}" onblur="updateUser(${u.id},'leagues',this.value)" placeholder="UFF,FFL"></td>
+    <td><input style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 8px;outline:none;width:80px" value="${esc(u.leagues)}" onblur="updUser(${u.id},'leagues',this.value)"></td>
     <td class="dim">${u.created}</td>
-    <td><button class="act-btn del" onclick="deleteUser(${u.id},'${esc(u.username)}')">Remove</button></td>
+    <td><button class="action-btn del" onclick="delUser(${u.id},'${esc(u.username)}')">Remove</button></td>
   </tr>`).join('');
 }
 
-async function updateUser(id,field,val){
-  await fetch(`/api/admin/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({[field]:val})});
-  showToast('Updated');
-}
-
-async function deleteUser(id,name){
-  if(!confirm(`Remove "${name}"?`)) return;
-  await fetch(`/api/admin/users/${id}`,{method:'DELETE'});
-  loadAdmin(); showToast('Removed');
-}
+async function updUser(id,f,v){ await fetch(`/api/admin/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({[f]:v})}); showToast('Saved'); }
+async function delUser(id,n){ if(!confirm(`Remove "${n}"?`)) return; await fetch(`/api/admin/users/${id}`,{method:'DELETE'}); loadAdmin(); showToast('Removed'); }
 
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function showToast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
-}
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 
 loadStats(); loadScans('overview','');
 </script>
