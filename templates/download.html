@@ -59,7 +59,7 @@ h1{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;margin-bottom:10
     <a href="/download" class="active">Download</a>
     <a href="/terms">Terms</a>
     <a href="/privacy">Privacy</a>
-    {% if session and session.get('user_id') %}
+    {% if user %}
     <a href="/dashboard" class="nav-btn">Dashboard</a>
     {% else %}
     <a href="/login" class="nav-btn">Sign In</a>
@@ -93,7 +93,7 @@ h1{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;margin-bottom:10
     <div class="step"><div class="step-num">5</div><div class="step-text">Results are automatically sent to the dashboard. The scan takes 1–3 minutes.</div></div>
   </div>
 
-  {% if session and session.get('role') in ('owner','admin') %}
+  {% if user and user.role in ('owner','admin') %}
   <div class="upload-card show">
     <div class="upload-title">Upload new build</div>
     <div class="upload-sub">Upload a new .exe to replace the current download. The version tag and file will update automatically.</div>
@@ -109,21 +109,29 @@ h1{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;margin-bottom:10
 
 <script>
 async function uploadBuild(){
-  const file = document.getElementById('exe-file').files[0];
-  const ver  = document.getElementById('ver-input').value.trim();
-  if(!file){ document.getElementById('upload-status').textContent='Please select a file.'; return; }
-  document.getElementById('upload-status').textContent='Uploading…';
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('version', ver || 'v3.0');
-  const r = await fetch('/api/admin/upload-exe', {method:'POST', body:fd});
-  const d = await r.json();
-  if(d.ok){
-    document.getElementById('upload-status').style.color='var(--green)';
-    document.getElementById('upload-status').textContent='Uploaded! Refresh to see the new download link.';
-  } else {
-    document.getElementById('upload-status').style.color='var(--red)';
-    document.getElementById('upload-status').textContent='Error: '+(d.error||'unknown');
+  const fileInput = document.getElementById('exe-file');
+  const ver = document.getElementById('ver-input').value.trim() || 'v3.0';
+  const status = document.getElementById('upload-status');
+  if(!fileInput.files.length){ status.style.color='var(--amber)'; status.textContent='Please select a file.'; return; }
+  const file = fileInput.files[0];
+  status.style.color='var(--fg2)'; status.textContent=`Uploading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)…`;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('version', ver);
+    const r = await fetch('/api/admin/upload-exe', {method:'POST', body:fd});
+    const d = await r.json();
+    if(d.ok){
+      status.style.color='var(--green)';
+      status.textContent=`✓ Uploaded ${d.version} (${d.size}). Refresh to confirm.`;
+      setTimeout(()=>location.reload(), 1500);
+    } else {
+      status.style.color='var(--red)';
+      status.textContent='Error: '+(d.error||'unknown');
+    }
+  } catch(e){
+    status.style.color='var(--red)';
+    status.textContent='Upload failed: '+e.message;
   }
 }
 </script>
