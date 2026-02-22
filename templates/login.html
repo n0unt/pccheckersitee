@@ -4,35 +4,87 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lite — Sign In</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0e1117;--bg2:#161b22;--bg3:#1c2333;--bdr:#30363d;--fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;--green:#2aff8f;--red:#f85149;}
-html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif}
-body{display:flex;align-items:center;justify-content:center;min-height:100vh;position:relative;overflow:hidden}
-body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(rgba(42,255,143,0.04) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;}
-.card{background:var(--bg2);border:1px solid var(--bdr);width:420px;padding:40px;animation:rise 0.4s cubic-bezier(0.16,1,0.3,1) both;}
-@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;}
-.logo-icon{width:36px;height:36px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#000;}
-.logo-text{font-size:18px;font-weight:700;}
+:root{
+  --bg:#080b10;--surface:#0f1420;--surface2:#151c2e;--surface3:#1a2235;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);
+  --fg:#f0f4ff;--fg2:#8892a4;--fg3:#3d4a5c;
+  --green:#00f5a0;--green-glow:rgba(0,245,160,0.15);
+  --red:#ff4d6d;--blue:#4d9fff;
+}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden}
+/* Animated mesh background */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(0,245,160,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 60% at 80% 80%, rgba(77,159,255,0.04) 0%, transparent 60%);
+  pointer-events:none;
+}
+/* Grid lines */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size:60px 60px;pointer-events:none;
+}
+.wrap{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.card{
+  width:100%;max-width:400px;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:20px;
+  padding:36px;
+  box-shadow:0 0 0 1px var(--border), 0 40px 80px rgba(0,0,0,0.4);
+  animation:rise 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(24px) scale(0.98)}to{opacity:1;transform:none}}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+.logo-mark{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg, var(--green), #00c97a);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#000;
+  box-shadow:0 0 20px var(--green-glow);
+}
+.logo-text{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;}
 .logo-sub{font-size:11px;color:var(--fg2);margin-top:1px;}
-h1{font-size:22px;font-weight:600;margin-bottom:6px;}
-.sub{font-size:13px;color:var(--fg2);margin-bottom:28px;line-height:1.5;}
-.error{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--red);font-size:12px;padding:10px 14px;margin-bottom:20px;}
-.discord-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;background:#5865F2;color:#fff;border:none;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:13px;cursor:pointer;transition:background 0.15s;text-decoration:none;}
-.discord-btn:hover{background:#4752c4;}
+h1{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:6px;}
+.sub{font-size:13px;color:var(--fg2);line-height:1.6;margin-bottom:24px;}
+.error{
+  background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);
+  color:var(--red);font-size:12px;padding:10px 14px;border-radius:10px;margin-bottom:16px;
+}
+.discord-btn{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;background:#5865F2;color:#fff;
+  border:none;border-radius:12px;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;
+  padding:14px;cursor:pointer;text-decoration:none;
+  transition:all 0.2s;
+  box-shadow:0 4px 20px rgba(88,101,242,0.3);
+}
+.discord-btn:hover{background:#4752c4;transform:translateY(-1px);box-shadow:0 6px 24px rgba(88,101,242,0.4);}
+.discord-btn:active{transform:translateY(0);}
 .discord-btn svg{width:20px;height:20px;fill:#fff;flex-shrink:0;}
-.divider{display:flex;align-items:center;gap:12px;color:var(--fg3);font-size:11px;margin:20px 0;}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bdr);}
-.info{font-size:11px;color:var(--fg2);text-align:center;line-height:1.6;padding:14px;background:var(--bg3);border:1px solid var(--bdr);}
+.sep{display:flex;align-items:center;gap:10px;color:var(--fg3);font-size:11px;margin:20px 0;}
+.sep::before,.sep::after{content:'';flex:1;height:1px;background:var(--border);}
+.info{
+  font-size:11px;color:var(--fg2);text-align:center;line-height:1.7;
+  padding:14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);
+}
+.info strong{color:var(--fg);}
 .info a{color:var(--green);text-decoration:none;}
 </style>
 </head>
 <body>
+<div class="wrap">
 <div class="card">
   <div class="logo">
-    <div class="logo-icon">L</div>
+    <div class="logo-mark">L</div>
     <div><div class="logo-text">Lite</div><div class="logo-sub">Forensic Portal</div></div>
   </div>
   <h1>Sign in</h1>
@@ -42,8 +94,9 @@ h1{font-size:22px;font-weight:600;margin-bottom:6px;}
     <svg viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
     Continue with Discord
   </a>
-  <div class="divider">access info</div>
-  <div class="info">You must have the <strong>Lite</strong>, <strong>UFF Access</strong>, or <strong>FFL Access</strong> role in the Lite Discord server.<br><br>Don't have access? Contact <a href="#">converts_19942</a> on Discord.</div>
+  <div class="sep">access info</div>
+  <div class="info">You must have <strong>Lite</strong>, <strong>UFF Access</strong>, or <strong>FFL Access</strong> in the Lite Discord.<br>No access? DM <a href="#">converts_19942</a></div>
+</div>
 </div>
 </body>
 </html>
