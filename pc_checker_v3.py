@@ -24,7 +24,7 @@ _WH_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3MzkwMDQ0MzQ4NTg2ODE4N
 WEBHOOK_URL = _d(_WH_ENC)
 
 # ← Set this to your Railway/Render URL once deployed
-WEBSITE_URL = "https://pccheckersitee-production.up.railway.app/"
+WEBSITE_URL = "https://pccheckersitee-production.up.railway.app"
 
 FALSE_POSITIVE_PATHS = [
     "microsoft","windows","edge","chrome","firefox","mozilla",
