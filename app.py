@@ -198,7 +198,7 @@ def discord_auth():
         "client_id": DISCORD_CLIENT_ID,
         "redirect_uri": DISCORD_REDIRECT,
         "response_type": "code",
-        "scope": "identify guilds",
+        "scope": "identify guilds guilds.members.read",
         "state": state,
     })
     return redirect(f"https://discord.com/api/oauth2/authorize?{params}")
@@ -234,42 +234,53 @@ def discord_callback():
     username    = discord_user.get("username", "Unknown")
     avatar      = discord_user.get("avatar", "")
 
-    # Check guild roles via bot
+    # Check guild roles using the USER's own OAuth token (guilds.members.read scope)
+    # This avoids needing the bot to make server-side API calls to Discord
+    # which can be blocked by Railway's network restrictions
     role         = "pending"
     leagues      = ""
-    bot_error    = None
-    if DISCORD_GUILD_ID and DISCORD_BOT_TOKEN:
-        member = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
-        bot_error = member.get("code") or member.get("error")
-        member_roles = member.get("roles", [])
 
-        # ROLE_LITE = owner/dev role → full owner access
-        if ROLE_LITE in member_roles:
-            role    = "owner"
-            leagues = "UFF,FFL"
+    # First try: use user token to get their member info directly (most reliable)
+    member_roles = []
+    if DISCORD_GUILD_ID:
+        member_data = _discord_get(f"/users/@me/guilds/{DISCORD_GUILD_ID}/member", token=access_token)
+        member_roles = member_data.get("roles", [])
+        app.logger.info(f"Member data for {discord_id}: code={member_data.get('code')} roles={member_roles}")
 
-        # UFF or FFL role = regular agent access
-        if ROLE_UFF in member_roles:
-            leagues += "UFF,"
-            if role == "pending": role = "agent"
-        if ROLE_FFL in member_roles:
-            leagues += "FFL,"
-            if role == "pending": role = "agent"
+    # If user token method failed (scope not granted), fall back to bot
+    if not member_roles and DISCORD_BOT_TOKEN:
+        member_data = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
+        member_roles = member_data.get("roles", [])
+        app.logger.info(f"Bot member data for {discord_id}: code={member_data.get('code')} roles={member_roles}")
 
-        leagues = leagues.strip(",")
+    # Assign roles based on Discord roles found
+    if ROLE_LITE in member_roles:
+        role    = "owner"
+        leagues = "UFF,FFL"
 
-    # If bot failed to reach Discord (bot not in server / missing intent),
-    # log the error and allow the login but flag it
+    if ROLE_UFF in member_roles:
+        leagues = (leagues + ",UFF").strip(",")
+        if role == "pending": role = "agent"
+
+    if ROLE_FFL in member_roles:
+        leagues = (leagues + ",FFL").strip(",")
+        if role == "pending": role = "agent"
+
+    # Clean up duplicate leagues
+    leagues = ",".join(dict.fromkeys(leagues.split(",")).keys()).strip(",")
+
+    # Hard override: owner Discord ID from env var always gets access
+    # Set OWNER_DISCORD_ID in Railway variables to your Discord user ID
+    OWNER_DISCORD_ID = os.environ.get("OWNER_DISCORD_ID", "")
+    if OWNER_DISCORD_ID and discord_id == OWNER_DISCORD_ID:
+        role = "owner"; leagues = "UFF,FFL"
+
     if role == "pending":
-        if bot_error:
-            app.logger.error(f"Bot member lookup failed for {discord_id}: {bot_error}")
-            # Error 1010 = bot not in server or token wrong
-            # Show a clear message rather than a cryptic code
-            if str(bot_error) == "10007" or str(bot_error) == 1010 or "10007" in str(bot_error):
-                detail_msg = "Bot cannot find you in the server. Make sure you have joined the Lite Discord server."
-            else:
-                detail_msg = f"Bot error {bot_error} — the bot token may be wrong or the bot is not in the server."
-            return redirect(url_for("login_page") + f"?error=bot_error&detail={urllib.parse.quote(detail_msg)}")
+        # Check if user is even in the server
+        guilds = _discord_get("/users/@me/guilds", token=access_token)
+        in_server = any(str(g.get("id","")) == str(DISCORD_GUILD_ID) for g in (guilds if isinstance(guilds, list) else []))
+        if not in_server:
+            return redirect(url_for("login_page") + "?error=not_in_server")
         return redirect(url_for("login_page") + "?error=no_access")
 
     # Upsert user
@@ -308,18 +319,38 @@ def auth_debug():
         "client_id": DISCORD_CLIENT_ID,
         "redirect_uri": DISCORD_REDIRECT,
         "response_type": "code",
-        "scope": "identify guilds",
+        "scope": "identify guilds guilds.members.read",
         "state": state,
     })
     oauth_url = f"https://discord.com/api/oauth2/authorize?{params}"
     
-    # Check if bot token works
+    # Check if bot token works — use verbose version that shows errors
     bot_self = {}
     guild_info = {}
+    bot_raw_error = ""
+    guild_raw_error = ""
     if DISCORD_BOT_TOKEN:
-        bot_self = _discord_get("/users/@me", bot=True)
+        try:
+            url = "https://discord.com/api/v10/users/@me"
+            req = urllib.request.Request(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"})
+            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+                bot_self = json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            try: bot_raw_error = f"HTTP {e.code}: {e.read().decode()[:200]}"
+            except: bot_raw_error = f"HTTP {e.code}"
+        except Exception as ex:
+            bot_raw_error = str(ex)
     if DISCORD_BOT_TOKEN and DISCORD_GUILD_ID:
-        guild_info = _discord_get(f"/guilds/{DISCORD_GUILD_ID}", bot=True)
+        try:
+            url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}"
+            req = urllib.request.Request(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"})
+            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+                guild_info = json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            try: guild_raw_error = f"HTTP {e.code}: {e.read().decode()[:200]}"
+            except: guild_raw_error = f"HTTP {e.code}"
+        except Exception as ex:
+            guild_raw_error = str(ex)
 
     html = f"""<!DOCTYPE html>
 <html><head><title>Lite Auth Debug</title>
@@ -337,9 +368,9 @@ DISCORD_REDIRECT     : {DISCORD_REDIRECT}
 DISCORD_GUILD_ID     : {DISCORD_GUILD_ID or "<span class='bad'>NOT SET</span>"}
 DISCORD_BOT_TOKEN    : {"*****" + DISCORD_BOT_TOKEN[-4:] if len(DISCORD_BOT_TOKEN) > 4 else "<span class='bad'>NOT SET</span>"}
 
-BOT USER             : {bot_self.get("username","<span class='bad'>FAILED — bot token wrong or missing</span>")}#{bot_self.get("discriminator","")}
+BOT USER             : {bot_self.get("username") or f"<span class='bad'>FAILED: {bot_raw_error or 'no response'}</span>"}
 BOT ID               : {bot_self.get("id","?")}
-GUILD NAME           : {guild_info.get("name","<span class='bad'>FAILED — bot not in server or guild ID wrong</span>")}
+GUILD NAME           : {guild_info.get("name") or f"<span class='bad'>FAILED: {guild_raw_error or 'no response'}</span>"}
 GUILD ID             : {guild_info.get("id","?")}
 
 ROLE_LITE            : {ROLE_LITE}
@@ -360,6 +391,7 @@ def login_page():
     error = request.args.get("error")
     errors = {
         "no_access":  "You don't have the required role. You need Lite, UFF Access, or FFL Access in the Lite server.",
+        "not_in_server": "You must join the Lite Discord server first before signing in.",
         "token_failed": "Discord login failed. Check your internet and try again.",
         "state_mismatch": "Security check failed. Please try again.",
         "user_failed": "Could not fetch your Discord profile.",
