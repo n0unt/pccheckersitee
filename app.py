@@ -23,7 +23,7 @@ ROLE_UFF  = "1475022240754962452"
 ROLE_FFL  = "1475022200095510621"
 
 # Guild ID — bot must be in this server
-DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "")
+DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1475014802194567238")
 
 # ── SSL context ──────────────────────────────────────────────
 def _ssl_ctx():
@@ -95,43 +95,69 @@ def rows_to_dicts(rows, cur):
     return [dict(zip(cols, r)) for r in rows]
 
 def init_db():
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY, discord_id TEXT UNIQUE,
-        username TEXT NOT NULL, avatar TEXT DEFAULT '',
-        role TEXT NOT NULL DEFAULT 'pending',
-        leagues TEXT NOT NULL DEFAULT '',
-        created TEXT NOT NULL)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS pins (
-        id SERIAL PRIMARY KEY, pin TEXT UNIQUE NOT NULL,
-        league TEXT NOT NULL, agent_id INTEGER NOT NULL,
-        used INTEGER NOT NULL DEFAULT 0,
-        created TEXT NOT NULL, expires TEXT NOT NULL,
-        scan_id INTEGER DEFAULT NULL,
-        finished_at TEXT DEFAULT NULL)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS scans (
-        id SERIAL PRIMARY KEY, league TEXT NOT NULL,
-        pc_user TEXT NOT NULL, verdict TEXT NOT NULL,
-        total_hits INTEGER NOT NULL DEFAULT 0,
-        roblox_accs TEXT NOT NULL DEFAULT '[]',
-        report_json TEXT NOT NULL DEFAULT '{}',
-        pin_used TEXT, submitted TEXT NOT NULL)""")
-    # Seed fallback owner (for non-Discord login)
+    """Create tables if they don't exist. Each statement uses a savepoint
+    so a failure in one doesn't abort the whole transaction."""
+    conn = get_db()
+    conn.autocommit = False
+    cur = conn.cursor()
+
+    tables = [
+        """CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY, discord_id TEXT UNIQUE,
+            username TEXT NOT NULL, avatar TEXT DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'pending',
+            leagues TEXT NOT NULL DEFAULT '',
+            created TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS pins (
+            id SERIAL PRIMARY KEY, pin TEXT UNIQUE NOT NULL,
+            league TEXT NOT NULL, agent_id INTEGER NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created TEXT NOT NULL, expires TEXT NOT NULL,
+            scan_id INTEGER DEFAULT NULL,
+            finished_at TEXT DEFAULT NULL)""",
+        """CREATE TABLE IF NOT EXISTS scans (
+            id SERIAL PRIMARY KEY, league TEXT NOT NULL,
+            pc_user TEXT NOT NULL, verdict TEXT NOT NULL,
+            total_hits INTEGER NOT NULL DEFAULT 0,
+            roblox_accs TEXT NOT NULL DEFAULT '[]',
+            report_json TEXT NOT NULL DEFAULT '{}',
+            pin_used TEXT, submitted TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL)""",
+    ]
+
+    for sql in tables:
+        try:
+            cur.execute("SAVEPOINT sp")
+            cur.execute(sql)
+            cur.execute("RELEASE SAVEPOINT sp")
+        except Exception as e:
+            cur.execute("ROLLBACK TO SAVEPOINT sp")
+
+    # Seed fallback owner
     try:
+        cur.execute("SAVEPOINT sp_seed")
         cur.execute("SELECT id FROM users WHERE username=%s AND discord_id IS NULL", ("ars",))
         if not cur.fetchone():
-            cur.execute("INSERT INTO users (discord_id,username,role,leagues,created) VALUES (NULL,%s,'owner','UFF,FFL',%s)",
-                        ("ars", now()))
-    except Exception: pass
-    # Settings table for EXE hosting etc.
-    cur.execute("""CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY, value TEXT NOT NULL)""")
-    # Auto-cleanup old pins (>3 days)
+            cur.execute(
+                "INSERT INTO users (discord_id,username,role,leagues,created) VALUES (NULL,%s,'owner','UFF,FFL',%s)",
+                ("ars", now()))
+        cur.execute("RELEASE SAVEPOINT sp_seed")
+    except Exception:
+        cur.execute("ROLLBACK TO SAVEPOINT sp_seed")
+
+    # Auto-cleanup old unused pins
     try:
+        cur.execute("SAVEPOINT sp_cleanup")
         cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
         cur.execute("DELETE FROM pins WHERE created < %s AND used=0", (cutoff,))
-    except Exception: pass
-    conn.commit(); cur.close(); conn.close()
+        cur.execute("RELEASE SAVEPOINT sp_cleanup")
+    except Exception:
+        cur.execute("ROLLBACK TO SAVEPOINT sp_cleanup")
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # ── Auth ─────────────────────────────────────────────────────
 def login_required(f):
