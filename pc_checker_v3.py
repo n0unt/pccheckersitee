@@ -1158,28 +1158,31 @@ def run_full_scan(league="?"):
     }
 
 # ============================================================
-#  GUI  — Windows 11 Black/White
+#  GUI  — Lite Futuristic Dark  (matches website aesthetic)
 # ============================================================
 class App:
-    # ── Palette ──
-    BG      = "#0a0a0a"
-    BG2     = "#111111"
-    BG3     = "#181818"
-    BG4     = "#1f1f1f"
-    BORDER  = "#1e1e1e"
-    BORDER2 = "#2a2a2a"
-    FG      = "#f0f0f0"
-    FG2     = "#707070"
-    FG3     = "#383838"
-    WHITE   = "#ffffff"
-    RED     = "#ff3b3b"
-    GREEN   = "#2aff8f"
-    AMBER   = "#ffb703"
-    BLUE    = "#4da6ff"
+    # ── Palette — matches website exactly ──
+    BG      = "#080b10"   # deepest bg
+    BG2     = "#0f1420"   # surface/sidebar
+    BG3     = "#131925"   # surface2
+    BG4     = "#1a2235"   # surface3
+    BG5     = "#1f2840"   # surface4
+    BORDER  = "rgba(255,255,255,0.06)"
+    BORDER_HEX = "#141e2e"
+    BORDER2 = "#1e2d44"
+    FG      = "#f0f4ff"
+    FG2     = "#8892a4"
+    FG3     = "#3d4a5c"
+    WHITE   = "#f0f4ff"
+    GREEN   = "#00f5a0"
+    GREEN_D = "#00c97a"
+    RED     = "#ff4d6d"
+    AMBER   = "#ffb830"
+    BLUE    = "#4d9fff"
 
     def __init__(self, root):
         self.root         = root
-        self.root.withdraw()          # hide until PIN validated
+        self.root.withdraw()
         self.results      = {}
         self.scanning     = False
         self._wh_sent     = False
@@ -1189,86 +1192,102 @@ class App:
         self._show_tos_screen()
 
     # ╔══════════════════════════════════════════════════════╗
-    # ║  TERMS OF SERVICE SCREEN                             ║
+    # ║  TERMS OF SERVICE                                    ║
     # ╚══════════════════════════════════════════════════════╝
     def _show_tos_screen(self):
-        self._tos_win = tk.Toplevel()
-        self._tos_win.title("PC Checker — Terms of Service")
-        self._tos_win.geometry("520x580")
-        self._tos_win.configure(bg=self.BG)
-        self._tos_win.resizable(False, False)
-        self._tos_win.protocol("WM_DELETE_WINDOW", lambda: (self._tos_win.destroy(), self.root.destroy()))
+        w = tk.Toplevel()
+        self._tos_win = w
+        w.title("Lite — Terms of Service")
+        w.geometry("520x600")
+        w.configure(bg=self.BG)
+        w.resizable(False, False)
+        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+        w.update_idletasks()
+        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        w.geometry(f"520x600+{(sw-520)//2}+{(sh-600)//2}")
 
-        self._tos_win.update_idletasks()
-        sw = self._tos_win.winfo_screenwidth()
-        sh = self._tos_win.winfo_screenheight()
-        self._tos_win.geometry(f"520x580+{(sw-520)//2}+{(sh-580)//2}")
-
-        cv = tk.Canvas(self._tos_win, width=520, height=580, bg=self.BG, highlightthickness=0)
+        # Canvas for corner accent brackets
+        cv = tk.Canvas(w, width=520, height=600, bg=self.BG, highlightthickness=0)
         cv.place(x=0, y=0)
-        cv.create_line(0,0,48,0,fill=self.WHITE,width=2)
-        cv.create_line(0,0,0,48,fill=self.WHITE,width=2)
-        cv.create_line(520,580,472,580,fill=self.FG3,width=1)
-        cv.create_line(520,580,520,532,fill=self.FG3,width=1)
+        # top-left bracket
+        cv.create_line(20,20, 60,20, fill=self.GREEN, width=2)
+        cv.create_line(20,20, 20,60, fill=self.GREEN, width=2)
+        # bottom-right bracket (dim)
+        cv.create_line(500,580, 460,580, fill=self.FG3, width=1)
+        cv.create_line(500,580, 500,540, fill=self.FG3, width=1)
 
-        f = tk.Frame(self._tos_win, bg=self.BG)
-        f.place(x=48, y=56, width=424)
+        f = tk.Frame(w, bg=self.BG)
+        f.place(x=44, y=52, width=432)
 
-        tk.Label(f, text="PC CHECKER", font=("Segoe UI", 9, "bold"),
-                 fg=self.FG2, bg=self.BG).pack(anchor="w")
-        tk.Label(f, text="Terms of Service", font=("Segoe UI", 20, "bold"),
-                 fg=self.FG, bg=self.BG).pack(anchor="w", pady=(4,0))
+        # Logo mark
+        logo_f = tk.Frame(f, bg=self.BG)
+        logo_f.pack(anchor="w", pady=(0,14))
+        mark = tk.Label(logo_f, text=" L ", font=("Segoe UI", 11, "bold"),
+                        fg="#000000", bg=self.GREEN, padx=2, pady=2)
+        mark.pack(side="left")
+        tk.Label(logo_f, text="  Lite", font=("Segoe UI", 13, "bold"),
+                 fg=self.FG, bg=self.BG).pack(side="left")
+        tk.Label(logo_f, text="  Forensic Scanner",
+                 font=("Segoe UI", 9), fg=self.FG3, bg=self.BG).pack(side="left", pady=3)
+
+        tk.Label(f, text="Terms of Service", font=("Segoe UI", 22, "bold"),
+                 fg=self.FG, bg=self.BG).pack(anchor="w")
         tk.Label(f, text="Last updated: 2/22/2026", font=("Segoe UI", 9),
                  fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(2,16))
 
-        # Scrolled text box for ToS
-        txt_frame = tk.Frame(f, bg=self.BORDER, bd=0)
-        txt_frame.pack(fill="x", pady=(0, 14))
-        txt = tk.Text(txt_frame, width=52, height=14, font=("Segoe UI", 9),
-                      bg=self.BG2, fg=self.FG2, bd=0, padx=10, pady=10,
-                      relief="flat", wrap="word", cursor="arrow",
-                      selectbackground=self.BG3)
+        # ToS text box — styled to match website surface cards
+        txt_outer = tk.Frame(f, bg=self.BORDER2, bd=1)
+        txt_outer.pack(fill="x", pady=(0,14))
+        txt_inner = tk.Frame(txt_outer, bg=self.BG3, bd=0)
+        txt_inner.pack(fill="both", padx=1, pady=1)
+        txt = tk.Text(txt_inner, width=52, height=12,
+                      font=("Segoe UI", 9), bg=self.BG3, fg=self.FG2,
+                      bd=0, padx=14, pady=12, relief="flat", wrap="word",
+                      cursor="arrow", selectbackground=self.BG4,
+                      insertbackground=self.GREEN)
+        scr = tk.Scrollbar(txt_inner, orient="vertical", command=txt.yview,
+                           bg=self.BG4, troughcolor=self.BG3, width=8,
+                           relief="flat", bd=0, highlightthickness=0)
+        scr.pack(side="right", fill="y")
+        txt.configure(yscrollcommand=scr.set)
         txt.pack(side="left", fill="both", expand=True)
-        sb = tk.Scrollbar(txt_frame, orient="vertical", command=txt.yview)
-        sb.pack(side="right", fill="y")
-        txt.configure(yscrollcommand=sb.set)
-        TOS_TEXT = (
-            "By using this software, you acknowledge and agree that the creator "
-            "of this software is NOT responsible for how the information obtained "
-            "is used by third party leagues and members.\n\n"
-            "This tool is provided to aid in the screensharing process and no "
-            "information will be distributed by the owner of the software.\n\n"
-            "If the league or individual using the software on you is NOT listed "
-            "or has received proper authorization, please report it immediately "
-            "by DMing Discord user: converts_19942 or by joining the Lite server "
-            "and making a ticket.\n\n"
-            "Unauthorized usage will be revoked."
-        )
-        txt.insert("1.0", TOS_TEXT)
+        TOS = ("By using this software, you acknowledge and agree that the creator "
+               "of this software is NOT responsible for how the information obtained "
+               "is used by third party leagues and members.\n\n"
+               "This tool is provided to aid in the screensharing process and no "
+               "information will be distributed by the owner of the software.\n\n"
+               "If the league or individual using the software on you is NOT listed "
+               "or has received proper authorization, please report it immediately "
+               "by DMing Discord user: converts_19942 or by joining the Lite server "
+               "and making a ticket.\n\n"
+               "Unauthorized usage will be revoked.")
+        txt.insert("1.0", TOS)
         txt.configure(state="disabled")
 
         tk.Label(f, text="You must read and agree before the scan can begin.",
                  font=("Segoe UI", 9), fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0,10))
 
-        agree_btn = tk.Button(f, text="I have read and agree to Terms of Service",
+        agree_btn = tk.Button(f, text="I agree to the Terms of Service",
                               font=("Segoe UI", 10, "bold"),
-                              bg=self.WHITE, fg="#000000", activebackground=self.FG,
-                              bd=0, padx=14, pady=10, cursor="hand2",
-                              command=self._tos_accepted)
+                              bg=self.GREEN, fg="#000000",
+                              activebackground=self.GREEN_D, activeforeground="#000000",
+                              bd=0, padx=14, pady=11, cursor="hand2",
+                              relief="flat", command=self._tos_accepted)
         agree_btn.pack(fill="x")
 
-        tk.Label(f, text="Declining will close the application.",
-                 font=("Segoe UI", 8), fg=self.FG3, bg=self.BG).pack(pady=(6,0))
-        tk.Button(f, text="Decline", font=("Segoe UI", 9),
-                  bg=self.BG, fg=self.FG3, activebackground=self.BG2,
-                  bd=0, pady=4, cursor="hand2",
-                  command=lambda: (self._tos_win.destroy(), self.root.destroy())).pack(pady=(4,0))
+        decline_row = tk.Frame(f, bg=self.BG)
+        decline_row.pack(fill="x", pady=(8,0))
+        tk.Label(decline_row, text="Declining will close the application.",
+                 font=("Segoe UI", 8), fg=self.FG3, bg=self.BG).pack(side="left")
+        tk.Button(decline_row, text="Decline", font=("Segoe UI", 9),
+                  bg=self.BG, fg=self.FG3, activebackground=self.BG3,
+                  bd=0, cursor="hand2", relief="flat",
+                  command=lambda: (w.destroy(), self.root.destroy())).pack(side="right")
 
     def _tos_accepted(self):
         self._tos_win.destroy()
         self._show_pin_screen()
 
-    # ── Close ─────────────────────────────────────────────────
     def _on_close(self):
         if self.results and not self._wh_sent:
             try: send_webhook(self.results); send_website(self.results, self._pin)
@@ -1279,131 +1298,122 @@ class App:
     # ║  PIN SCREEN                                          ║
     # ╚══════════════════════════════════════════════════════╝
     def _show_pin_screen(self):
-        self._pin_win = tk.Toplevel()
-        self._pin_win.title("PC Checker — Authorization")
-        self._pin_win.geometry("440x560")
-        self._pin_win.configure(bg=self.BG)
-        self._pin_win.resizable(False, False)
-        self._pin_win.protocol("WM_DELETE_WINDOW", lambda: (self._pin_win.destroy(), self.root.destroy()))
+        w = tk.Toplevel()
+        self._pin_win = w
+        w.title("Lite — Authorization")
+        w.geometry("460x580")
+        w.configure(bg=self.BG)
+        w.resizable(False, False)
+        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+        w.update_idletasks()
+        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        w.geometry(f"460x580+{(sw-460)//2}+{(sh-580)//2}")
 
-        # Center it
-        self._pin_win.update_idletasks()
-        sw = self._pin_win.winfo_screenwidth()
-        sh = self._pin_win.winfo_screenheight()
-        x  = (sw - 440) // 2
-        y  = (sh - 560) // 2
-        self._pin_win.geometry(f"440x560+{x}+{y}")
-
-        # Corner accent (canvas)
-        cv = tk.Canvas(self._pin_win, width=440, height=560, bg=self.BG,
-                       highlightthickness=0)
+        cv = tk.Canvas(w, width=460, height=580, bg=self.BG, highlightthickness=0)
         cv.place(x=0, y=0)
-        cv.create_line(0, 0, 44, 0, fill=self.WHITE, width=2)
-        cv.create_line(0, 0, 0, 44, fill=self.WHITE, width=2)
-        cv.create_line(440, 560, 396, 560, fill=self.FG3, width=1)
-        cv.create_line(440, 560, 440, 516, fill=self.FG3, width=1)
+        cv.create_line(20,20, 60,20, fill=self.GREEN, width=2)
+        cv.create_line(20,20, 20,60, fill=self.GREEN, width=2)
+        cv.create_line(440,560, 400,560, fill=self.FG3, width=1)
+        cv.create_line(440,560, 440,520, fill=self.FG3, width=1)
 
-        f = tk.Frame(self._pin_win, bg=self.BG)
-        f.place(x=48, y=64, width=344)
+        f = tk.Frame(w, bg=self.BG)
+        f.place(x=44, y=58, width=372)
 
-        tk.Label(f, text="PC CHECKER", font=("Segoe UI", 10, "bold"),
-                 fg=self.FG2, bg=self.BG).pack(anchor="w")
-        tk.Label(f, text="Forensic Scanner", font=("Segoe UI", 22, "bold"),
-                 fg=self.FG, bg=self.BG).pack(anchor="w", pady=(6, 0))
-        tk.Label(f, text="v3.0  ·  OFL / FFL", font=("Segoe UI", 10),
-                 fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(2, 32))
+        # Logo
+        logo_f = tk.Frame(f, bg=self.BG)
+        logo_f.pack(anchor="w", pady=(0,20))
+        tk.Label(logo_f, text=" L ", font=("Segoe UI", 11, "bold"),
+                 fg="#000000", bg=self.GREEN, padx=2, pady=2).pack(side="left")
+        tk.Label(logo_f, text="  Lite", font=("Segoe UI", 13, "bold"),
+                 fg=self.FG, bg=self.BG).pack(side="left")
+
+        tk.Label(f, text="Sign in", font=("Segoe UI", 24, "bold"),
+                 fg=self.FG, bg=self.BG).pack(anchor="w")
+        tk.Label(f, text="Enter the PIN provided by your screenshare agent.",
+                 font=("Segoe UI", 10), fg=self.FG2, bg=self.BG,
+                 wraplength=360, justify="left").pack(anchor="w", pady=(4,20))
 
         # League selector
-        tk.Label(f, text="LEAGUE", font=("Segoe UI", 9),
-                 fg=self.FG2, bg=self.BG).pack(anchor="w", pady=(0, 6))
-
-        sel_frame = tk.Frame(f, bg=self.BG2, bd=0, highlightthickness=1,
-                             highlightbackground=self.BORDER2)
-        sel_frame.pack(fill="x", pady=(0, 20))
-
+        tk.Label(f, text="LEAGUE", font=("Segoe UI", 8, "bold"),
+                 fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0,5))
         self._league_var = tk.StringVar(value="UFF")
-        self._sel_lbl = tk.Label(sel_frame, textvariable=self._league_var,
-                                  font=("Segoe UI Semibold", 12),
-                                  fg=self.FG, bg=self.BG2,
-                                  anchor="w", padx=14, pady=10)
-        self._sel_lbl.pack(side="left", fill="x", expand=True)
-        self._arr = tk.Label(sel_frame, text="∨", font=("Segoe UI", 11),
-                             fg=self.FG2, bg=self.BG2, padx=12, pady=10)
+        league_f = tk.Frame(f, bg=self.BORDER2, bd=1)
+        league_f.pack(fill="x", pady=(0,14))
+        league_inner = tk.Frame(league_f, bg=self.BG3)
+        league_inner.pack(fill="both", padx=1, pady=1)
+        self._league_disp = tk.Label(league_inner, textvariable=self._league_var,
+                                      font=("Segoe UI", 11), fg=self.FG, bg=self.BG3,
+                                      anchor="w", padx=14, pady=10)
+        self._league_disp.pack(side="left", fill="x", expand=True)
+        self._arr = tk.Label(league_inner, text="∨", font=("Segoe UI", 10),
+                             fg=self.FG2, bg=self.BG3, padx=12, cursor="hand2")
         self._arr.pack(side="right")
-        sel_frame.bind("<Button-1>", self._toggle_dropdown)
-        self._sel_lbl.bind("<Button-1>", self._toggle_dropdown)
-        self._arr.bind("<Button-1>", self._toggle_dropdown)
-        self._dropdown_open = False
-
-        # Dropdown menu (hidden initially)
-        self._dd = tk.Frame(self._pin_win, bg=self.BG3,
+        league_inner.bind("<Button-1>", lambda e: self._toggle_dd())
+        self._league_disp.bind("<Button-1>", lambda e: self._toggle_dd())
+        self._arr.bind("<Button-1>", lambda e: self._toggle_dd())
+        self._dd = tk.Frame(w, bg=self.BG3, bd=1, relief="flat",
                             highlightthickness=1, highlightbackground=self.BORDER2)
         self._dd_visible = False
 
-        # PIN entry
-        tk.Label(f, text="AUTHORIZATION PIN", font=("Segoe UI", 9),
-                 fg=self.FG2, bg=self.BG).pack(anchor="w", pady=(0, 6))
-
-        pin_frame = tk.Frame(f, bg=self.BG2, bd=0, highlightthickness=1,
-                             highlightbackground=self.BORDER2)
-        pin_frame.pack(fill="x", pady=(0, 8))
+        # PIN input
+        tk.Label(f, text="PIN CODE", font=("Segoe UI", 8, "bold"),
+                 fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0,5))
+        pin_f = tk.Frame(f, bg=self.BORDER2, bd=1)
+        pin_f.pack(fill="x", pady=(0,6))
+        pin_inner = tk.Frame(pin_f, bg=self.BG3)
+        pin_inner.pack(fill="both", padx=1, pady=1)
         self._pin_var = tk.StringVar()
-        self._pin_entry = tk.Entry(pin_frame, textvariable=self._pin_var,
-                                   font=("Segoe UI Semibold", 15),
-                                   fg=self.FG, bg=self.BG2,
-                                   insertbackground=self.WHITE,
-                                   relief="flat", bd=0,
-                                   show="●")
-        self._pin_entry.pack(padx=14, pady=11, fill="x")
+        self._pin_entry = tk.Entry(pin_inner, textvariable=self._pin_var,
+                                    font=("Segoe UI", 14), fg=self.GREEN, bg=self.BG3,
+                                    insertbackground=self.GREEN, bd=0, relief="flat",
+                                    highlightthickness=0, width=20)
+        self._pin_entry.pack(fill="x", padx=14, pady=12)
         self._pin_entry.bind("<Return>", lambda e: self._validate_pin())
-        self._pin_entry.bind("<KeyRelease>", self._format_pin)
-
-        tk.Label(f, text="8-character PIN provided by your DOJ agent",
-                 font=("Segoe UI", 9), fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0, 28))
-
-        # Submit button
-        self._pin_btn = tk.Button(f, text="Authorize & Continue",
-                                  font=("Segoe UI Semibold", 11),
-                                  bg=self.WHITE, fg=self.BG,
-                                  relief="flat", bd=0, cursor="hand2",
-                                  padx=20, pady=12,
-                                  command=self._validate_pin,
-                                  activebackground="#dddddd",
-                                  activeforeground=self.BG)
-        self._pin_btn.pack(fill="x")
+        self._pin_var.trace_add("write", lambda *a: self._format_pin())
 
         self._pin_err = tk.Label(f, text="", font=("Segoe UI", 9),
-                                 fg=self.RED, bg=self.BG, wraplength=320)
-        self._pin_err.pack(pady=(10, 0), anchor="w")
-
+                                  fg=self.RED, bg=self.BG, wraplength=360)
+        self._pin_err.pack(anchor="w", pady=(0,6))
         self._pin_status = tk.Label(f, text="", font=("Segoe UI", 9),
-                                    fg=self.FG2, bg=self.BG)
-        self._pin_status.pack(pady=(4, 0), anchor="w")
+                                     fg=self.FG2, bg=self.BG)
+        self._pin_status.pack(anchor="w", pady=(0,14))
+
+        self._pin_btn = tk.Button(f, text="Authorize  →",
+                                   font=("Segoe UI", 11, "bold"),
+                                   bg=self.GREEN, fg="#000000",
+                                   activebackground=self.GREEN_D, activeforeground="#000000",
+                                   bd=0, padx=14, pady=12, cursor="hand2",
+                                   relief="flat", command=self._validate_pin)
+        self._pin_btn.pack(fill="x")
+
+        # Access info box
+        info_f = tk.Frame(f, bg=self.BG3, bd=1,
+                          highlightthickness=1, highlightbackground=self.BORDER2)
+        info_f.pack(fill="x", pady=(18,0))
+        tk.Label(info_f,
+                 text="You must have Lite, UFF Access, or FFL Access\nin the Lite Discord server.",
+                 font=("Segoe UI", 8), fg=self.FG2, bg=self.BG3,
+                 justify="center").pack(pady=10)
 
         self._pin_entry.focus_set()
 
-    def _toggle_dropdown(self, e=None):
+    def _toggle_dd(self):
         if self._dd_visible:
             self._dd.place_forget()
             self._dd_visible = False
             self._arr.config(text="∨")
         else:
-            # Calculate position relative to pin_win
-            sel = self._sel_lbl.master
-            x = sel.winfo_rootx() - self._pin_win.winfo_rootx()
-            y = sel.winfo_rooty() - self._pin_win.winfo_rooty() + sel.winfo_height()
-            self._dd.place(x=x, y=y, width=sel.winfo_width())
-            # Clear and populate
-            for w in self._dd.winfo_children():
-                w.destroy()
+            for w in self._dd.winfo_children(): w.destroy()
+            x = self._league_disp.winfo_rootx() - self._pin_win.winfo_rootx()
+            y = self._league_disp.winfo_rooty() - self._pin_win.winfo_rooty() + self._league_disp.winfo_height() + 2
+            self._dd.place(x=x, y=y, width=self._league_disp.winfo_width()+self._arr.winfo_width()+4)
             for league in ["UFF", "FFL"]:
-                item = tk.Label(self._dd, text=league,
-                                font=("Segoe UI Semibold", 12),
-                                fg=self.FG, bg=self.BG3,
-                                anchor="w", padx=14, pady=10, cursor="hand2")
+                item = tk.Label(self._dd, text=f"  {league}",
+                                font=("Segoe UI", 11), fg=self.FG, bg=self.BG3,
+                                anchor="w", padx=8, pady=10, cursor="hand2")
                 item.pack(fill="x")
-                item.bind("<Enter>", lambda e, w=item: w.config(bg=self.BG4))
-                item.bind("<Leave>", lambda e, w=item, l=league: w.config(bg=self.BG3))
+                item.bind("<Enter>",    lambda e, i=item: i.config(bg=self.BG4))
+                item.bind("<Leave>",    lambda e, i=item: i.config(bg=self.BG3))
                 item.bind("<Button-1>", lambda e, l=league: self._pick_league(l))
             self._dd_visible = True
             self._arr.config(text="∧")
@@ -1427,7 +1437,7 @@ class App:
             return
         self._pin_btn.config(state="disabled", text="Validating…")
         self._pin_err.config(text="")
-        self._pin_status.config(text="Contacting server…")
+        self._pin_status.config(text="Contacting server…", fg=self.FG2)
         threading.Thread(target=self._do_validate, args=(pin, league), daemon=True).start()
 
     def _do_validate(self, pin, league):
@@ -1445,7 +1455,7 @@ class App:
         self.root.deiconify()
 
     def _pin_rejected(self, err):
-        self._pin_btn.config(state="normal", text="Authorize & Continue")
+        self._pin_btn.config(state="normal", text="Authorize  →")
         self._pin_err.config(text=f"✗  {err}")
         self._pin_status.config(text="")
 
@@ -1453,129 +1463,138 @@ class App:
     # ║  MAIN WINDOW                                         ║
     # ╚══════════════════════════════════════════════════════╝
     def _build_main(self):
-        self.root.title(f"PC Checker  ·  {self._league}  ·  {current_user()}")
-        self.root.geometry("1220x800")
+        self.root.title(f"Lite  ·  {self._league}  ·  {current_user()}")
+        self.root.geometry("1240x820")
         self.root.configure(bg=self.BG)
         self.root.resizable(True, True)
-
-        # Center
         self.root.update_idletasks()
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
-        self.root.geometry(f"1220x800+{(sw-1220)//2}+{(sh-800)//2}")
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.root.geometry(f"1240x820+{(sw-1240)//2}+{(sh-820)//2}")
 
-        # ── Top bar
+        # ── Top nav bar ──────────────────────────────────────
         topbar = tk.Frame(self.root, bg=self.BG2, height=52)
         topbar.pack(fill="x"); topbar.pack_propagate(False)
-        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
+        tk.Frame(self.root, bg=self.BORDER_HEX, height=1).pack(fill="x")
 
-        tk.Label(topbar, text="PC CHECKER", font=("Segoe UI Semibold", 13),
-                 fg=self.FG, bg=self.BG2).pack(side="left", padx=(24, 0))
-        self._league_badge = tk.Label(topbar,
-                                       text=f" {self._league} ",
-                                       font=("Segoe UI", 9),
-                                       fg=self.FG2, bg=self.BG3,
-                                       padx=6, pady=2)
-        self._league_badge.pack(side="left", padx=8, pady=17)
+        # Logo mark
+        mark_f = tk.Frame(topbar, bg=self.BG2)
+        mark_f.pack(side="left", padx=(20, 0))
+        tk.Label(mark_f, text=" L ", font=("Segoe UI", 10, "bold"),
+                 fg="#000000", bg=self.GREEN, padx=2).pack(side="left", pady=14)
+        tk.Label(mark_f, text="  Lite", font=("Segoe UI", 12, "bold"),
+                 fg=self.FG, bg=self.BG2).pack(side="left")
 
-        self._status_lbl = tk.Label(topbar, text="IDLE", font=("Segoe UI", 9),
-                                    fg=self.FG3, bg=self.BG2)
-        self._status_lbl.pack(side="right", padx=24)
+        # League badge
+        self._league_badge = tk.Label(topbar, text=f" {self._league} ",
+                                       font=("Segoe UI", 8, "bold"),
+                                       fg=self.GREEN, bg=self.BG4,
+                                       padx=8, pady=3,
+                                       relief="flat")
+        self._league_badge.pack(side="left", padx=10, pady=17)
+
+        # Right side: status + send label
+        self._status_lbl = tk.Label(topbar, text="IDLE", font=("Segoe UI", 9, "bold"),
+                                     fg=self.FG3, bg=self.BG2)
+        self._status_lbl.pack(side="right", padx=20)
         self._wh_lbl = tk.Label(topbar, text="", font=("Segoe UI", 9),
                                  fg=self.FG2, bg=self.BG2)
-        self._wh_lbl.pack(side="right", padx=(0, 16))
+        self._wh_lbl.pack(side="right", padx=(0, 8))
 
-        # ── Body: sidebar + content
+        # ── Body ──────────────────────────────────────────────
         body = tk.Frame(self.root, bg=self.BG)
         body.pack(fill="both", expand=True)
 
-        # Sidebar
-        sidebar = tk.Frame(body, bg=self.BG2, width=192)
+        # ── Sidebar ──────────────────────────────────────────
+        sidebar = tk.Frame(body, bg=self.BG2, width=210)
         sidebar.pack(side="left", fill="y"); sidebar.pack_propagate(False)
-        tk.Frame(body, bg=self.BORDER, width=1).pack(side="left", fill="y")
+        tk.Frame(body, bg=self.BORDER_HEX, width=1).pack(side="left", fill="y")
 
-        tk.Label(sidebar, text="MODULES", font=("Segoe UI", 8),
-                 fg=self.FG3, bg=self.BG2, anchor="w").pack(fill="x", padx=16, pady=(18, 6))
+        # Sidebar section label
+        tk.Label(sidebar, text="MODULES", font=("Segoe UI", 8, "bold"),
+                 fg=self.FG3, bg=self.BG2, anchor="w").pack(fill="x", padx=16, pady=(16,6))
 
-        self.tabs = {}
-        self._tab_frames = {}
-        self._nav_btns   = {}
+        self.tabs         = {}
+        self._tab_frames  = {}
+        self._nav_btns    = {}
+        self._active_nav  = None
+
         tab_defs = [
-            ("SUMMARY",     "summary"),
-            ("SHELLBAGS",   "shellbags"),
-            ("BAM",         "bam"),
-            ("PREFETCH",    "prefetch"),
-            ("APPCOMPAT",   "appcompat"),
-            ("ROBLOX LOGS", "roblox"),
-            ("CHEAT FILES", "cheat"),
-            ("YARA",        "yara"),
-            ("UNSIGNED",    "unsigned"),
-            ("RECYCLE BIN", "recycle"),
-            ("SYSMAIN",     "sysmain"),
+            ("◈  Summary",     "summary"),
+            ("◉  ShellBags",   "shellbags"),
+            ("◉  BAM",         "bam"),
+            ("◉  Prefetch",    "prefetch"),
+            ("◉  AppCompat",   "appcompat"),
+            ("◉  Roblox Logs", "roblox"),
+            ("◉  Cheat Files", "cheat"),
+            ("◉  YARA",        "yara"),
+            ("◉  Unsigned",    "unsigned"),
+            ("◉  Recycle Bin", "recycle"),
+            ("◉  SysMain",     "sysmain"),
         ]
 
         content_wrap = tk.Frame(body, bg=self.BG)
         content_wrap.pack(side="left", fill="both", expand=True)
 
         for label, key in tab_defs:
-            # Sidebar nav button
-            btn = tk.Label(sidebar, text=f"  {label}", font=("Segoe UI", 10),
-                           fg=self.FG2, bg=self.BG2, anchor="w",
-                           pady=8, padx=8, cursor="hand2")
-            btn.pack(fill="x")
-            btn.bind("<Enter>",   lambda e, b=btn: b.config(bg=self.BG3) if b != self._active_nav else None)
-            btn.bind("<Leave>",   lambda e, b=btn: b.config(bg=self.BG2) if b != self._active_nav else None)
-            btn.bind("<Button-1>",lambda e, k=key, b=btn: self._switch(k, b))
+            btn = tk.Label(sidebar, text=f"  {label}",
+                           font=("Segoe UI", 10), fg=self.FG2, bg=self.BG2,
+                           anchor="w", pady=9, padx=4, cursor="hand2")
+            btn.pack(fill="x", padx=6)
+            btn.bind("<Enter>",    lambda e, b=btn: b.config(bg=self.BG3) if b != self._active_nav else None)
+            btn.bind("<Leave>",    lambda e, b=btn: b.config(bg=self.BG2) if b != self._active_nav else None)
+            btn.bind("<Button-1>", lambda e, k=key, b=btn: self._switch(k, b))
             self._nav_btns[key] = btn
 
-            # Content frame
-            f   = tk.Frame(content_wrap, bg=self.BG)
-            txt = scrolledtext.ScrolledText(
-                f, bg=self.BG2, fg=self.FG,
-                font=("Cascadia Code", 9) if self._font_exists("Cascadia Code") else ("Consolas", 9),
-                relief="flat", insertbackground=self.WHITE,
-                wrap="word", selectbackground=self.BG3,
-                padx=20, pady=16,
+            # Content frame + styled text widget
+            frm = tk.Frame(content_wrap, bg=self.BG)
+            mono = "Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"
+            txt  = scrolledtext.ScrolledText(
+                frm, bg=self.BG2, fg=self.FG,
+                font=(mono, 9),
+                relief="flat", insertbackground=self.GREEN,
+                wrap="word", selectbackground=self.BG4,
+                padx=24, pady=18,
                 borderwidth=0, highlightthickness=0,
             )
             txt.pack(fill="both", expand=True)
             txt.configure(state="disabled")
-            self._tab_frames[key] = f
+            self._tab_frames[key] = frm
             self.tabs[key]        = txt
 
         self._active_nav = self._nav_btns["summary"]
         self._setup_tags()
 
-        # ── Bottom bar
-        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
-        bot = tk.Frame(self.root, bg=self.BG2, height=52)
+        # ── Bottom bar ───────────────────────────────────────
+        tk.Frame(self.root, bg=self.BORDER_HEX, height=1).pack(fill="x")
+        bot = tk.Frame(self.root, bg=self.BG2, height=56)
         bot.pack(fill="x"); bot.pack_propagate(False)
 
-        # Progress canvas
-        self._pb = tk.Canvas(bot, width=220, height=3, bg=self.BG3,
-                             highlightthickness=0)
-        self._pb.pack(side="left", padx=24, pady=24)
-        self._pb_bar  = self._pb.create_rectangle(0,0,0,3, fill=self.WHITE, outline="")
-        self._pb_pos  = 0
-        self._pb_run  = False
+        # Animated progress bar
+        self._pb = tk.Canvas(bot, width=240, height=3, bg=self.BG4, highlightthickness=0)
+        self._pb.pack(side="left", padx=24, pady=26)
+        self._pb_bar = self._pb.create_rectangle(0, 0, 0, 3, fill=self.GREEN, outline="")
+        self._pb_pos = 0
+        self._pb_run = False
 
         btn_area = tk.Frame(bot, bg=self.BG2)
         btn_area.pack(side="right", padx=20)
-        self._run_btn = tk.Button(btn_area, text="Run Scan",
-                                   font=("Segoe UI Semibold", 10),
-                                   bg=self.WHITE, fg=self.BG, relief="flat", bd=0,
-                                   padx=20, pady=7, cursor="hand2",
-                                   command=self._start,
-                                   activebackground="#dddddd", activeforeground=self.BG)
-        self._run_btn.pack(side="left", padx=(0, 8))
-        tk.Button(btn_area, text="Save Report",
-                  font=("Segoe UI", 10), bg=self.BG3, fg=self.FG2,
-                  relief="flat", bd=0, padx=16, pady=7, cursor="hand2",
-                  command=self._save,
-                  activebackground=self.BG4, activeforeground=self.FG,
-                  highlightthickness=1, highlightbackground=self.BORDER2).pack(side="left")
 
-        # Show summary by default
+        self._run_btn = tk.Button(
+            btn_area, text="Run Scan",
+            font=("Segoe UI", 10, "bold"),
+            bg=self.GREEN, fg="#000000",
+            activebackground=self.GREEN_D, activeforeground="#000000",
+            bd=0, padx=22, pady=8, cursor="hand2", relief="flat",
+            command=self._start)
+        self._run_btn.pack(side="left", padx=(0,8))
+
+        tk.Button(btn_area, text="Save Report",
+                  font=("Segoe UI", 10), bg=self.BG4, fg=self.FG2,
+                  activebackground=self.BG5, activeforeground=self.FG,
+                  bd=0, padx=16, pady=8, cursor="hand2", relief="flat",
+                  highlightthickness=1, highlightbackground=self.BORDER2,
+                  command=self._save).pack(side="left")
+
         self._switch("summary", self._nav_btns["summary"])
 
     def _font_exists(self, name):
@@ -1585,16 +1604,15 @@ class App:
     def _switch(self, key, btn):
         for f in self._tab_frames.values(): f.pack_forget()
         for b in self._nav_btns.values():
-            b.config(bg=self.BG2, fg=self.FG2,
-                     font=("Segoe UI", 10))
+            b.config(bg=self.BG2, fg=self.FG2, font=("Segoe UI", 10))
         self._tab_frames[key].pack(fill="both", expand=True)
-        btn.config(bg=self.BG3, fg=self.FG,
-                   font=("Segoe UI Semibold", 10))
+        btn.config(bg=self.BG3, fg=self.GREEN, font=("Segoe UI Semibold", 10))
         self._active_nav = btn
 
     def _setup_tags(self):
+        mono = "Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"
         for txt in self.tabs.values():
-            txt.configure(state="normal"); txt.delete("1.0","end")
+            txt.configure(state="normal"); txt.delete("1.0", "end")
             txt.configure(state="disabled")
             txt.tag_configure("ok",    foreground=self.GREEN)
             txt.tag_configure("bad",   foreground=self.RED)
@@ -1602,169 +1620,178 @@ class App:
             txt.tag_configure("info",  foreground=self.BLUE)
             txt.tag_configure("dim",   foreground=self.FG2)
             txt.tag_configure("white", foreground=self.FG)
-            txt.tag_configure("hl",    foreground=self.WHITE,
-                               font=(("Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"), 9, "bold"))
+            txt.tag_configure("green", foreground=self.GREEN)
+            txt.tag_configure("hl",    foreground=self.GREEN,
+                               font=(mono, 9, "bold"))
             txt.tag_configure("head",  foreground=self.FG,
-                               font=(("Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"), 10, "bold"))
+                               font=(mono, 10, "bold"))
 
-    # ── Progress
     def _pb_start(self):
-        self._pb_run=True; self._pb_pos=0; self._pb_tick()
+        self._pb_run = True; self._pb_pos = 0; self._pb_tick()
 
     def _pb_stop(self):
-        self._pb_run=False
-        self._pb.coords(self._pb_bar,0,0,220,3)
+        self._pb_run = False
+        self._pb.coords(self._pb_bar, 0, 0, 240, 3)
+        self._pb.itemconfig(self._pb_bar, fill=self.GREEN)
 
     def _pb_tick(self):
         if not self._pb_run: return
-        self._pb_pos=(self._pb_pos+4)%260
-        x1=max(0,self._pb_pos-100); x2=min(220,self._pb_pos)
-        self._pb.coords(self._pb_bar,x1,0,x2,3)
-        self.root.after(14,self._pb_tick)
+        self._pb_pos = (self._pb_pos + 5) % 280
+        x1 = max(0, self._pb_pos - 110); x2 = min(240, self._pb_pos)
+        self._pb.coords(self._pb_bar, x1, 0, x2, 3)
+        self.root.after(12, self._pb_tick)
 
-    # ── Write
-    def _w(self,key,text,tag="white"):
-        t=self.tabs[key]
-        t.configure(state="normal"); t.insert("end",text,tag); t.see("end")
+    def _w(self, key, text, tag="white"):
+        t = self.tabs[key]
+        t.configure(state="normal"); t.insert("end", text, tag); t.see("end")
         t.configure(state="disabled")
 
-    def _render(self,key,text):
-        if not text: self._w(key,"  No data.\n","dim"); return
+    def _render(self, key, text):
+        if not text:
+            self._w(key, "  No data.\n", "dim"); return
         for line in text.split("\n"):
-            ll=line.lower()
+            ll = line.lower()
             if any(x in ll for x in ["⚠","warning","suspicious","tamper","multiple account","detected"]):
-                tag="warn"
+                tag = "warn"
             elif any(x in ll for x in ["✓","normal","clean","no cheat","no suspicious"]):
-                tag="ok"
-            elif any(x in ll for x in ["cheater","ban evasion","flagged"]):
-                tag="bad"
-            elif "──" in line or "━" in line or "═" in line:
-                tag="hl"
+                tag = "ok"
+            elif any(x in ll for x in ["✗","cheater","ban evasion","flagged","fail"]):
+                tag = "bad"
+            elif "──" in line or "━" in line or "═" in line or "◈" in line:
+                tag = "hl"
             elif line.startswith("  username") or line.startswith("  userid"):
-                tag="info"
+                tag = "info"
             elif line.startswith("  ") or line.startswith("\t"):
-                tag="dim"
+                tag = "dim"
             else:
-                tag="white"
-            self._w(key,line+"\n",tag)
+                tag = "white"
+            self._w(key, line + "\n", tag)
 
-    def _render_summary(self,r):
-        k="summary"
-        v=r.get("verdict","UNKNOWN")
-        vt={"CHEATER":"bad","SUSPICIOUS":"warn","CLEAN":"ok"}.get(v,"white")
-        vi={"CHEATER":"✗","SUSPICIOUS":"!","CLEAN":"✓"}.get(v,"?")
+    def _render_summary(self, r):
+        k = "summary"
+        v  = r.get("verdict", "UNKNOWN")
+        vt = {"CHEATER":"bad","SUSPICIOUS":"warn","CLEAN":"ok"}.get(v,"white")
+        vi = {"CHEATER":"✗","SUSPICIOUS":"!","CLEAN":"✓"}.get(v,"?")
 
-        self._w(k,"\n","white")
-        self._w(k,f"  ┌── VERDICT ────────────────────────────────────┐\n","hl")
-        self._w(k,f"  │  {vi}  {v:<45}│\n",vt)
-        self._w(k,f"  └───────────────────────────────────────────────┘\n\n","hl")
-        self._w(k,f"  Generated  :  {now_str()}\n","dim")
-        self._w(k,f"  PC User    :  {current_user()}\n","dim")
-        self._w(k,f"  League     :  {r.get('league','?')}\n\n","dim")
-        self._w(k,"  ── Detection Scores ──────────────────────────────\n","dim")
+        self._w(k, "\n", "white")
+        self._w(k, f"  ◈ VERDICT ─────────────────────────────────────────\n", "hl")
+        self._w(k, f"    {vi}  {v}\n\n", vt)
+        self._w(k, f"  Generated  :  {now_str()}\n", "dim")
+        self._w(k, f"  PC User    :  {current_user()}\n", "dim")
+        self._w(k, f"  League     :  {r.get('league','?')}\n\n", "dim")
 
-        # Auto-fail banner
         if r.get("sysmain_autofail"):
-            self._w(k,"  ╔══ AUTO FAIL ══════════════════════════════════╗\n","bad")
-            self._w(k,"  ║  SysMain DISABLED + Prefetch empty            ║\n","bad")
-            self._w(k,"  ║  Deliberate trace wiping detected             ║\n","bad")
-            self._w(k,"  ╚═══════════════════════════════════════════════╝\n\n","bad")
+            self._w(k, "  ─── AUTO FAIL ─────────────────────────────────────\n", "bad")
+            self._w(k, "  ✗  SysMain DISABLED + Prefetch empty\n", "bad")
+            self._w(k, "  ✗  Deliberate trace wiping detected\n\n", "bad")
 
-        rows=[
-            ("ShellBag Hits",   r.get("shellbag_hits",0)),
-            ("BAM Hits",        r.get("bam_hits",0)),
-            ("Prefetch Hits",   r.get("prefetch_hits",0)),
-            ("AppCompat Hits",  r.get("appcompat_hits",0)),
-            ("Cheat File Hits", r.get("cheat_hits",0)),
-            ("YARA Hits",       r.get("yara_hits",0)),
-            ("Unsigned EXEs",   len(r.get("unsigned_hits",[]))),
-            ("Log Tamper Hits", r.get("roblox_hits",0) if "roblox_hits" in r else 0),
-            ("SysMain Hits",    r.get("sysmain_hits",0)),
+        self._w(k, "  ◈ Detection Scores ────────────────────────────────\n", "hl")
+        rows = [
+            ("ShellBag Hits",   r.get("shellbag_hits", 0)),
+            ("BAM Hits",        r.get("bam_hits", 0)),
+            ("Prefetch Hits",   r.get("prefetch_hits", 0)),
+            ("AppCompat Hits",  r.get("appcompat_hits", 0)),
+            ("Cheat File Hits", r.get("cheat_hits", 0)),
+            ("YARA Hits",       r.get("yara_hits", 0)),
+            ("Unsigned EXEs",   len(r.get("unsigned_hits", []))),
+            ("SysMain Hits",    r.get("sysmain_hits", 0)),
         ]
-        for label,val in rows:
-            bar="█"*min(val,24)
-            tag="bad" if val>0 else "ok"
-            sym="△" if val>0 else "○"
-            self._w(k,f"  {sym}  {label:<22}  {val:>3}  {bar}\n",tag)
+        for label, val in rows:
+            bar = "█" * min(val, 28)
+            tag = "bad" if val > 0 else "dim"
+            sym = "▲" if val > 0 else "○"
+            self._w(k, f"  {sym}  {label:<22}  {val:>3}  {bar}\n", tag)
 
-        total=r.get("total_hits",0)
-        self._w(k,f"\n  ─────────────────────────────────────────────────\n","dim")
-        self._w(k,f"  TOTAL HITS  :  {total}\n\n",vt)
-        self._w(k,"  ── Roblox Accounts ───────────────────────────────\n","dim")
-        accs=r.get("roblox_accounts",[])
+        total = r.get("total_hits", 0)
+        self._w(k, f"\n  ────────────────────────────────────────────────────\n", "dim")
+        self._w(k, f"  TOTAL HITS  :  {total}\n\n", vt)
+
+        self._w(k, "  ◈ Roblox Accounts ────────────────────────────────\n", "hl")
+        accs = r.get("roblox_accounts", [])
         if accs:
             for a in accs:
-                self._w(k,f"  ›  {a}\n","warn" if len(accs)>1 else "info")
-            if len(accs)>1:
-                self._w(k,f"\n  ⚠  {len(accs)} accounts detected — review for ban evasion\n","bad")
+                name = a.get("username","?") if isinstance(a, dict) else str(a)
+                uid  = a.get("userid","") if isinstance(a, dict) else ""
+                self._w(k, f"  ›  {name}", "warn" if len(accs) > 1 else "info")
+                if uid: self._w(k, f"  (ID: {uid})", "dim")
+                self._w(k, "\n", "white")
+            if len(accs) > 1:
+                self._w(k, f"\n  ⚠  {len(accs)} accounts — possible ban evasion\n", "bad")
         else:
-            self._w(k,"  No accounts detected\n","dim")
-        self._w(k,f"\n  Recycle Bin Modified: {r.get('recycle_bin_time','Unknown')}\n","dim")
+            self._w(k, "  No accounts detected\n", "dim")
 
-    # ── Scan
+    # ── Scan ─────────────────────────────────────────────────
     def _start(self):
         if self.scanning: return
-        self.scanning=True; self._wh_sent=False
+        self.scanning = True; self._wh_sent = False
         self._setup_tags()
-        self._run_btn.config(state="disabled",text="Scanning…",bg=self.BG3,fg=self.FG2)
-        self._status_lbl.config(text="SCANNING",fg=self.AMBER)
+        self._run_btn.config(state="disabled", text="Scanning…",
+                             bg=self.BG4, fg=self.FG2)
+        self._status_lbl.config(text="SCANNING", fg=self.AMBER)
         self._wh_lbl.config(text="")
         self._pb_start()
-        threading.Thread(target=self._do_scan,daemon=True).start()
+        threading.Thread(target=self._do_scan, daemon=True).start()
 
     def _do_scan(self):
         try:
-            r=run_full_scan(league=self._league)
-            self.results=r
-            self.root.after(0,self._show,r)
+            r = run_full_scan(league=self._league)
+            self.results = r
+            self.root.after(0, self._show, r)
         except Exception as e:
-            self.root.after(0,self._err,str(e))
+            self.root.after(0, self._err, str(e))
 
-    def _show(self,r):
-        self._pb_stop(); self.scanning=False
-        v=r.get("verdict","UNKNOWN")
-        vc={"CHEATER":self.RED,"SUSPICIOUS":self.AMBER,"CLEAN":self.GREEN}.get(v,self.FG2)
-        self._status_lbl.config(text=v,fg=vc)
-        self._run_btn.config(state="normal",text="Run Scan",bg=self.WHITE,fg=self.BG)
+    def _show(self, r):
+        self._pb_stop(); self.scanning = False
+        v  = r.get("verdict", "UNKNOWN")
+        vc = {"CHEATER":self.RED,"SUSPICIOUS":self.AMBER,"CLEAN":self.GREEN}.get(v, self.FG2)
+        self._status_lbl.config(text=v, fg=vc)
+        self._run_btn.config(state="normal", text="Run Scan",
+                             bg=self.GREEN, fg="#000000")
         self._render_summary(r)
         for key in ("shellbags","bam","prefetch","appcompat","roblox","cheat","yara","unsigned","recycle","sysmain"):
-            self._render(key,r.get(key,""))
-        self._switch("summary",self._nav_btns["summary"])
-        threading.Thread(target=self._do_send,daemon=True).start()
+            self._render(key, r.get(key, ""))
+        self._switch("summary", self._nav_btns["summary"])
+        threading.Thread(target=self._do_send, daemon=True).start()
 
-    def _err(self,msg):
-        self._pb_stop(); self.scanning=False
-        self._status_lbl.config(text="ERROR",fg=self.RED)
-        self._run_btn.config(state="normal",text="Run Scan",bg=self.WHITE,fg=self.BG)
-        messagebox.showerror("Scan Error",msg)
+    def _err(self, msg):
+        self._pb_stop(); self.scanning = False
+        self._status_lbl.config(text="ERROR", fg=self.RED)
+        self._run_btn.config(state="normal", text="Run Scan",
+                             bg=self.GREEN, fg="#000000")
+        messagebox.showerror("Lite — Scan Error", msg)
 
     def _do_send(self):
-        self.root.after(0,lambda: self._wh_lbl.config(text="sending…",fg=self.AMBER))
-        wh_ok,wh_err = send_webhook(self.results)
-        wb_ok,wb_err = send_website(self.results, self._pin)
+        self.root.after(0, lambda: self._wh_lbl.config(text="sending…", fg=self.AMBER))
+        wh_ok, wh_err = send_webhook(self.results)
+        wb_ok, wb_err = send_website(self.results, self._pin)
         self._wh_sent = wh_ok or wb_ok
         if wh_ok and wb_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text="✓ results sent",fg=self.GREEN))
+            self.root.after(0, lambda: self._wh_lbl.config(text="✓ sent", fg=self.GREEN))
         elif wh_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text=f"✓ webhook  ✗ web: {wb_err[:50]}",fg=self.AMBER))
+            self.root.after(0, lambda: self._wh_lbl.config(
+                text=f"✓ webhook  ✗ web: {wb_err[:60]}", fg=self.AMBER))
         elif wb_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text=f"✓ web  ✗ webhook: {wh_err[:50]}",fg=self.AMBER))
+            self.root.after(0, lambda: self._wh_lbl.config(
+                text=f"✓ web  ✗ webhook: {wh_err[:60]}", fg=self.AMBER))
         else:
             err_show = (wb_err or wh_err or "unknown")[:90]
-            self.root.after(0,lambda e=err_show: self._wh_lbl.config(text=f"✗ {e}",fg=self.RED))
+            self.root.after(0, lambda e=err_show: self._wh_lbl.config(
+                text=f"✗ {e}", fg=self.RED))
 
     def _save(self):
         if not self.results:
-            messagebox.showwarning("No Results","Run a scan first."); return
-        path=filedialog.asksaveasfilename(defaultextension=".txt",
+            messagebox.showwarning("No Results", "Run a scan first."); return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
             filetypes=[("Text Report","*.txt"),("All Files","*.*")],
-            initialfile="pc_checker_report.txt")
+            initialfile="lite_report.txt")
         if not path: return
         try:
-            with open(path,"w",encoding="utf-8") as f: f.write(self.results.get("full_report","No report."))
-            messagebox.showinfo("Saved",f"Saved to:\n{path}")
-        except Exception as e: messagebox.showerror("Error",str(e))
-
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.results.get("full_report", "No report."))
+            messagebox.showinfo("Saved", f"Report saved:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
 if __name__ == "__main__":
     root = tk.Tk()
