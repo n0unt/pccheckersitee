@@ -9,6 +9,7 @@ import hashlib, secrets, string, datetime, json, os, urllib.request, urllib.pars
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production")
+app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024  # 150MB max upload
 
 DATABASE_URL        = os.environ.get("DATABASE_URL", "")
 DISCORD_CLIENT_ID   = os.environ.get("DISCORD_CLIENT_ID", "")
@@ -122,6 +123,9 @@ def init_db():
             cur.execute("INSERT INTO users (discord_id,username,role,leagues,created) VALUES (NULL,%s,'owner','UFF,FFL',%s)",
                         ("ars", now()))
     except Exception: pass
+    # Settings table for EXE hosting etc.
+    cur.execute("""CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY, value TEXT NOT NULL)""")
     # Auto-cleanup old pins (>3 days)
     try:
         cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
@@ -168,7 +172,7 @@ def discord_auth():
         "client_id": DISCORD_CLIENT_ID,
         "redirect_uri": DISCORD_REDIRECT,
         "response_type": "code",
-        "scope": "identify guilds.members.read",
+        "scope": "identify guilds",
         "state": state,
     })
     return redirect(f"https://discord.com/api/oauth2/authorize?{params}")
@@ -189,7 +193,9 @@ def discord_callback():
         "redirect_uri": DISCORD_REDIRECT,
     })
     if status != 200 or "access_token" not in token_data:
-        return redirect(url_for("login_page") + "?error=token_failed")
+        err_detail = token_data.get("error_description") or token_data.get("error") or str(token_data)[:100]
+        app.logger.error(f"Discord token exchange failed {status}: {err_detail}")
+        return redirect(url_for("login_page") + f"?error=token_failed&detail={urllib.parse.quote(err_detail)}")
 
     access_token = token_data["access_token"]
 
@@ -248,7 +254,8 @@ def discord_callback():
 # ── Pages ────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return redirect(url_for("dashboard") if "user_id" in session else url_for("login_page"))
+    user = get_user() if "user_id" in session else None
+    return render_template("home.html", user=user)
 
 @app.route("/login")
 def login_page():
@@ -256,10 +263,14 @@ def login_page():
     errors = {
         "no_access": "You don't have the required Discord role to access this.",
         "token_failed": "Discord login failed. Try again.",
-        "state_mismatch": "Security error. Try again.",
+        "state_mismatch": "Security error. Please try again.",
         "user_failed": "Could not fetch your Discord profile.",
     }
-    return render_template("login.html", error=errors.get(error))
+    detail = request.args.get("detail","")
+    err_msg = errors.get(error)
+    if err_msg and detail and error == "token_failed":
+        err_msg = f"Discord login failed: {detail}"
+    return render_template("login.html", error=err_msg)
 
 @app.route("/logout")
 def logout():
@@ -296,10 +307,11 @@ def results_page(pin):
 
 # ── API: Stats ───────────────────────────────────────────────
 @app.route("/api/stats")
-@login_required
 def api_stats():
-    user = get_user(); conn = get_db(); cur = conn.cursor()
-    if user["role"] in ("owner", "admin"):
+    # Public totals are fine to show on home page; detailed breakdown requires login
+    user = get_user() if "user_id" in session else None
+    conn = get_db(); cur = conn.cursor()
+    if user and user["role"] in ("owner", "admin"):
         cur.execute("SELECT COUNT(*) FROM scans"); total = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CHEATER'"); cheater = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS'"); susp = cur.fetchone()[0]
@@ -457,27 +469,36 @@ def api_admin_delete_user(uid):
 # ── Public pages ─────────────────────────────────────────────
 @app.route("/download")
 def download_page():
-    conn = get_db(); cur = conn.cursor()
+    meta = {}
     try:
+        conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT value FROM settings WHERE key=%s", ("exe_meta",))
         row = cur.fetchone()
         meta = json.loads(row[0]) if row else {}
-    except Exception:
-        meta = {}
-    cur.close(); conn.close()
+        cur.close(); conn.close()
+    except Exception: pass
+    has_exe = bool(meta.get("b64",""))
+    user = get_user() if "user_id" in session else None
     return render_template("download.html",
-                           download_url=meta.get("url"),
+                           has_exe=has_exe,
                            version=meta.get("version","v3.0"),
                            file_size=meta.get("size",""),
-                           updated=meta.get("updated",""))
+                           updated=meta.get("updated",""),
+                           user=user)
 
 @app.route("/privacy")
 def privacy_page():
-    return render_template("privacy.html")
+    user = get_user() if "user_id" in session else None
+    return render_template("privacy.html", user=user)
 
 @app.route("/terms")
 def terms_page():
-    return render_template("terms.html")
+    user = get_user() if "user_id" in session else None
+    return render_template("terms.html", user=user)
+
+@app.route("/home")
+def home_page():
+    return redirect(url_for("login_page"))
 
 @app.route("/api/admin/upload-exe", methods=["POST"])
 @login_required
@@ -485,45 +506,43 @@ def terms_page():
 def upload_exe():
     import base64
     f = request.files.get("file")
-    ver = request.form.get("version","v3.0")
-    if not f: return jsonify({"error":"No file"}),400
+    ver = (request.form.get("version") or "v3.0").strip()
+    if not f: return jsonify({"error":"No file provided"}),400
+    filename = f.filename or "scanner.exe"
     data = f.read()
-    # Store as base64 in settings table (small EXEs only — for large files use external storage)
+    if len(data) == 0: return jsonify({"error":"File is empty"}),400
     b64 = base64.b64encode(data).decode()
     size_mb = round(len(data)/1024/1024, 1)
-    meta = {"version": ver, "size": f"{size_mb} MB",
+    meta = {"version": ver, "size": f"{size_mb} MB", "filename": filename,
             "updated": now(), "b64": b64}
-    conn = get_db(); cur = conn.cursor()
     try:
-        cur.execute("""CREATE TABLE IF NOT EXISTS settings
-                       (key TEXT PRIMARY KEY, value TEXT NOT NULL)""")
+        conn = get_db(); cur = conn.cursor()
         cur.execute("INSERT INTO settings (key,value) VALUES (%s,%s) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
                     ("exe_meta", json.dumps(meta)))
-        conn.commit()
+        conn.commit(); cur.close(); conn.close()
     except Exception as e:
-        cur.close(); conn.close()
         return jsonify({"error":str(e)}),500
-    cur.close(); conn.close()
-    return jsonify({"ok":True})
+    return jsonify({"ok":True,"version":ver,"size":f"{size_mb} MB"})
 
 @app.route("/download/exe")
 def download_exe():
     import base64
-    conn = get_db(); cur = conn.cursor()
+    from flask import Response
     try:
+        conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT value FROM settings WHERE key=%s",("exe_meta",))
         row = cur.fetchone()
+        cur.close(); conn.close()
     except Exception:
-        row = None
-    cur.close(); conn.close()
+        abort(404)
     if not row: abort(404)
     meta = json.loads(row[0])
     b64  = meta.get("b64","")
     if not b64: abort(404)
-    from flask import Response
     data = base64.b64decode(b64)
+    fname = meta.get("filename","LiteScanner.exe")
     return Response(data, mimetype="application/octet-stream",
-                    headers={"Content-Disposition":"attachment; filename=LiteScanner.exe"})
+                    headers={"Content-Disposition":f"attachment; filename={fname}"})
 
 with app.app_context():
     init_db()
