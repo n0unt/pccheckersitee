@@ -294,6 +294,62 @@ def index():
     user = get_user() if "user_id" in session else None
     return render_template("home.html", user=user)
 
+@app.route("/auth/debug")
+def auth_debug():
+    """Public debug page — shows OAuth config so you can verify it matches Discord portal."""
+    import urllib.parse
+    state = "teststate123"
+    params = urllib.parse.urlencode({
+        "client_id": DISCORD_CLIENT_ID,
+        "redirect_uri": DISCORD_REDIRECT,
+        "response_type": "code",
+        "scope": "identify guilds",
+        "state": state,
+    })
+    oauth_url = f"https://discord.com/api/oauth2/authorize?{params}"
+    
+    # Check if bot token works
+    bot_self = {}
+    guild_info = {}
+    if DISCORD_BOT_TOKEN:
+        bot_self = _discord_get("/users/@me", bot=True)
+    if DISCORD_BOT_TOKEN and DISCORD_GUILD_ID:
+        guild_info = _discord_get(f"/guilds/{DISCORD_GUILD_ID}", bot=True)
+
+    html = f"""<!DOCTYPE html>
+<html><head><title>Lite Auth Debug</title>
+<style>
+body{{font-family:monospace;background:#080b10;color:#f0f4ff;padding:40px;}}
+h2{{color:#00f5a0;}} .ok{{color:#00f5a0;}} .bad{{color:#ff4d6d;}} .warn{{color:#ffb830;}}
+pre{{background:#0f1420;padding:16px;border-radius:8px;border:1px solid #1e2d44;overflow-x:auto;}}
+a{{color:#00f5a0;}}
+</style></head><body>
+<h2>Lite — OAuth2 Debug</h2>
+<pre>
+DISCORD_CLIENT_ID    : {DISCORD_CLIENT_ID or "<span class='bad'>NOT SET</span>"}
+DISCORD_CLIENT_SECRET: {"*****" + DISCORD_CLIENT_SECRET[-4:] if len(DISCORD_CLIENT_SECRET) > 4 else "<span class='bad'>NOT SET</span>"}
+DISCORD_REDIRECT     : {DISCORD_REDIRECT}
+DISCORD_GUILD_ID     : {DISCORD_GUILD_ID or "<span class='bad'>NOT SET</span>"}
+DISCORD_BOT_TOKEN    : {"*****" + DISCORD_BOT_TOKEN[-4:] if len(DISCORD_BOT_TOKEN) > 4 else "<span class='bad'>NOT SET</span>"}
+
+BOT USER             : {bot_self.get("username","<span class='bad'>FAILED — bot token wrong or missing</span>")}#{bot_self.get("discriminator","")}
+BOT ID               : {bot_self.get("id","?")}
+GUILD NAME           : {guild_info.get("name","<span class='bad'>FAILED — bot not in server or guild ID wrong</span>")}
+GUILD ID             : {guild_info.get("id","?")}
+
+ROLE_LITE            : {ROLE_LITE}
+ROLE_UFF             : {ROLE_UFF}
+ROLE_FFL             : {ROLE_FFL}
+</pre>
+<h2>OAuth URL (copy this, compare to Discord portal redirect)</h2>
+<pre>{DISCORD_REDIRECT}</pre>
+<p>👆 This MUST exactly match what you put in Discord Developer Portal → OAuth2 → Redirects</p>
+<h2>Test Login</h2>
+<p><a href="/auth/discord">Click here to test Discord login →</a></p>
+<p><a href="/">← Back to home</a></p>
+</body></html>"""
+    return html
+
 @app.route("/login")
 def login_page():
     error = request.args.get("error")
