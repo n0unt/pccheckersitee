@@ -24,7 +24,7 @@ _WH_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3MzkwMDQ0MzQ4NTg2ODE4N
 WEBHOOK_URL = _d(_WH_ENC)
 
 # ← Set this to your Railway/Render URL once deployed
-WEBSITE_URL = "https://your-app.railway.app"
+WEBSITE_URL = "https://pccheckersitee-production.up.railway.app/"
 
 FALSE_POSITIVE_PATHS = [
     "microsoft","windows","edge","chrome","firefox","mozilla",
@@ -113,26 +113,44 @@ def section(title, lines):
 # ============================================================
 #  PIN VALIDATION
 # ============================================================
+def _make_request(url, payload_dict, timeout=10):
+    """Cross-platform HTTPS POST — SSL verification fully disabled for compatibility."""
+    import urllib.request, urllib.error
+    payload = json.dumps(payload_dict).encode("utf-8")
+    # Completely bypass SSL verification — works on all Windows versions
+    ctx = ssl._create_unverified_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={"Content-Type": "application/json",
+                 "User-Agent": "PCChecker/3.0"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+            return resp.status, json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        try: body = json.loads(e.read().decode())
+        except Exception: body = {}
+        return e.code, body
+    except Exception as e:
+        raise
+
 def validate_pin(pin, league):
     """Returns (valid: bool, error_msg: str)"""
     try:
         url = WEBSITE_URL.rstrip("/") + "/api/pins/validate"
-        payload = json.dumps({"pin": pin, "league": league}).encode()
-        url_no_scheme = url.replace("https://","").replace("http://","")
-        host, path = url_no_scheme.split("/",1)
-        path = "/" + path
-        ctx  = ssl.create_default_context()
-        conn = http.client.HTTPSConnection(host, 443, context=ctx, timeout=10)
-        conn.request("POST", path, body=payload,
-                     headers={"Content-Type":"application/json","Content-Length":str(len(payload))})
-        resp = conn.getresponse()
-        body = json.loads(resp.read().decode())
-        conn.close()
-        if resp.status == 200 and body.get("valid"):
+        # Send pin uppercase, stripped, no spaces
+        clean_pin = pin.upper().strip().replace(" ", "")
+        status, body = _make_request(url, {"pin": clean_pin, "league": league.upper().strip()})
+        if status == 200 and body.get("valid"):
             return True, ""
-        return False, body.get("error", "Invalid PIN")
+        # Show detailed error including status code so we can debug
+        err = body.get("error", "Invalid PIN")
+        return False, f"{err} (HTTP {status})"
     except Exception as e:
-        return False, f"Could not reach server: {e}"
+        return False, f"Server error: {type(e).__name__}: {e}"
 
 # ============================================================
 #  WEBHOOK + WEBSITE SUBMIT
@@ -147,6 +165,8 @@ def _post_json(payload_dict, url_override=None, retries=3):
     for attempt in range(retries):
         try:
             ctx  = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
             conn = http.client.HTTPSConnection(host,443,context=ctx,timeout=20)
             conn.request("POST", path, body=payload,
                          headers={"Content-Type":"application/json",
@@ -236,36 +256,32 @@ def send_webhook(results):
 def send_website(results, pin):
     """Submit scan results to the web dashboard."""
     try:
-        payload = json.dumps({
-            "pin":          pin,
-            "league":       results.get("league","?"),
-            "pc_user":      current_user(),
-            "verdict":      results.get("verdict","UNKNOWN"),
-            "total_hits":   results.get("total_hits",0),
+        url = WEBSITE_URL.rstrip("/") + "/api/submit"
+        # Use the rich report dict if available, otherwise build it
+        report = results.get("report") or {
+            "shellbag_hits":  results.get("shellbag_hits",0),
+            "bam_hits":       results.get("bam_hits",0),
+            "prefetch_hits":  results.get("prefetch_hits",0),
+            "appcompat_hits": results.get("appcompat_hits",0),
+            "cheat_hits":     results.get("cheat_hits",0),
+            "yara_hits":      results.get("yara_hits",0),
+            "unsigned_count": len(results.get("unsigned_hits",[])) if isinstance(results.get("unsigned_hits"),list) else 0,
+            "sysmain_hits":   results.get("sysmain_hits",0),
+            "sysmain_autofail": results.get("sysmain_autofail",False),
+            "discord_accounts": results.get("discord_accounts",[]),
+            "fastflags":      results.get("fastflag_hits",[]),
+            "full_report":    results.get("full_report",""),
+        }
+        status, body = _make_request(url, {
+            "pin":             pin,
+            "league":          results.get("league","?"),
+            "pc_user":         current_user(),
+            "verdict":         results.get("verdict","UNKNOWN"),
+            "total_hits":      results.get("total_hits",0),
             "roblox_accounts": results.get("roblox_accounts",[]),
-            "report": {
-                "shellbag_hits":  results.get("shellbag_hits",0),
-                "bam_hits":       results.get("bam_hits",0),
-                "prefetch_hits":  results.get("prefetch_hits",0),
-                "appcompat_hits": results.get("appcompat_hits",0),
-                "cheat_hits":     results.get("cheat_hits",0),
-                "yara_hits":      results.get("yara_hits",0),
-                "unsigned_count": len(results.get("unsigned_hits",[])),
-                "full_report":    results.get("full_report",""),
-            }
-        }).encode("utf-8")
-        url  = WEBSITE_URL.rstrip("/") + "/api/submit"
-        url_ns = url.replace("https://","").replace("http://","")
-        host, path = url_ns.split("/",1)
-        path = "/" + path
-        ctx  = ssl.create_default_context()
-        conn = http.client.HTTPSConnection(host,443,context=ctx,timeout=20)
-        conn.request("POST",path,body=payload,
-                     headers={"Content-Type":"application/json","Content-Length":str(len(payload))})
-        resp = conn.getresponse()
-        body = json.loads(resp.read().decode())
-        conn.close()
-        return resp.status==200, body.get("error","")
+            "report":          report,
+        }, timeout=30)
+        return status == 200, body.get("error","")
     except Exception as e:
         return False, str(e)
 
@@ -785,29 +801,339 @@ def scan_recycle_bin():
     if not hits: lines.append("✓ No cheat files in Recycle Bin.")
     return section("Recycle Bin",lines),len(hits),last_mod
 
+
+def scan_sysmain():
+    """
+    Detect if SysMain (Superfetch) service is disabled.
+    SysMain controls Prefetch — disabling it is a common technique
+    to prevent execution traces from being written.
+    If disabled AND prefetch folder is empty/missing = AUTO FAIL signal.
+    """
+    if not WINDOWS:
+        return section("SysMain / Prefetch Service", ["Windows only"]), 0, False
+
+    sysmain_disabled = False
+    start_value      = None
+    state_str        = "Unknown"
+    lines            = []
+
+    # Check registry for SysMain service start type
+    # 2 = Auto, 3 = Manual, 4 = Disabled
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Services\SysMain",
+            0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+        )
+        start_value, _ = winreg.QueryValueEx(key, "Start")
+        winreg.CloseKey(key)
+        state_map  = {2: "Automatic (Normal)", 3: "Manual", 4: "DISABLED"}
+        state_str  = state_map.get(start_value, f"Unknown ({start_value})")
+        sysmain_disabled = (start_value == 4)
+    except Exception as e:
+        lines.append(f"  Could not read SysMain registry: {e}")
+
+    # Check how many prefetch files exist
+    pf_dir   = r"C:\Windows\Prefetch"
+    pf_count = 0
+    try:
+        pf_count = len(glob.glob(os.path.join(pf_dir, "*.pf")))
+    except Exception:
+        pass
+
+    # Determine auto-fail condition:
+    # SysMain disabled + fewer than 5 prefetch files = deliberate trace hiding
+    pf_empty     = pf_count < 5
+    auto_fail    = sysmain_disabled and pf_empty
+    hit_count    = 0
+
+    lines.append(f"  SysMain Service State : {state_str}")
+    lines.append(f"  Registry Start Value  : {start_value}")
+    lines.append(f"  Prefetch File Count   : {pf_count}")
+    lines.append("")
+
+    if sysmain_disabled:
+        hit_count += 3
+        lines.append("  ⚠ SysMain is DISABLED — Prefetch logging suppressed")
+        lines.append("  ⚠ This prevents execution history from being recorded")
+        if pf_empty:
+            hit_count += 5  # Extra weight — combined signal is very strong
+            lines.append("")
+            lines.append("  ✗ AUTO FAIL: SysMain disabled AND Prefetch folder nearly empty")
+            lines.append("  ✗ This combination strongly indicates deliberate trace wiping")
+        else:
+            lines.append(f"  NOTE: {pf_count} prefetch files still present")
+            lines.append("  This may indicate SysMain was recently disabled after use")
+    else:
+        lines.append(f"  ✓ SysMain is running normally ({state_str})")
+        if pf_count < 10:
+            hit_count += 1
+            lines.append(f"  ⚠ Low prefetch count ({pf_count}) despite SysMain enabled — possible manual wipe")
+        else:
+            lines.append(f"  ✓ Prefetch file count normal ({pf_count} files)")
+
+    return section("SysMain / Prefetch Service Check", lines), hit_count, auto_fail
+
+
+# ============================================================
+#  NEW DETECTIONS v3
+# ============================================================
+
+def scan_discord_cache():
+    """Read Discord local storage/cache to find account usernames/IDs."""
+    hits = []
+    discord_paths = [
+        os.path.expanduser(r"~\AppData\Roaming\discord\Local Storage\leveldb"),
+        os.path.expanduser(r"~\AppData\Roaming\discordptb\Local Storage\leveldb"),
+        os.path.expanduser(r"~\AppData\Roaming\discordcanary\Local Storage\leveldb"),
+    ]
+    TOKEN_RE  = re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
+    ID_RE     = re.compile(r'"id"\s*:\s*"(\d{17,19})"')
+    NAME_RE   = re.compile(r'"username"\s*:\s*"([^"]{2,32})"')
+    accounts  = []
+    seen_ids  = set()
+
+    for base in discord_paths:
+        if not os.path.exists(base): continue
+        src = os.path.basename(os.path.dirname(base))
+        try:
+            for fname in os.listdir(base):
+                if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
+                fpath = os.path.join(base, fname)
+                try:
+                    with open(fpath, "rb") as f: raw = f.read().decode("utf-8", errors="ignore")
+                    ids    = ID_RE.findall(raw)
+                    names  = NAME_RE.findall(raw)
+                    tokens = TOKEN_RE.findall(raw)
+                    for uid in ids:
+                        if uid not in seen_ids:
+                            seen_ids.add(uid)
+                            uname = names[0] if names else "Unknown"
+                            accounts.append({"id": uid, "username": uname,
+                                             "has_token": bool(tokens), "source": src})
+                except Exception: pass
+        except Exception: pass
+
+    lines = [f"\n  Discord cache paths scanned: {len(discord_paths)}",
+             f"  Accounts found: {len(accounts)}", ""]
+    for acc in accounts:
+        lines.append(f"  Username : {acc['username']}")
+        lines.append(f"  ID       : {acc['id']}")
+        lines.append(f"  Token    : {'FOUND (suspicious)' if acc['has_token'] else 'Not found'}")
+        lines.append(f"  Source   : {acc['source']}")
+        lines.append("  " + "─"*30)
+    if not accounts: lines.append("  No Discord accounts found in cache.")
+    return section("Discord Cache", lines), len(accounts), accounts
+
+
+def scan_factory_reset():
+    """Detect Windows reinstall/factory reset history via registry."""
+    if not WINDOWS:
+        return section("Factory Reset", ["Windows only"]), False, ""
+    resets = []
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"SYSTEM\Setup",
+                             0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+        # Enumerate upgrade history
+        try:
+            hist_key = winreg.OpenKey(key, "Source OS", 0, winreg.KEY_READ)
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(hist_key, i)
+                    sk  = winreg.OpenKey(hist_key, sub, 0, winreg.KEY_READ)
+                    try:
+                        prod,_  = winreg.QueryValueEx(sk, "ProductName")
+                        build,_ = winreg.QueryValueEx(sk, "CurrentBuild")
+                        when,_  = winreg.QueryValueEx(sk, "InstallDate")
+                        resets.append(f"{prod} (Build {build}) installed {when}")
+                    except Exception: pass
+                    winreg.CloseKey(sk); i += 1
+                except OSError: break
+            winreg.CloseKey(hist_key)
+        except Exception: pass
+        winreg.CloseKey(key)
+    except Exception: pass
+
+    # Current install
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                             0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+        prod,_  = winreg.QueryValueEx(key, "ProductName")
+        build,_ = winreg.QueryValueEx(key, "CurrentBuild")
+        try: rel,_ = winreg.QueryValueEx(key, "ReleaseId")
+        except Exception: rel = "?"
+        try: idate,_ = winreg.QueryValueEx(key, "InstallDate")
+        except Exception: idate = "Unknown"
+        current = f"Current: {prod} (Build {build}, Release {rel}) — InstallDate: {idate}"
+        winreg.CloseKey(key)
+    except Exception:
+        current = "Could not read current Windows version"
+
+    lines = [f"\n  {current}", ""]
+    if resets:
+        lines.append("  Previous installs / resets:")
+        for r in resets: lines.append(f"    ► {r}")
+    else:
+        lines.append("  No previous installs found (may indicate fresh install or cleared history)")
+    reset_text = current + ("\n  " + "\n  ".join(resets) if resets else "")
+    return section("Factory Reset Detection", lines), bool(resets), reset_text
+
+
+def scan_fastflags():
+    """Detect Roblox FastFlags which can enable cheating features."""
+    SUSPICIOUS_FLAGS = {
+        "FFlagDebugGraphicsDisableDirect3D11": "Disables D3D11 (anti-cheat bypass)",
+        "FFlagDisableNewIGMinDUA": "Disables input guard",
+        "DFStringTaskSchedulerTargetFps": "Uncapped FPS exploit",
+        "FFlagDebugRenderingSetDeterministic": "Rendering manipulation",
+        "FFlagDisablePostFx": "Visual exploit flag",
+        "FFlagEnableHyperscaleImpostors": "Known cheat flag",
+        "FFlagFixGraphicsQuality": "Graphics bypass flag",
+    }
+    ff_paths = [
+        os.path.expanduser(r"~\AppData\Local\Roblox\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
+    ]
+    hits = []; all_flags = {}
+    for path in ff_paths:
+        if not os.path.exists(path): continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                flags = json.loads(f.read())
+            for k, v in flags.items():
+                all_flags[k] = v
+                if k in SUSPICIOUS_FLAGS:
+                    hits.append(f"{k} = {v}  [{SUSPICIOUS_FLAGS[k]}]")
+        except Exception: pass
+
+    lines = [f"\n  Total FastFlags found: {len(all_flags)}",
+             f"  Suspicious flags: {len(hits)}", ""]
+    if hits:
+        for h in hits: lines.append(f"  ⚠ {h}")
+    else:
+        lines.append("  ✓ No suspicious FastFlags detected.")
+    return section("FastFlag Detection", lines), len(hits), hits
+
+
+def scan_drives():
+    """Check for evidence of unplugged/external drives."""
+    if not WINDOWS:
+        return section("Drive Detection", ["Windows only"]), False, ""
+    drives_found = []
+    drive_warn   = False
+    lines        = []
+    # Check USB storage history in registry
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"SYSTEM\CurrentControlSet\Enum\USBSTOR",
+                             0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+        i = 0
+        while True:
+            try:
+                device = winreg.EnumKey(key, i)
+                dk = winreg.OpenKey(key, device, 0, winreg.KEY_READ)
+                j = 0
+                while True:
+                    try:
+                        inst = winreg.EnumKey(dk, j)
+                        ik   = winreg.OpenKey(dk, inst, 0, winreg.KEY_READ)
+                        try: friendly,_ = winreg.QueryValueEx(ik, "FriendlyName")
+                        except Exception: friendly = device
+                        drives_found.append(friendly)
+                        winreg.CloseKey(ik); j += 1
+                    except OSError: break
+                winreg.CloseKey(dk); i += 1
+            except OSError: break
+        winreg.CloseKey(key)
+    except Exception: pass
+
+    # Current drives
+    current_letters = []
+    try:
+        import string as _str
+        for letter in _str.ascii_uppercase:
+            if os.path.exists(f"{letter}:\\"):
+                current_letters.append(f"{letter}:")
+    except Exception: pass
+
+    lines.append(f"  Current drives detected: {', '.join(current_letters) or 'None'}")
+    lines.append(f"  USB storage devices (ever connected): {len(drives_found)}")
+    if drives_found:
+        lines.append("")
+        for d in drives_found[:20]: lines.append(f"  ► {d}")
+    if len(drives_found) > 3:
+        drive_warn = True
+        lines.append(f"\n  ⚠ {len(drives_found)} USB storage devices detected — check for external drives")
+
+    info_str = f"Current: {', '.join(current_letters)} | USB history: {len(drives_found)} devices"
+    return section("Drive Detection", lines), drive_warn, info_str
+
 def run_full_scan(league="?"):
-    sb_t,sb_h,_  = scan_shellbags()
-    bm_t,bm_h,_  = scan_bam()
-    pf_t,pf_h,_  = scan_prefetch()
-    ac_t,ac_h,_  = scan_appcompat()
-    rl_t,rl_h,accs= scan_roblox_logs()
-    cs_t,cs_h,_  = scan_cheat_files()
-    yr_t,yr_h,_  = scan_yara()
-    us_t,us_h,us_l= scan_unsigned()
-    rb_t,rb_h,rb_l= scan_recycle_bin()
-    total=sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+rl_h
-    verdict="CHEATER" if total>=5 else ("SUSPICIOUS" if total>=1 else "CLEAN")
+    sb_t,sb_h,_         = scan_shellbags()
+    bm_t,bm_h,_         = scan_bam()
+    pf_t,pf_h,_         = scan_prefetch()
+    ac_t,ac_h,_         = scan_appcompat()
+    rl_t,rl_h,accs      = scan_roblox_logs()
+    cs_t,cs_h,_         = scan_cheat_files()
+    yr_t,yr_h,_         = scan_yara()
+    us_t,us_h,us_l      = scan_unsigned()
+    rb_t,rb_h,rb_l      = scan_recycle_bin()
+    sm_t,sm_h,auto_fail = scan_sysmain()
+    dc_t,dc_h,dc_accs   = scan_discord_cache()
+    fr_t,_,fr_text      = scan_factory_reset()
+    ff_t,ff_h,ff_hits   = scan_fastflags()
+    dv_t,dv_warn,dv_inf = scan_drives()
+
+    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+rl_h+sm_h+ff_h
+
+    if auto_fail:
+        verdict = "CHEATER"
+    else:
+        verdict = "CHEATER" if total>=5 else ("SUSPICIOUS" if total>=1 else "CLEAN")
+
+    # Build rich roblox account objects if accs is just strings
+    roblox_list = []
+    if isinstance(accs, list):
+        for a in accs:
+            if isinstance(a, dict): roblox_list.append(a)
+            else: roblox_list.append({"username": str(a), "userid": None, "sources": [], "placeids": [], "last_seen": None})
+
     return {
         "shellbags":sb_t,"bam":bm_t,"prefetch":pf_t,"appcompat":ac_t,
-        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,"recycle":rb_t,
+        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,
+        "recycle":rb_t,"sysmain":sm_t,"discord":dc_t,
         "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
         "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_hits":us_l,
-        "roblox_accounts":accs if isinstance(accs,list) else [],
+        "sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
+        "fastflag_hits":ff_h,
+        "roblox_accounts": roblox_list,
+        "discord_accounts": dc_accs,
         "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
         "total_hits":total,"verdict":verdict,"league":league,
+        "report": {
+            "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
+            "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
+            "sysmain_hits":sm_h,"sysmain_autofail":auto_fail,"sysmain_raw":sm_t,
+            "roblox_hits":rl_h,"fastflags":ff_hits,
+            "discord_accounts":dc_accs,
+            "factory_resets":fr_text,
+            "drive_info":dv_inf,"drive_warn":dv_warn,
+            "shellbags_raw":sb_t,"bam_raw":bm_t,"prefetch_raw":pf_t,"appcompat_raw":ac_t,
+            "roblox_raw":rl_t,"cheat_raw":cs_t,"unsigned_raw":us_t,"recycle_raw":rb_t,
+            "full_report":"\n".join([
+                f"PC CHECKER v3  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
+                sb_t,bm_t,pf_t,ac_t,rl_t,cs_t,yr_t,us_t,rb_t,sm_t,dc_t,fr_t,ff_t,dv_t,
+                f"\nAUTO FAIL: {auto_fail}",
+                f"\nVERDICT: {verdict}  —  Total Hits: {total}"
+            ]),
+        },
         "full_report":"\n".join([
             f"PC CHECKER v3  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
-            sb_t,bm_t,pf_t,ac_t,rl_t,cs_t,yr_t,us_t,rb_t,
+            sb_t,bm_t,pf_t,ac_t,rl_t,cs_t,yr_t,us_t,rb_t,sm_t,dc_t,fr_t,ff_t,dv_t,
+            f"\nAUTO FAIL: {auto_fail}",
             f"\nVERDICT: {verdict}  —  Total Hits: {total}"
         ]),
     }
@@ -841,6 +1167,86 @@ class App:
         self._pin         = ""
         self._league      = "UFF"
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._show_tos_screen()
+
+    # ╔══════════════════════════════════════════════════════╗
+    # ║  TERMS OF SERVICE SCREEN                             ║
+    # ╚══════════════════════════════════════════════════════╝
+    def _show_tos_screen(self):
+        self._tos_win = tk.Toplevel()
+        self._tos_win.title("PC Checker — Terms of Service")
+        self._tos_win.geometry("520x580")
+        self._tos_win.configure(bg=self.BG)
+        self._tos_win.resizable(False, False)
+        self._tos_win.protocol("WM_DELETE_WINDOW", lambda: (self._tos_win.destroy(), self.root.destroy()))
+
+        self._tos_win.update_idletasks()
+        sw = self._tos_win.winfo_screenwidth()
+        sh = self._tos_win.winfo_screenheight()
+        self._tos_win.geometry(f"520x580+{(sw-520)//2}+{(sh-580)//2}")
+
+        cv = tk.Canvas(self._tos_win, width=520, height=580, bg=self.BG, highlightthickness=0)
+        cv.place(x=0, y=0)
+        cv.create_line(0,0,48,0,fill=self.WHITE,width=2)
+        cv.create_line(0,0,0,48,fill=self.WHITE,width=2)
+        cv.create_line(520,580,472,580,fill=self.FG3,width=1)
+        cv.create_line(520,580,520,532,fill=self.FG3,width=1)
+
+        f = tk.Frame(self._tos_win, bg=self.BG)
+        f.place(x=48, y=56, width=424)
+
+        tk.Label(f, text="PC CHECKER", font=("Segoe UI", 9, "bold"),
+                 fg=self.FG2, bg=self.BG).pack(anchor="w")
+        tk.Label(f, text="Terms of Service", font=("Segoe UI", 20, "bold"),
+                 fg=self.FG, bg=self.BG).pack(anchor="w", pady=(4,0))
+        tk.Label(f, text="Last updated: 2/22/2026", font=("Segoe UI", 9),
+                 fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(2,16))
+
+        # Scrolled text box for ToS
+        txt_frame = tk.Frame(f, bg=self.BORDER, bd=0)
+        txt_frame.pack(fill="x", pady=(0, 14))
+        txt = tk.Text(txt_frame, width=52, height=14, font=("Segoe UI", 9),
+                      bg=self.BG2, fg=self.FG2, bd=0, padx=10, pady=10,
+                      relief="flat", wrap="word", cursor="arrow",
+                      selectbackground=self.BG3)
+        txt.pack(side="left", fill="both", expand=True)
+        sb = tk.Scrollbar(txt_frame, orient="vertical", command=txt.yview)
+        sb.pack(side="right", fill="y")
+        txt.configure(yscrollcommand=sb.set)
+        TOS_TEXT = (
+            "By using this software, you acknowledge and agree that the creator "
+            "of this software is NOT responsible for how the information obtained "
+            "is used by third party leagues and members.\n\n"
+            "This tool is provided to aid in the screensharing process and no "
+            "information will be distributed by the owner of the software.\n\n"
+            "If the league or individual using the software on you is NOT listed "
+            "or has received proper authorization, please report it immediately "
+            "by DMing Discord user: converts_19942 or by joining the Lite server "
+            "and making a ticket.\n\n"
+            "Unauthorized usage will be revoked."
+        )
+        txt.insert("1.0", TOS_TEXT)
+        txt.configure(state="disabled")
+
+        tk.Label(f, text="You must read and agree before the scan can begin.",
+                 font=("Segoe UI", 9), fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0,10))
+
+        agree_btn = tk.Button(f, text="I have read and agree to Terms of Service",
+                              font=("Segoe UI", 10, "bold"),
+                              bg=self.WHITE, fg="#000000", activebackground=self.FG,
+                              bd=0, padx=14, pady=10, cursor="hand2",
+                              command=self._tos_accepted)
+        agree_btn.pack(fill="x")
+
+        tk.Label(f, text="Declining will close the application.",
+                 font=("Segoe UI", 8), fg=self.FG3, bg=self.BG).pack(pady=(6,0))
+        tk.Button(f, text="Decline", font=("Segoe UI", 9),
+                  bg=self.BG, fg=self.FG3, activebackground=self.BG2,
+                  bd=0, pady=4, cursor="hand2",
+                  command=lambda: (self._tos_win.destroy(), self.root.destroy())).pack(pady=(4,0))
+
+    def _tos_accepted(self):
+        self._tos_win.destroy()
         self._show_pin_screen()
 
     # ── Close ─────────────────────────────────────────────────
@@ -882,7 +1288,7 @@ class App:
         f.place(x=48, y=64, width=344)
 
         tk.Label(f, text="PC CHECKER", font=("Segoe UI", 10, "bold"),
-                 fg=self.FG2, bg=self.BG, letter_spacing=3).pack(anchor="w")
+                 fg=self.FG2, bg=self.BG).pack(anchor="w")
         tk.Label(f, text="Forensic Scanner", font=("Segoe UI", 22, "bold"),
                  fg=self.FG, bg=self.BG).pack(anchor="w", pady=(6, 0))
         tk.Label(f, text="v3.0  ·  OFL / FFL", font=("Segoe UI", 10),
@@ -1086,6 +1492,7 @@ class App:
             ("YARA",        "yara"),
             ("UNSIGNED",    "unsigned"),
             ("RECYCLE BIN", "recycle"),
+            ("SYSMAIN",     "sysmain"),
         ]
 
         content_wrap = tk.Frame(body, bg=self.BG)
@@ -1237,6 +1644,13 @@ class App:
         self._w(k,f"  League     :  {r.get('league','?')}\n\n","dim")
         self._w(k,"  ── Detection Scores ──────────────────────────────\n","dim")
 
+        # Auto-fail banner
+        if r.get("sysmain_autofail"):
+            self._w(k,"  ╔══ AUTO FAIL ══════════════════════════════════╗\n","bad")
+            self._w(k,"  ║  SysMain DISABLED + Prefetch empty            ║\n","bad")
+            self._w(k,"  ║  Deliberate trace wiping detected             ║\n","bad")
+            self._w(k,"  ╚═══════════════════════════════════════════════╝\n\n","bad")
+
         rows=[
             ("ShellBag Hits",   r.get("shellbag_hits",0)),
             ("BAM Hits",        r.get("bam_hits",0)),
@@ -1246,6 +1660,7 @@ class App:
             ("YARA Hits",       r.get("yara_hits",0)),
             ("Unsigned EXEs",   len(r.get("unsigned_hits",[]))),
             ("Log Tamper Hits", r.get("roblox_hits",0) if "roblox_hits" in r else 0),
+            ("SysMain Hits",    r.get("sysmain_hits",0)),
         ]
         for label,val in rows:
             bar="█"*min(val,24)
@@ -1293,7 +1708,7 @@ class App:
         self._status_lbl.config(text=v,fg=vc)
         self._run_btn.config(state="normal",text="Run Scan",bg=self.WHITE,fg=self.BG)
         self._render_summary(r)
-        for key in ("shellbags","bam","prefetch","appcompat","roblox","cheat","yara","unsigned","recycle"):
+        for key in ("shellbags","bam","prefetch","appcompat","roblox","cheat","yara","unsigned","recycle","sysmain"):
             self._render(key,r.get(key,""))
         self._switch("summary",self._nav_btns["summary"])
         threading.Thread(target=self._do_send,daemon=True).start()
