@@ -263,8 +263,13 @@ def discord_callback():
     if role == "pending":
         if bot_error:
             app.logger.error(f"Bot member lookup failed for {discord_id}: {bot_error}")
-            # Still block — but show a more helpful error
-            return redirect(url_for("login_page") + f"?error=no_access&detail={urllib.parse.quote(str(bot_error))}")
+            # Error 1010 = bot not in server or token wrong
+            # Show a clear message rather than a cryptic code
+            if str(bot_error) == "10007" or str(bot_error) == 1010 or "10007" in str(bot_error):
+                detail_msg = "Bot cannot find you in the server. Make sure you have joined the Lite Discord server."
+            else:
+                detail_msg = f"Bot error {bot_error} — the bot token may be wrong or the bot is not in the server."
+            return redirect(url_for("login_page") + f"?error=bot_error&detail={urllib.parse.quote(detail_msg)}")
         return redirect(url_for("login_page") + "?error=no_access")
 
     # Upsert user
@@ -354,15 +359,17 @@ ROLE_FFL             : {ROLE_FFL}
 def login_page():
     error = request.args.get("error")
     errors = {
-        "no_access": "You don't have the required Discord role to access this.",
-        "token_failed": "Discord login failed. Try again.",
-        "state_mismatch": "Security error. Please try again.",
+        "no_access":  "You don't have the required role. You need Lite, UFF Access, or FFL Access in the Lite server.",
+        "token_failed": "Discord login failed. Check your internet and try again.",
+        "state_mismatch": "Security check failed. Please try again.",
         "user_failed": "Could not fetch your Discord profile.",
+        "bot_error":  "Bot verification failed.",
     }
-    detail = request.args.get("detail","")
+    detail  = request.args.get("detail", "")
     err_msg = errors.get(error)
-    if err_msg and detail and error == "token_failed":
-        err_msg = f"Discord login failed: {detail}"
+    # Show detail message for all error types if available
+    if detail and err_msg:
+        err_msg = detail
     return render_template("login.html", error=err_msg)
 
 @app.route("/logout")
