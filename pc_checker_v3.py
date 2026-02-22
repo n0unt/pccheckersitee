@@ -129,13 +129,16 @@ def _make_request(url, payload_dict, timeout=10):
     )
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read().decode())
+            raw = resp.read()
+            try: body = json.loads(raw.decode("utf-8"))
+            except Exception: body = {"raw": raw.decode("utf-8","replace")[:200]}
+            return resp.status, body
     except urllib.error.HTTPError as e:
-        try: body = json.loads(e.read().decode())
-        except Exception: body = {}
+        try: body = json.loads(e.read().decode("utf-8","replace"))
+        except Exception: body = {"error": f"HTTP {e.code}"}
         return e.code, body
     except Exception as e:
-        raise
+        return 0, {"error": str(e)}
 
 def validate_pin(pin, league):
     """Returns (valid: bool, error_msg: str)"""
@@ -1747,7 +1750,8 @@ class App:
         elif wb_ok:
             self.root.after(0,lambda: self._wh_lbl.config(text=f"✓ web  ✗ webhook: {wh_err[:50]}",fg=self.AMBER))
         else:
-            self.root.after(0,lambda: self._wh_lbl.config(text=f"✗ send failed",fg=self.RED))
+            err_show = (wb_err or wh_err or "unknown")[:90]
+            self.root.after(0,lambda e=err_show: self._wh_lbl.config(text=f"✗ {e}",fg=self.RED))
 
     def _save(self):
         if not self.results:
