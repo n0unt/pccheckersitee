@@ -514,7 +514,8 @@ def download_page():
         meta = json.loads(row[0]) if row else {}
         cur.close(); conn.close()
     except Exception: pass
-    has_exe = bool(meta.get("b64") or meta.get("url"))
+    # exe_meta exists = a file was uploaded (data is in exe_data row)
+    has_exe = bool(meta.get("version") and meta.get("updated"))
     user = get_user() if "user_id" in session else None
     return render_template("download.html",
                            has_exe=has_exe,
@@ -545,41 +546,80 @@ def upload_exe():
     f = request.files.get("file")
     ver = (request.form.get("version") or "v3.0").strip()
     if not f: return jsonify({"error":"No file provided"}),400
-    filename = f.filename or "scanner.exe"
+    filename = f.filename or "LiteScanner.exe"
     data = f.read()
     if len(data) == 0: return jsonify({"error":"File is empty"}),400
-    b64 = base64.b64encode(data).decode()
     size_mb = round(len(data)/1024/1024, 1)
-    meta = {"version": ver, "size": f"{size_mb} MB", "filename": filename,
-            "updated": now(), "b64": b64}
+    b64 = base64.b64encode(data).decode("ascii")
+
+    # Store meta (without file) and file data separately so meta queries stay fast
+    meta = {"version": ver, "size": f"{size_mb} MB", "filename": filename, "updated": now()}
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("INSERT INTO settings (key,value) VALUES (%s,%s) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+        # Meta row (small, fast to query)
+        cur.execute("INSERT INTO settings (key,value) VALUES (%s,%s) "
+                    "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
                     ("exe_meta", json.dumps(meta)))
+        # File data row (large, only read on download)
+        cur.execute("INSERT INTO settings (key,value) VALUES (%s,%s) "
+                    "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+                    ("exe_data", b64))
         conn.commit(); cur.close(); conn.close()
     except Exception as e:
-        return jsonify({"error":str(e)}),500
+        return jsonify({"error": str(e)}), 500
+
+    # Also cache to /tmp for fast serving this session
+    try:
+        with open("/tmp/litescanner.exe","wb") as fp: fp.write(data)
+        with open("/tmp/lite_fname.txt","w") as fp: fp.write(filename)
+    except Exception: pass
+
     return jsonify({"ok":True,"version":ver,"size":f"{size_mb} MB"})
+
 
 @app.route("/download/exe")
 def download_exe():
-    import base64
-    from flask import Response
+    import base64, io
+    from flask import send_file
+
+    filename = "LiteScanner.exe"
+
+    # Try /tmp cache first (fast)
+    if os.path.exists("/tmp/litescanner.exe"):
+        try:
+            if os.path.exists("/tmp/lite_fname.txt"):
+                filename = open("/tmp/lite_fname.txt").read().strip()
+            return send_file("/tmp/litescanner.exe", as_attachment=True,
+                             download_name=filename, mimetype="application/octet-stream")
+        except Exception: pass
+
+    # Fall back to DB
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT value FROM settings WHERE key=%s",("exe_meta",))
-        row = cur.fetchone()
+        cur.execute("SELECT value FROM settings WHERE key='exe_meta'")
+        meta_row = cur.fetchone()
+        cur.execute("SELECT value FROM settings WHERE key='exe_data'")
+        data_row = cur.fetchone()
         cur.close(); conn.close()
     except Exception:
         abort(404)
-    if not row: abort(404)
-    meta = json.loads(row[0])
-    b64  = meta.get("b64","")
-    if not b64: abort(404)
-    data = base64.b64decode(b64)
-    fname = meta.get("filename","LiteScanner.exe")
-    return Response(data, mimetype="application/octet-stream",
-                    headers={"Content-Disposition":f"attachment; filename={fname}"})
+
+    if not data_row or not data_row[0]:
+        abort(404)
+
+    if meta_row:
+        meta = json.loads(meta_row[0])
+        filename = meta.get("filename", filename)
+
+    data = base64.b64decode(data_row[0])
+    # Cache for next time
+    try:
+        with open("/tmp/litescanner.exe","wb") as fp: fp.write(data)
+        with open("/tmp/lite_fname.txt","w") as fp: fp.write(filename)
+    except Exception: pass
+
+    return send_file(io.BytesIO(data), as_attachment=True,
+                     download_name=filename, mimetype="application/octet-stream")
 
 
 @app.route("/debug/discord/<discord_id>")
