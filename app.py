@@ -50,17 +50,23 @@ def _discord_get(path, token=None, bot=False):
 
 def _discord_post(path, data, token=None, bot=False):
     url = f"https://discord.com/api/v10{path}"
-    payload = urllib.parse.urlencode(data).encode() if isinstance(data, dict) and not token and not bot else json.dumps(data).encode()
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     if bot:
+        payload = json.dumps(data).encode()
         headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    else:
+        # OAuth2 token exchange must be form-encoded
+        payload = urllib.parse.urlencode(data).encode()
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        try: return e.code, json.loads(e.read().decode())
-        except: return e.code, {}
+        body = b""
+        try: body = e.read()
+        except: pass
+        try: return e.code, json.loads(body.decode())
+        except: return e.code, {"error": body.decode()[:200]}
     except Exception as ex:
         return 0, {"error": str(ex)}
 
@@ -446,6 +452,78 @@ def api_admin_delete_user(uid):
     cur.execute("DELETE FROM users WHERE id=%s",(uid,))
     conn.commit(); cur.close(); conn.close()
     return jsonify({"ok":True})
+
+
+# ── Public pages ─────────────────────────────────────────────
+@app.route("/download")
+def download_page():
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key=%s", ("exe_meta",))
+        row = cur.fetchone()
+        meta = json.loads(row[0]) if row else {}
+    except Exception:
+        meta = {}
+    cur.close(); conn.close()
+    return render_template("download.html",
+                           download_url=meta.get("url"),
+                           version=meta.get("version","v3.0"),
+                           file_size=meta.get("size",""),
+                           updated=meta.get("updated",""))
+
+@app.route("/privacy")
+def privacy_page():
+    return render_template("privacy.html")
+
+@app.route("/terms")
+def terms_page():
+    return render_template("terms.html")
+
+@app.route("/api/admin/upload-exe", methods=["POST"])
+@login_required
+@owner_required
+def upload_exe():
+    import base64
+    f = request.files.get("file")
+    ver = request.form.get("version","v3.0")
+    if not f: return jsonify({"error":"No file"}),400
+    data = f.read()
+    # Store as base64 in settings table (small EXEs only — for large files use external storage)
+    b64 = base64.b64encode(data).decode()
+    size_mb = round(len(data)/1024/1024, 1)
+    meta = {"version": ver, "size": f"{size_mb} MB",
+            "updated": now(), "b64": b64}
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("""CREATE TABLE IF NOT EXISTS settings
+                       (key TEXT PRIMARY KEY, value TEXT NOT NULL)""")
+        cur.execute("INSERT INTO settings (key,value) VALUES (%s,%s) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+                    ("exe_meta", json.dumps(meta)))
+        conn.commit()
+    except Exception as e:
+        cur.close(); conn.close()
+        return jsonify({"error":str(e)}),500
+    cur.close(); conn.close()
+    return jsonify({"ok":True})
+
+@app.route("/download/exe")
+def download_exe():
+    import base64
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key=%s",("exe_meta",))
+        row = cur.fetchone()
+    except Exception:
+        row = None
+    cur.close(); conn.close()
+    if not row: abort(404)
+    meta = json.loads(row[0])
+    b64  = meta.get("b64","")
+    if not b64: abort(404)
+    from flask import Response
+    data = base64.b64decode(b64)
+    return Response(data, mimetype="application/octet-stream",
+                    headers={"Content-Disposition":"attachment; filename=LiteScanner.exe"})
 
 with app.app_context():
     init_db()
