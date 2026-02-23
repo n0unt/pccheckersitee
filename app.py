@@ -317,24 +317,18 @@ def auth_debug():
     guild_raw_error = ""
     if DISCORD_BOT_TOKEN:
         try:
-            url = "https://discord.com/api/v10/users/@me"
-            req = urllib.request.Request(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"})
-            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
-                bot_self = json.loads(r.read().decode())
-        except urllib.error.HTTPError as e:
-            try: bot_raw_error = f"HTTP {e.code}: {e.read().decode()[:200]}"
-            except: bot_raw_error = f"HTTP {e.code}"
+            r = _requests.get("https://discord.com/api/v10/users/@me",
+                headers={**_DISCORD_HEADERS, "Authorization": f"Bot {DISCORD_BOT_TOKEN}"}, timeout=10)
+            if r.ok: bot_self = r.json()
+            else: bot_raw_error = f"HTTP {r.status_code}: {r.text[:200]}"
         except Exception as ex:
             bot_raw_error = str(ex)
     if DISCORD_BOT_TOKEN and DISCORD_GUILD_ID:
         try:
-            url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}"
-            req = urllib.request.Request(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"})
-            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
-                guild_info = json.loads(r.read().decode())
-        except urllib.error.HTTPError as e:
-            try: guild_raw_error = f"HTTP {e.code}: {e.read().decode()[:200]}"
-            except: guild_raw_error = f"HTTP {e.code}"
+            r = _requests.get(f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}",
+                headers={**_DISCORD_HEADERS, "Authorization": f"Bot {DISCORD_BOT_TOKEN}"}, timeout=10)
+            if r.ok: guild_info = r.json()
+            else: guild_raw_error = f"HTTP {r.status_code}: {r.text[:200]}"
         except Exception as ex:
             guild_raw_error = str(ex)
 
@@ -518,24 +512,40 @@ def api_validate_pin():
 
 @app.route("/api/submit", methods=["POST"])
 def api_submit_scan():
-    data = request.json or {}
-    pin = data.get("pin","").upper().strip()
-    league = data.get("league","").upper().strip()
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT * FROM pins WHERE pin=%s AND used=0",(pin,))
-    pin_row = row_to_dict(cur.fetchone(), cur)
-    if not pin_row: cur.close(); conn.close(); return jsonify({"error":"Invalid PIN"}),401
-    cur.execute("""INSERT INTO scans (league,pc_user,verdict,total_hits,roblox_accs,report_json,pin_used,submitted)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (league or pin_row["league"], data.get("pc_user","unknown"),
-                 data.get("verdict","UNKNOWN"), data.get("total_hits",0),
-                 json.dumps(data.get("roblox_accounts",[])),
-                 json.dumps(data.get("report",{})), pin, now()))
-    scan_id = cur.fetchone()[0]
-    cur.execute("UPDATE pins SET used=1, scan_id=%s, finished_at=%s WHERE pin=%s",
-                (scan_id, now(), pin))
-    conn.commit(); cur.close(); conn.close()
-    return jsonify({"ok":True,"scan_id":scan_id})
+    try:
+        data = request.json or {}
+        pin = data.get("pin","").upper().strip()
+        league = data.get("league","").upper().strip()
+        if not pin:
+            return jsonify({"error":"No PIN provided"}),400
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM pins WHERE pin=%s AND used=0",(pin,))
+        pin_row = row_to_dict(cur.fetchone(), cur)
+        if not pin_row:
+            cur.close(); conn.close()
+            return jsonify({"error":"Invalid or already used PIN"}),401
+        # Truncate report to avoid DB overflow
+        report = data.get("report",{})
+        report_str = json.dumps(report)
+        if len(report_str) > 500000:
+            report = {"truncated": True, "verdict": data.get("verdict","?")}
+        cur.execute("""INSERT INTO scans (league,pc_user,verdict,total_hits,roblox_accs,report_json,pin_used,submitted)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                    (league or pin_row["league"],
+                     data.get("pc_user","unknown"),
+                     data.get("verdict","UNKNOWN"),
+                     int(data.get("total_hits",0)),
+                     json.dumps(data.get("roblox_accounts",[])),
+                     json.dumps(report),
+                     pin, now()))
+        scan_id = cur.fetchone()[0]
+        cur.execute("UPDATE pins SET used=1, scan_id=%s, finished_at=%s WHERE pin=%s",
+                    (scan_id, now(), pin))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({"ok":True,"scan_id":scan_id})
+    except Exception as e:
+        app.logger.error(f"api_submit_scan error: {e}", exc_info=True)
+        return jsonify({"error":str(e)}),500
 
 @app.route("/api/pins")
 @login_required
