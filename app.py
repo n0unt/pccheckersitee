@@ -286,18 +286,22 @@ def discord_callback():
         return redirect(url_for("login_page") + "?error=no_access")
 
     # Upsert user
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE discord_id=%s", (discord_id,))
-    existing = cur.fetchone()
-    if existing:
-        cur.execute("UPDATE users SET username=%s, avatar=%s, role=%s, leagues=%s WHERE discord_id=%s",
-                    (username, avatar, role, leagues, discord_id))
-        user_id = existing[0]
-    else:
-        cur.execute("INSERT INTO users (discord_id,username,avatar,role,leagues,created) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
-                    (discord_id, username, avatar, role, leagues, now()))
-        user_id = cur.fetchone()[0]
-    conn.commit(); cur.close(); conn.close()
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE discord_id=%s", (discord_id,))
+        existing = cur.fetchone()
+        if existing:
+            cur.execute("UPDATE users SET username=%s, avatar=%s, role=%s, leagues=%s WHERE discord_id=%s",
+                        (username, avatar, role, leagues, discord_id))
+            user_id = existing[0]
+        else:
+            cur.execute("INSERT INTO users (discord_id,username,avatar,role,leagues,created) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                        (discord_id, username, avatar, role, leagues, now()))
+            user_id = cur.fetchone()[0]
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        app.logger.error(f"User upsert failed: {e}", exc_info=True)
+        return redirect(url_for("login_page") + f"?error=db_error&detail={urllib.parse.quote(str(e)[:100])}")
 
     session["user_id"] = user_id
     session["username"] = username
@@ -415,6 +419,7 @@ def login_page():
     errors = {
         "no_access":  "You don't have the required role. You need Lite, UFF Access, or FFL Access in the Lite server.",
         "not_in_server": "You must join the Lite Discord server first before signing in.",
+        "db_error": "Database error during login.",
         "token_failed": "Discord login failed. Check your internet and try again.",
         "state_mismatch": "Security check failed. Please try again.",
         "user_failed": "Could not fetch your Discord profile.",
