@@ -127,6 +127,7 @@ def init_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS leagues TEXT DEFAULT ''",
         "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS scan_id INTEGER DEFAULT NULL",
         "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS finished_at TEXT DEFAULT NULL",
+        "ALTER TABLE users ALTER COLUMN password DROP NOT NULL",
     ]
     for sql in migrations:
         try:
@@ -326,9 +327,10 @@ def fix_db():
         migrations = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS leagues TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS leagues TEXT DEFAULT ''",
             "ALTER TABLE pins ADD COLUMN IF NOT EXISTS scan_id INTEGER DEFAULT NULL",
             "ALTER TABLE pins ADD COLUMN IF NOT EXISTS finished_at TEXT DEFAULT NULL",
+            "ALTER TABLE users ALTER COLUMN password DROP NOT NULL",
         ]
         for sql in migrations:
             try:
