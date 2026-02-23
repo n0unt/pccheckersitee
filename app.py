@@ -33,51 +33,65 @@ def _ssl_ctx():
     return ctx
 
 def _discord_get(path, token=None, bot=False):
-    url = f"https://discord.com/api/v10{path}"
+    import http.client
+    host = "discord.com"
+    api_path = f"/api/v10{path}"
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+        "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
+        "Accept": "application/json",
     }
     if bot:
         headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
     elif token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        try: return json.loads(e.read().decode())
-        except: return {}
-    except Exception:
-        return {}
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(host, 443, context=ctx, timeout=15)
+        conn.request("GET", api_path, headers=headers)
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8", "replace")
+        conn.close()
+        try:
+            return json.loads(body)
+        except:
+            return {"error": body[:200], "status": resp.status}
+    except Exception as ex:
+        return {"error": str(ex)}
 
 def _discord_post(path, data, token=None, bot=False):
-    url = f"https://discord.com/api/v10{path}"
+    import http.client
+    host = "discord.com"
+    api_path = f"/api/v10{path}"
+    
     if bot:
         payload = json.dumps(data).encode()
         headers = {
             "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
             "Content-Type": "application/json",
-            "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+            "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
+            "Accept": "application/json",
         }
     else:
-        # OAuth2 token exchange must be form-encoded
         payload = urllib.parse.urlencode(data).encode()
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "LiteScanner (https://pccheckersitee-production.up.railway.app, 1.0)",
+            "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+    
     try:
-        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
-            return r.status, json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        body = b""
-        try: body = e.read()
-        except: pass
-        try: return e.code, json.loads(body.decode())
-        except: return e.code, {"error": body.decode()[:200]}
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(host, 443, context=ctx, timeout=15)
+        conn.request("POST", api_path, body=payload, headers=headers)
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8", "replace")
+        conn.close()
+        try:
+            return resp.status, json.loads(body)
+        except:
+            return resp.status, {"error": body[:200]}
     except Exception as ex:
         return 0, {"error": str(ex)}
 
