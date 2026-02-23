@@ -660,6 +660,7 @@ def download_page():
     user = get_user() if "user_id" in session else None
     return render_template("download.html",
                            has_exe=has_exe,
+                           download_url="/download/exe" if has_exe else None,
                            version=meta.get("version","v3.0"),
                            file_size=meta.get("size",""),
                            updated=meta.get("updated",""),
