@@ -5,7 +5,8 @@ Flask + PostgreSQL + Discord OAuth2
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, abort
 from functools import wraps
 import psycopg2, psycopg2.extras
-import hashlib, secrets, string, datetime, json, os, urllib.request, urllib.parse, urllib.error, ssl
+import hashlib, secrets, string, datetime, json, os, urllib.parse, ssl
+import requests as _requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production")
@@ -25,73 +26,34 @@ ROLE_FFL  = "1475022200095510621"
 # Guild ID — bot must be in this server
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1475014802194567238")
 
-# ── SSL context ──────────────────────────────────────────────
-def _ssl_ctx():
-    ctx = ssl._create_unverified_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
+# ── Discord HTTP session ─────────────────────────────────────
+_DISCORD_HEADERS = {
+    "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
+    "Accept": "application/json",
+}
 
 def _discord_get(path, token=None, bot=False):
-    import http.client
-    host = "discord.com"
-    api_path = f"/api/v10{path}"
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
-        "Accept": "application/json",
-    }
-    if bot:
-        headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
-    elif token:
-        headers["Authorization"] = f"Bearer {token}"
+    url = f"https://discord.com/api/v10{path}"
+    headers = dict(_DISCORD_HEADERS)
+    if bot:   headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
+    elif token: headers["Authorization"] = f"Bearer {token}"
     try:
-        ctx = ssl.create_default_context()
-        conn = http.client.HTTPSConnection(host, 443, context=ctx, timeout=15)
-        conn.request("GET", api_path, headers=headers)
-        resp = conn.getresponse()
-        body = resp.read().decode("utf-8", "replace")
-        conn.close()
-        try:
-            return json.loads(body)
-        except:
-            return {"error": body[:200], "status": resp.status}
+        r = _requests.get(url, headers=headers, timeout=15)
+        return r.json()
     except Exception as ex:
         return {"error": str(ex)}
 
 def _discord_post(path, data, token=None, bot=False):
-    import http.client
-    host = "discord.com"
-    api_path = f"/api/v10{path}"
-    
-    if bot:
-        payload = json.dumps(data).encode()
-        headers = {
-            "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
-            "Content-Type": "application/json",
-            "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
-            "Accept": "application/json",
-        }
-    else:
-        payload = urllib.parse.urlencode(data).encode()
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "DiscordBot (https://pccheckersitee-production.up.railway.app, 1.0)",
-            "Accept": "application/json",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-    
+    url = f"https://discord.com/api/v10{path}"
+    headers = dict(_DISCORD_HEADERS)
     try:
-        ctx = ssl.create_default_context()
-        conn = http.client.HTTPSConnection(host, 443, context=ctx, timeout=15)
-        conn.request("POST", api_path, body=payload, headers=headers)
-        resp = conn.getresponse()
-        body = resp.read().decode("utf-8", "replace")
-        conn.close()
-        try:
-            return resp.status, json.loads(body)
-        except:
-            return resp.status, {"error": body[:200]}
+        if bot:
+            headers["Authorization"] = f"Bot {DISCORD_BOT_TOKEN}"
+            r = _requests.post(url, json=data, headers=headers, timeout=15)
+        else:
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+            r = _requests.post(url, data=data, headers=headers, timeout=15)
+        return r.status_code, r.json()
     except Exception as ex:
         return 0, {"error": str(ex)}
 
