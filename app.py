@@ -120,6 +120,22 @@ def init_db():
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT sp")
 
+    # ── Migrations: add columns that may be missing from old DBs ──
+    migrations = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS leagues TEXT DEFAULT ''",
+        "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS scan_id INTEGER DEFAULT NULL",
+        "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS finished_at TEXT DEFAULT NULL",
+    ]
+    for sql in migrations:
+        try:
+            cur.execute("SAVEPOINT sp_mig")
+            cur.execute(sql)
+            cur.execute("RELEASE SAVEPOINT sp_mig")
+        except Exception:
+            cur.execute("ROLLBACK TO SAVEPOINT sp_mig")
+
     # Seed fallback owner
     try:
         cur.execute("SAVEPOINT sp_seed")
@@ -295,6 +311,33 @@ def discord_callback():
 def index():
     user = get_user() if "user_id" in session else None
     return render_template("home.html", user=user)
+
+@app.route("/admin/fix-db")
+def fix_db():
+    """One-time route to run DB migrations on existing database."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        results = []
+        migrations = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS leagues TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE pins ADD COLUMN IF NOT EXISTS scan_id INTEGER DEFAULT NULL",
+            "ALTER TABLE pins ADD COLUMN IF NOT EXISTS finished_at TEXT DEFAULT NULL",
+        ]
+        for sql in migrations:
+            try:
+                cur.execute(sql)
+                conn.commit()
+                results.append(f"✓ {sql[:60]}")
+            except Exception as e:
+                conn.rollback()
+                results.append(f"✗ {sql[:60]} — {e}")
+        cur.close(); conn.close()
+        return "<br>".join(results) + "<br><br><b>Done. <a href='/'>Go home</a></b>"
+    except Exception as e:
+        return f"Error: {e}", 500
 
 @app.route("/auth/debug")
 def auth_debug():
