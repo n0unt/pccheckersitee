@@ -20,8 +20,16 @@ _KW_ENC = [
 ]
 KEYWORDS = [_d(k) for k in _KW_ENC]
 
-_WH_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3MzkwMDQ0MzQ4NTg2ODE4Ny9uTmVfbGF3VlpIYk5VNEtWd2FTblpSX1h2YzVnTWlVRy0zSjBFSGJfajZ2YkxMaklBZUlCV2Zlem5VMTIxQU4teUxCYw=="
-WEBHOOK_URL = _d(_WH_ENC)
+_WH_FFL_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NTkyNjY1ODU1MTgwOS9Ua09kVEk2QldWQW0tUzBZbEpLTE5TQm9WQkZZRHZMYmlidVlhZWlPYmxIZ2tWZDB6aHJRdHBMUWdpV3VmWjRPVkYwRA=="
+_WH_UFF_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NjE3NjE1MjY1ODA0MS85WnlCamgtX1hjZmN3TllXLVBWam9tNC1lVDhFWWRIdHVRQm10NnpxQVN4cDBsREFJY1FJYklMdDhmam9laENmNE9WXw=="
+WEBHOOK_FFL = _d(_WH_FFL_ENC)
+WEBHOOK_UFF = _d(_WH_UFF_ENC)
+
+def get_webhook_for_league(league):
+    """Return the correct webhook URL based on league."""
+    if str(league).upper() == "FFL":
+        return WEBHOOK_FFL
+    return WEBHOOK_UFF  # Default to UFF for UFF or unknown
 
 # ← Set this to your Railway/Render URL once deployed
 WEBSITE_URL = "https://pccheckersitee-production.up.railway.app"
@@ -202,7 +210,9 @@ def _chunk(text, limit=3800):
 def send_webhook(results):
     verdict = results.get("verdict","UNKNOWN")
     total   = results.get("total_hits",0)
+    league  = results.get("league","UFF")
     color   = {"CHEATER":0xf87171,"SUSPICIOUS":0xfbbf24,"CLEAN":0x34d399}.get(verdict,0x6b7280)
+    webhook = get_webhook_for_league(league)
     errors  = []
     try:
         accounts  = results.get("roblox_accounts",[])
@@ -230,7 +240,7 @@ def send_webhook(results):
             ],
             "footer":{"text":f"PC Checker v3 · {now_str()} · {results.get('league','?')}"},
         }
-        ok,_,err = _post_json({"embeds":[summary]})
+        ok,_,err = _post_json({"embeds":[summary]}, url_override=webhook)
         if not ok: errors.append(f"Summary: {err}")
         time.sleep(0.8)
         tabs = [
@@ -249,7 +259,7 @@ def send_webhook(results):
             for i, chunk in enumerate(_chunk(text.strip())):
                 embed={"title":name if i==0 else f"{name} (cont.)","color":color,
                        "description":f"```\n{chunk}\n```"}
-                ok,_,err = _post_json({"embeds":[embed]})
+                ok,_,err = _post_json({"embeds":[embed]}, url_override=webhook)
                 if not ok: errors.append(f"{name}: {err}")
                 time.sleep(0.8)
     except Exception as e:
