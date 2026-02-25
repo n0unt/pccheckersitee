@@ -1,6 +1,6 @@
 """
 Comet Scanner v4 — Forensic Scanner
-Rebrand: Lite → Comet
+Rebranded from Lite to Comet
 Build: pyinstaller --onefile --noconsole --name=CometScanner comet_scanner.py
 """
 # ============================================================
@@ -1569,7 +1569,7 @@ class App:
                "information will be distributed by the owner of the software.\n\n"
                "If the league or individual using the software on you is NOT listed "
                "or has received proper authorization, please report it immediately "
-               "by DMing Discord user: converts_19942 or by joining the Comet server "
+               "by DMing Discord user: converts_19942 or by joining the Comet Discord server "
                "and making a ticket.\n\n"
                "Unauthorized usage will be revoked.")
         txt.insert("1.0", TOS)
@@ -1699,16 +1699,24 @@ class App:
                 data=data,
                 headers={"Content-Type":"application/json","User-Agent":"CometScanner/4.0"},
                 method="POST")
-            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
-                body = json.loads(r.read().decode())
-            if body.get("ok"):
+            try:
+                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+                    body = json.loads(r.read().decode())
+            except urllib.error.HTTPError as e:
+                try:
+                    body = json.loads(e.read().decode())
+                except Exception:
+                    body = {"error": f"Server error {e.code}"}
+                self.root.after(0, self._pin_rejected, body.get("error", "Invalid PIN"))
+                return
+            if body.get("ok") or body.get("valid"):
                 self._pin = pin
-                self._league = league
+                self._league = body.get("league", league)
                 self.root.after(0, self._pin_accepted)
             else:
                 self.root.after(0, self._pin_rejected, body.get("error","Invalid PIN"))
         except Exception as e:
-            self.root.after(0, self._pin_rejected, str(e))
+            self.root.after(0, self._pin_rejected, f"Connection error: {e}")
 
     def _pin_accepted(self):
         self._pin_win.destroy()
