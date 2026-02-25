@@ -19,7 +19,7 @@ DISCORD_BOT_TOKEN   = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_REDIRECT    = os.environ.get("DISCORD_REDIRECT", "https://pccheckersitee-production.up.railway.app/auth/discord/callback")
 
 # Role IDs
-ROLE_LITE = "1475015141882855424"
+ROLE_COMET = "1475015141882855424"
 ROLE_UFF  = "1475022240754962452"
 ROLE_FFL  = "1475022200095510621"
 
@@ -257,7 +257,7 @@ def discord_callback():
         app.logger.info(f"Bot member data for {discord_id}: code={member_data.get('code')} roles={member_roles}")
 
     # Assign roles based on Discord roles found
-    if ROLE_LITE in member_roles:
+    if ROLE_COMET in member_roles:
         role    = "owner"
         leagues = "UFF,FFL"
 
@@ -402,7 +402,7 @@ BOT ID               : {bot_self.get("id","?")}
 GUILD NAME           : {guild_info.get("name") or f"<span class='bad'>FAILED: {guild_raw_error or 'no response'}</span>"}
 GUILD ID             : {guild_info.get("id","?")}
 
-ROLE_LITE            : {ROLE_LITE}
+ROLE_COMET           : {ROLE_LITE}
 ROLE_UFF             : {ROLE_UFF}
 ROLE_FFL             : {ROLE_FFL}
 </pre>
@@ -419,8 +419,8 @@ ROLE_FFL             : {ROLE_FFL}
 def login_page():
     error = request.args.get("error")
     errors = {
-        "no_access":  "You don't have the required role. You need Lite, UFF Access, or FFL Access in the Lite server.",
-        "not_in_server": "You must join the Lite Discord server first before signing in.",
+        "no_access":  "You don't have the required role. You need Comet, UFF Access, or FFL Access in the Comet server.",
+        "not_in_server": "You must join the Comet Discord server first before signing in.",
         "db_error": "Database error during login.",
         "token_failed": "Discord login failed. Check your internet and try again.",
         "state_mismatch": "Security check failed. Please try again.",
@@ -465,7 +465,18 @@ def results_page(pin):
         if scan and scan.get("roblox_accs"):
             scan["roblox_accounts"] = json.loads(scan["roblox_accs"])
     cur.close(); conn.close()
-    return render_template("results.html", pin=pin_row, scan=scan, user=user)
+    # Build tab data dict from stored report
+    report = {}
+    roblox_accs = []
+    has_scan = bool(scan)
+    if scan:
+        report = scan.get("report", {})
+        roblox_accs = scan.get("roblox_accounts", [])
+        if not roblox_accs and scan.get("roblox_accs"):
+            try: roblox_accs = json.loads(scan["roblox_accs"])
+            except Exception: pass
+    return render_template("results.html", pin=pin_row, scan=scan, user=user,
+                           report=report, roblox_accs=roblox_accs, has_scan=has_scan)
 
 # ── API: Stats ───────────────────────────────────────────────
 @app.route("/api/stats")
@@ -475,8 +486,8 @@ def api_stats():
     conn = get_db(); cur = conn.cursor()
     if user and user["role"] in ("owner", "admin"):
         cur.execute("SELECT COUNT(*) FROM scans"); total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CHEATER'"); cheater = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS'"); susp = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL')"); cheater = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict IN ('SUSPICIOUS','REVIEW')"); susp = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CLEAN'"); clean = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE league='UFF'"); uff_c = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE league='FFL'"); ffl_c = cur.fetchone()[0]
@@ -484,8 +495,8 @@ def api_stats():
         allowed = get_user_leagues(user)
         ph = ",".join(["%s"]*len(allowed))
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league IN ({ph})", allowed); total = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CHEATER' AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS' AND league IN ({ph})", allowed); susp = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL') AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('SUSPICIOUS','REVIEW') AND league IN ({ph})", allowed); susp = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CLEAN' AND league IN ({ph})", allowed); clean = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='UFF' AND league IN ({ph})", allowed); uff_c = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='FFL' AND league IN ({ph})", allowed); ffl_c = cur.fetchone()[0]
@@ -559,6 +570,7 @@ def api_gen_pin():
     return jsonify({"pin":pin,"league":league,"expires":expires,
                     "results_url": f"/results/{pin}"})
 
+@app.route("/api/validate_pin", methods=["POST"])
 @app.route("/api/pins/validate", methods=["POST"])
 def api_validate_pin():
     data = request.json or {}
@@ -573,7 +585,7 @@ def api_validate_pin():
         return jsonify({"valid":False,"error":"PIN has expired"}),401
     if league and row["league"] != league:
         return jsonify({"valid":False,"error":f"PIN is for {row['league']}, not {league}"}),401
-    return jsonify({"valid":True,"league":row["league"]})
+    return jsonify({"ok":True,"valid":True,"league":row["league"]})
 
 @app.route("/api/submit", methods=["POST"])
 def api_submit_scan():
@@ -591,9 +603,20 @@ def api_submit_scan():
             return jsonify({"error":"Invalid or already used PIN"}),401
         # Truncate report to avoid DB overflow
         report = data.get("report",{})
+        # Also store top-level scan tabs in report for results page
+        for tab_key in ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
+                        "unsigned","recycle","sysmain","processes","cleaners","network",
+                        "registry_extra","discord"]:
+            if tab_key in data and tab_key not in report:
+                report[tab_key+"_raw"] = data[tab_key]
+        # Store extra fields from new scanner
+        for field in ["vpn_info","cleaner_info","process_hits","cleaner_hits"]:
+            if field in data: report[field] = data[field]
         report_str = json.dumps(report)
         if len(report_str) > 500000:
-            report = {"truncated": True, "verdict": data.get("verdict","?")}
+            report = {"truncated": True, "verdict": data.get("verdict","?"),
+                     "shellbag_hits": data.get("report",{}).get("shellbag_hits",0),
+                     "bam_hits": data.get("report",{}).get("bam_hits",0)}
         cur.execute("""INSERT INTO scans (league,pc_user,verdict,total_hits,roblox_accs,report_json,pin_used,submitted)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (league or pin_row["league"],
@@ -703,7 +726,7 @@ def upload_exe():
     f = request.files.get("file")
     ver = (request.form.get("version") or "v3.0").strip()
     if not f: return jsonify({"error":"No file provided"}),400
-    filename = f.filename or "LiteScanner.exe"
+    filename = f.filename or "CometScanner.exe"
     data = f.read()
     if len(data) == 0: return jsonify({"error":"File is empty"}),400
     size_mb = round(len(data)/1024/1024, 1)
@@ -727,8 +750,8 @@ def upload_exe():
 
     # Also cache to /tmp for fast serving this session
     try:
-        with open("/tmp/litescanner.exe","wb") as fp: fp.write(data)
-        with open("/tmp/lite_fname.txt","w") as fp: fp.write(filename)
+        with open("/tmp/cometscanner.exe","wb") as fp: fp.write(data)
+        with open("/tmp/comet_fname.txt","w") as fp: fp.write(filename)
     except Exception: pass
 
     return jsonify({"ok":True,"version":ver,"size":f"{size_mb} MB"})
@@ -739,14 +762,14 @@ def download_exe():
     import base64, io
     from flask import send_file
 
-    filename = "LiteScanner.exe"
+    filename = "CometScanner.exe"
 
     # Try /tmp cache first (fast)
-    if os.path.exists("/tmp/litescanner.exe"):
+    if os.path.exists("/tmp/cometscanner.exe"):
         try:
-            if os.path.exists("/tmp/lite_fname.txt"):
-                filename = open("/tmp/lite_fname.txt").read().strip()
-            return send_file("/tmp/litescanner.exe", as_attachment=True,
+            if os.path.exists("/tmp/comet_fname.txt"):
+                filename = open("/tmp/comet_fname.txt").read().strip()
+            return send_file("/tmp/cometscanner.exe", as_attachment=True,
                              download_name=filename, mimetype="application/octet-stream")
         except Exception: pass
 
@@ -771,8 +794,8 @@ def download_exe():
     data = base64.b64decode(data_row[0])
     # Cache for next time
     try:
-        with open("/tmp/litescanner.exe","wb") as fp: fp.write(data)
-        with open("/tmp/lite_fname.txt","w") as fp: fp.write(filename)
+        with open("/tmp/cometscanner.exe","wb") as fp: fp.write(data)
+        with open("/tmp/comet_fname.txt","w") as fp: fp.write(filename)
     except Exception: pass
 
     return send_file(io.BytesIO(data), as_attachment=True,
@@ -792,7 +815,7 @@ def debug_discord(discord_id):
         "bot_id":   bot_self.get("id"),
         "member":   member,
         "roles_found": member.get("roles",[]),
-        "ROLE_LITE_match": ROLE_LITE in member.get("roles",[]),
+        "ROLE_COMET_match": ROLE_COMET in member.get("roles",[]),
         "ROLE_UFF_match":  ROLE_UFF  in member.get("roles",[]),
         "ROLE_FFL_match":  ROLE_FFL  in member.get("roles",[]),
     })
