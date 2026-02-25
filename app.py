@@ -1,5 +1,5 @@
 """
-PC Checker - Web Dashboard v2
+Comet - Web Dashboard v2
 Flask + PostgreSQL + Discord OAuth2
 """
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, abort
@@ -382,14 +382,14 @@ def auth_debug():
             guild_raw_error = str(ex)
 
     html = f"""<!DOCTYPE html>
-<html><head><title>Lite Auth Debug</title>
+<html><head><title>Comet Auth Debug</title>
 <style>
 body{{font-family:monospace;background:#080b10;color:#f0f4ff;padding:40px;}}
 h2{{color:#00f5a0;}} .ok{{color:#00f5a0;}} .bad{{color:#ff4d6d;}} .warn{{color:#ffb830;}}
 pre{{background:#0f1420;padding:16px;border-radius:8px;border:1px solid #1e2d44;overflow-x:auto;}}
 a{{color:#00f5a0;}}
 </style></head><body>
-<h2>Lite — OAuth2 Debug</h2>
+<h2>Comet — OAuth2 Debug</h2>
 <pre>
 DISCORD_CLIENT_ID    : {DISCORD_CLIENT_ID or "<span class='bad'>NOT SET</span>"}
 DISCORD_CLIENT_SECRET: {"*****" + DISCORD_CLIENT_SECRET[-4:] if len(DISCORD_CLIENT_SECRET) > 4 else "<span class='bad'>NOT SET</span>"}
@@ -540,6 +540,21 @@ def api_gen_pin():
     conn = get_db(); cur = conn.cursor()
     cur.execute("INSERT INTO pins (pin,league,agent_id,used,created,expires) VALUES (%s,%s,%s,0,%s,%s)",
                 (pin,league,user["id"],now(),expires))
+    # Cleanup: keep only the 3 most recent pins per agent (delete older ones)
+    try:
+        cur.execute("""
+            DELETE FROM pins WHERE agent_id=%s AND id NOT IN (
+                SELECT id FROM (
+                    SELECT id FROM pins WHERE agent_id=%s ORDER BY id DESC LIMIT 3
+                ) AS keep
+            )
+        """, (user["id"], user["id"]))
+        # Also delete scan data for deleted pins
+        cur.execute("""
+            DELETE FROM scans WHERE pin NOT IN (SELECT pin FROM pins)
+        """)
+    except Exception:
+        pass  # Non-critical cleanup
     conn.commit(); cur.close(); conn.close()
     return jsonify({"pin":pin,"league":league,"expires":expires,
                     "results_url": f"/results/{pin}"})
