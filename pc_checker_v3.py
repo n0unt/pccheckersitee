@@ -173,7 +173,7 @@ def send_webhook(results):
     verdict = results.get("verdict","UNKNOWN")
     total   = results.get("total_hits",0)
     league  = results.get("league","UFF")
-    color   = {"CHEATER":0xf87171,"SUSPICIOUS":0xfbbf24,"CLEAN":0x34d399}.get(verdict,0x6b7280)
+    color   = 0x1a2235  # neutral dark - no verdict coloring
     webhook = get_webhook_for_league(league)
     errors  = []
     try:
@@ -191,7 +191,7 @@ def send_webhook(results):
             "color": color,
             "timestamp": datetime.datetime.utcnow().isoformat()+"Z",
             "fields":[
-                {"name":"Verdict",        "value":f"**{verdict}**",      "inline":True},
+                {"name":"Status",         "value":"Review Required",      "inline":True},
                 {"name":"Total Hits",     "value":str(total),             "inline":True},
                 {"name":"PC User",        "value":current_user(),         "inline":True},
                 {"name":"League",         "value":league,                 "inline":True},
@@ -1433,11 +1433,12 @@ def run_full_scan(league="?"):
     ff_t,ff_h,ff_hits    = scan_fastflags()
     dv_t,dv_warn,dv_inf  = scan_drives()
 
-    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+rl_h+sm_h+ff_h+pr_h+cl_h+al_h+dc_h
+    # Only count definitive forensic hits - NOT roblox logs (too many false positives)
+    # Agents review roblox accounts/discord separately
+    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h
 
-    # No automatic verdict — let the agent decide
+    # No verdict — agent decides. Scanner just provides raw data.
     verdict = "REVIEW"
-    if auto_fail: verdict = "AUTO FAIL"
 
     roblox_list=[]
     if isinstance(accs,list):
@@ -1952,13 +1953,8 @@ class App:
 
     def _render_summary(self, r):
         k="summary"
-        v=r.get("verdict","REVIEW")
-        vt={"AUTO FAIL":"bad","REVIEW":"warn","CLEAN":"ok"}.get(v,"white")
-        vi={"AUTO FAIL":"✗","REVIEW":"!","CLEAN":"✓"}.get(v,"?")
-
         self._w(k,"\n","white")
-        self._w(k,"  ◈ STATUS ─────────────────────────────────────────\n","hl")
-        self._w(k,f"    {vi}  {v}\n\n",vt)
+        self._w(k,"  ◈ SCAN COMPLETE ────────────────────────────────────\n","hl")
         self._w(k,f"  Generated  :  {now_str()}\n","dim")
         self._w(k,f"  PC User    :  {current_user()}\n","dim")
         self._w(k,f"  League     :  {r.get('league','?')}\n\n","dim")
@@ -2042,9 +2038,10 @@ class App:
 
     def _show(self, r):
         self._pb_stop(); self.scanning=False
-        v=r.get("verdict","REVIEW")
-        vc={"AUTO FAIL":self.RED,"REVIEW":self.AMBER,"CLEAN":self.GREEN}.get(v,self.FG2)
-        self._status_lbl.config(text=v,fg=vc)
+        total_h = r.get("total_hits", 0)
+        vc = self.RED if total_h > 0 else self.GREEN
+        v_label = f"{total_h} HITS" if total_h > 0 else "CLEAN"
+        self._status_lbl.config(text=v_label, fg=vc)
         self._run_btn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000000")
         self._render_summary(r)
         tab_map=[
