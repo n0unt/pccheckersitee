@@ -185,7 +185,6 @@ td.dim{color:var(--fg2);font-size:11px;}
   <div class="main">
     <div class="panel active" id="panel-overview">
       <div class="stats-row">
-        <div class="stat-card red"><div class="stat-glow"></div><div class="stat-label">Auto Fail</div><div class="stat-num" id="s-cheater">—</div><div class="stat-sub">High severity hits</div></div>
         <div class="stat-card amber"><div class="stat-glow"></div><div class="stat-label">Needs Review</div><div class="stat-num" id="s-susp">—</div><div class="stat-sub">Hits detected</div></div>
         <div class="stat-card green"><div class="stat-glow"></div><div class="stat-label">Clean</div><div class="stat-num" id="s-clean">—</div><div class="stat-sub">No findings</div></div>
         <div class="stat-card blue"><div class="stat-glow"></div><div class="stat-label">Total Scans</div><div class="stat-num" id="s-total">—</div><div class="stat-sub">All time</div></div>
@@ -284,7 +283,7 @@ function applyFilter(){const v=document.getElementById("lf").value;loadStats();l
 async function loadStats(){
   try{
     const d=await(await fetch("/api/stats")).json();
-    document.getElementById("s-cheater").textContent=d.cheater??"—";
+    
     document.getElementById("s-susp").textContent=d.suspicious??"—";
     document.getElementById("s-clean").textContent=d.clean??"—";
     document.getElementById("s-total").textContent=d.total??"—";
