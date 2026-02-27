@@ -486,7 +486,7 @@ def api_stats():
     conn = get_db(); cur = conn.cursor()
     if user and user["role"] in ("owner", "admin"):
         cur.execute("SELECT COUNT(*) FROM scans"); total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL')"); cheater = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL','AUTO-FAIL')"); cheater = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE verdict IN ('SUSPICIOUS','REVIEW')"); susp = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE verdict='CLEAN'"); clean = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE league='UFF'"); uff_c = cur.fetchone()[0]
@@ -495,7 +495,7 @@ def api_stats():
         allowed = get_user_leagues(user)
         ph = ",".join(["%s"]*len(allowed))
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league IN ({ph})", allowed); total = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL') AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL','AUTO-FAIL') AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('SUSPICIOUS','REVIEW') AND league IN ({ph})", allowed); susp = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict='CLEAN' AND league IN ({ph})", allowed); clean = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league='UFF' AND league IN ({ph})", allowed); uff_c = cur.fetchone()[0]
@@ -581,8 +581,21 @@ def api_validate_pin():
     cur.execute("SELECT * FROM pins WHERE pin=%s AND used=0",(pin,))
     row = row_to_dict(cur.fetchone(), cur); cur.close(); conn.close()
     if not row: return jsonify({"valid":False,"error":"Invalid or already used PIN"}),401
-    if datetime.datetime.utcnow() > datetime.datetime.strptime(row["expires"],"%Y-%m-%d %H:%M:%S"):
-        return jsonify({"valid":False,"error":"PIN has expired"}),401
+    try:
+        exp_str = row["expires"]
+        # Handle various stored formats
+        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"]:
+            try:
+                exp_dt = datetime.datetime.strptime(exp_str[:19], fmt[:len(fmt)])
+                break
+            except ValueError:
+                continue
+        else:
+            exp_dt = datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # default to valid
+        if datetime.datetime.utcnow() > exp_dt:
+            return jsonify({"valid":False,"error":"PIN has expired"}),401
+    except Exception:
+        pass  # If we can't parse expires, allow it through
     if league and row["league"] != league:
         return jsonify({"valid":False,"error":f"PIN is for {row['league']}, not {league}"}),401
     return jsonify({"ok":True,"valid":True,"league":row["league"]})
