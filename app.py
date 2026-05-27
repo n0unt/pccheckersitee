@@ -128,6 +128,7 @@ def init_db():
         "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS scan_id INTEGER DEFAULT NULL",
         "ALTER TABLE pins  ADD COLUMN IF NOT EXISTS finished_at TEXT DEFAULT NULL",
         "ALTER TABLE users ALTER COLUMN password DROP NOT NULL",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
     ]
     for sql in migrations:
         try:
@@ -192,126 +193,39 @@ def can_access_league(user, league):
     if user["role"] in ("owner", "admin"): return True
     return league in get_user_leagues(user)
 
-# ── Discord OAuth ─────────────────────────────────────────────
-@app.route("/auth/discord")
-def discord_auth():
-    state = secrets.token_hex(16)
-    session["oauth_state"] = state
-    params = urllib.parse.urlencode({
-        "client_id": DISCORD_CLIENT_ID,
-        "redirect_uri": DISCORD_REDIRECT,
-        "response_type": "code",
-        "scope": "identify guilds guilds.members.read",
-        "state": state,
-    })
-    return redirect(f"https://discord.com/api/oauth2/authorize?{params}")
-
-@app.route("/auth/discord/callback")
-def discord_callback():
-    code  = request.args.get("code")
-    state = request.args.get("state")
-    if not code or state != session.get("oauth_state"):
-        return redirect(url_for("login_page") + "?error=state_mismatch")
-
-    # Exchange code for token
-    status, token_data = _discord_post("/oauth2/token", {
-        "client_id": DISCORD_CLIENT_ID,
-        "client_secret": DISCORD_CLIENT_SECRET,
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": DISCORD_REDIRECT,
-    })
-    if status != 200 or "access_token" not in token_data:
-        err_detail = token_data.get("error_description") or token_data.get("error") or str(token_data)[:100]
-        app.logger.error(f"Discord token exchange failed {status}: {err_detail}")
-        return redirect(url_for("login_page") + f"?error=token_failed&detail={urllib.parse.quote(err_detail)}")
-
-    access_token = token_data["access_token"]
-
-    # Get Discord user
-    discord_user = _discord_get("/users/@me", token=access_token)
-    if not discord_user.get("id"):
-        return redirect(url_for("login_page") + "?error=user_failed")
-
-    discord_id  = discord_user["id"]
-    username    = discord_user.get("username", "Unknown")
-    avatar      = discord_user.get("avatar", "")
-
-    # Check guild roles using the USER's own OAuth token (guilds.members.read scope)
-    # This avoids needing the bot to make server-side API calls to Discord
-    # which can be blocked by Railway's network restrictions
-    role         = "pending"
-    leagues      = ""
-
-    # First try: use user token to get their member info directly (most reliable)
-    member_roles = []
-    if DISCORD_GUILD_ID:
-        member_data = _discord_get(f"/users/@me/guilds/{DISCORD_GUILD_ID}/member", token=access_token)
-        member_roles = member_data.get("roles", [])
-        app.logger.info(f"Member data for {discord_id}: code={member_data.get('code')} roles={member_roles}")
-
-    # If user token method failed (scope not granted), fall back to bot
-    if not member_roles and DISCORD_BOT_TOKEN:
-        member_data = _discord_get(f"/guilds/{DISCORD_GUILD_ID}/members/{discord_id}", bot=True)
-        member_roles = member_data.get("roles", [])
-        app.logger.info(f"Bot member data for {discord_id}: code={member_data.get('code')} roles={member_roles}")
-
-    # Assign roles based on Discord roles found
-    if ROLE_COMET in member_roles:
-        role    = "owner"
-        leagues = "UFF,FFL"
-
-    if ROLE_UFF in member_roles:
-        leagues = (leagues + ",UFF").strip(",")
-        if role == "pending": role = "agent"
-
-    if ROLE_FFL in member_roles:
-        leagues = (leagues + ",FFL").strip(",")
-        if role == "pending": role = "agent"
-
-    # Clean up duplicate leagues
-    leagues = ",".join(dict.fromkeys(leagues.split(",")).keys()).strip(",")
-
-    # Hard override: owner Discord ID from env var always gets access
-    # Set OWNER_DISCORD_ID in Railway variables to your Discord user ID
-    OWNER_DISCORD_ID = os.environ.get("OWNER_DISCORD_ID", "")
-    if OWNER_DISCORD_ID and discord_id == OWNER_DISCORD_ID:
-        role = "owner"; leagues = "UFF,FFL"
-
-    if role == "pending":
-        # Check if user is even in the server
-        guilds = _discord_get("/users/@me/guilds", token=access_token)
-        in_server = any(str(g.get("id","")) == str(DISCORD_GUILD_ID) for g in (guilds if isinstance(guilds, list) else []))
-        if not in_server:
-            return redirect(url_for("login_page") + "?error=not_in_server")
-        return redirect(url_for("login_page") + "?error=no_access")
-
-    # Upsert user
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT id FROM users WHERE discord_id=%s", (discord_id,))
-        existing = cur.fetchone()
-        if existing:
-            cur.execute("UPDATE users SET username=%s, avatar=%s, role=%s, leagues=%s WHERE discord_id=%s",
-                        (username, avatar, role, leagues, discord_id))
-            user_id = existing[0]
-        else:
-            cur.execute("INSERT INTO users (discord_id,username,avatar,role,leagues,created) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
-                        (discord_id, username, avatar, role, leagues, now()))
-            user_id = cur.fetchone()[0]
-        conn.commit(); cur.close(); conn.close()
-    except Exception as e:
-        app.logger.error(f"User upsert failed: {e}", exc_info=True)
-        return redirect(url_for("login_page") + f"?error=db_error&detail={urllib.parse.quote(str(e)[:100])}")
-
-    session["user_id"] = user_id
-    session["username"] = username
-    session["role"] = role
-    session["leagues"] = leagues
-    session["avatar"] = f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar}.png" if avatar else ""
+# ── Simple Login ──────────────────────────────────────────────
+@app.route("/auth/login", methods=["POST"])
+def do_login():
+    username = request.form.get("username","").strip()
+    password = request.form.get("password","").strip()
+    if not username or not password:
+        return redirect(url_for("login_page")+"?error=empty")
+    conn=get_db(); cur=conn.cursor()
+    cur.execute("SELECT * FROM users WHERE username=%s",(username,))
+    row=row_to_dict(cur.fetchone(),cur); cur.close(); conn.close()
+    if not row:
+        return redirect(url_for("login_page")+"?error=no_access")
+    import hashlib
+    pw_hash=hashlib.sha256(password.encode()).hexdigest()
+    stored=row.get("password_hash","")
+    # Owner with no password set = allow and save hash
+    if row["role"] in ("owner","admin") and not stored:
+        conn2=get_db(); cur2=conn2.cursor()
+        cur2.execute("UPDATE users SET password_hash=%s WHERE id=%s",(pw_hash,row["id"]))
+        conn2.commit(); cur2.close(); conn2.close()
+    elif stored and stored!=pw_hash:
+        return redirect(url_for("login_page")+"?error=bad_password")
+    session["user_id"]=row["id"]; session["username"]=row["username"]; session["role"]=row["role"]
     return redirect(url_for("dashboard"))
 
-# ── Pages ────────────────────────────────────────────────────
+@app.route("/auth/logout")
+def auth_logout():
+    session.clear(); return redirect(url_for("login_page"))
+
+@app.route("/logout")
+def logout():
+    session.clear(); return redirect(url_for("login_page"))
+
 @app.route("/")
 def index():
     user = get_user() if "user_id" in session else None
@@ -419,20 +333,12 @@ ROLE_FFL             : {ROLE_FFL}
 def login_page():
     error = request.args.get("error")
     errors = {
-        "no_access":  "You don't have the required role. You need Comet, UFF Access, or FFL Access in the Comet server.",
-        "not_in_server": "You must join the Comet Discord server first before signing in.",
-        "db_error": "Database error during login.",
-        "token_failed": "Discord login failed. Check your internet and try again.",
-        "state_mismatch": "Security check failed. Please try again.",
-        "user_failed": "Could not fetch your Discord profile.",
-        "bot_error":  "Bot verification failed.",
+        "no_access": "Account not found. Contact an admin.",
+                "db_error": "Database error during login.",
+                        "bad_password": "Incorrect password.",
+        "empty": "Please enter username and password.",
     }
-    detail  = request.args.get("detail", "")
-    err_msg = errors.get(error)
-    # Show detail message for all error types if available
-    if detail and err_msg:
-        err_msg = detail
-    return render_template("login.html", error=err_msg)
+    return render_template("login.html", error=errors.get(error, error if error else None))
 
 @app.route("/logout")
 def logout():
