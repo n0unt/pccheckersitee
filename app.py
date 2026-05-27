@@ -340,10 +340,6 @@ def login_page():
     }
     return render_template("login.html", error=errors.get(error, error if error else None))
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login_page"))
 
 @app.route("/dashboard")
 @login_required
