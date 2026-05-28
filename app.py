@@ -498,8 +498,8 @@ def api_validate_pin():
             return jsonify({"valid":False,"error":"PIN has expired"}),401
     except Exception:
         pass  # If we can't parse expires, allow it through
-    if league and row["league"] != league:
-        return jsonify({"valid":False,"error":f"PIN is for {row['league']}, not {league}"}),401
+    # Don't reject on league mismatch — just return the correct league
+    # (scanner may send wrong league; we always trust the stored PIN league)
     return jsonify({"ok":True,"valid":True,"league":row["league"]})
 
 @app.route("/api/submit", methods=["POST"])
@@ -519,13 +519,16 @@ def api_submit_scan():
         # Truncate report to avoid DB overflow
         report = data.get("report",{})
         # Also store top-level scan tabs in report for results page
-        for tab_key in ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
-                        "unsigned","recycle","sysmain","processes","cleaners","network",
-                        "registry_extra","discord"]:
-            if tab_key in data and tab_key not in report:
+        ALL_TABS = ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
+                    "unsigned","recycle","sysmain","processes","cleaners","network",
+                    "registry_extra","discord","eventlog","jumplists","lnkfiles",
+                    "deleted_int","exec_history_text"]
+        for tab_key in ALL_TABS:
+            if tab_key in data:
                 report[tab_key+"_raw"] = data[tab_key]
-        # Store extra fields from new scanner
-        for field in ["vpn_info","cleaner_info","process_hits","cleaner_hits"]:
+        for field in ["vpn_info","cleaner_info","process_hits","cleaner_hits",
+                      "eventlog_hits","jumplist_hits","lnk_hits","deleted_hits",
+                      "exec_history","roblox_log_hits"]:
             if field in data: report[field] = data[field]
         report_str = json.dumps(report)
         if len(report_str) > 500000:
@@ -581,8 +584,49 @@ def api_admin_users():
 @owner_required
 def api_admin_update_user(uid):
     data = request.json or {}; conn = get_db(); cur = conn.cursor()
-    if data.get("role"): cur.execute("UPDATE users SET role=%s WHERE id=%s",(data["role"],uid))
+    if data.get("role"):     cur.execute("UPDATE users SET role=%s WHERE id=%s",(data["role"],uid))
     if data.get("leagues") is not None: cur.execute("UPDATE users SET leagues=%s WHERE id=%s",(data["leagues"],uid))
+    if data.get("username"): cur.execute("UPDATE users SET username=%s WHERE id=%s",(data["username"],uid))
+    if data.get("password"):
+        pw_hash = hashlib.sha256(data["password"].encode()).hexdigest()
+        cur.execute("UPDATE users SET password_hash=%s WHERE id=%s",(pw_hash,uid))
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/admin/users/create", methods=["POST"])
+@login_required
+@owner_required
+def api_admin_create_user():
+    data = request.json or {}
+    username = data.get("username","").strip()
+    password = data.get("password","").strip()
+    role     = data.get("role","agent")
+    leagues  = data.get("leagues","")
+    if not username or not password:
+        return jsonify({"error":"Username and password required"}),400
+    conn=get_db(); cur=conn.cursor()
+    cur.execute("SELECT id FROM users WHERE username=%s",(username,))
+    if cur.fetchone():
+        cur.close(); conn.close()
+        return jsonify({"error":"Username already exists"}),409
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    cur.execute(
+        "INSERT INTO users (discord_id,username,password_hash,role,leagues,created) VALUES (NULL,%s,%s,%s,%s,%s) RETURNING id",
+        (username, pw_hash, role, leagues, now()))
+    new_id = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({"ok":True,"id":new_id,"username":username})
+
+@app.route("/api/admin/users/<int:uid>/reset-password", methods=["POST"])
+@login_required
+@owner_required
+def api_admin_reset_password(uid):
+    data = request.json or {}
+    password = data.get("password","").strip()
+    if not password: return jsonify({"error":"Password required"}),400
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    conn=get_db(); cur=conn.cursor()
+    cur.execute("UPDATE users SET password_hash=%s WHERE id=%s",(pw_hash,uid))
     conn.commit(); cur.close(); conn.close()
     return jsonify({"ok":True})
 
