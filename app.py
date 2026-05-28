@@ -451,24 +451,34 @@ def api_gen_pin():
     pin = gen_pin()
     expires = (datetime.datetime.utcnow()+datetime.timedelta(hours=4)).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db(); cur = conn.cursor()
+
+    # Step 1: Insert the new pin
     cur.execute("INSERT INTO pins (pin,league,agent_id,used,created,expires) VALUES (%s,%s,%s,0,%s,%s)",
-                (pin,league,user["id"],now(),expires))
-    # Cleanup: keep only the 3 most recent pins per agent (delete older ones)
+                (pin, league, user["id"], now(), expires))
+
+    # Step 2: Commit the insert FIRST so the cleanup sees it
+    conn.commit()
+
+    # Step 3: Now clean up old pins — keep only 3 most recent UNUSED per agent
     try:
         cur.execute("""
-            DELETE FROM pins WHERE agent_id=%s AND id NOT IN (
-                SELECT id FROM (
-                    SELECT id FROM pins WHERE agent_id=%s ORDER BY id DESC LIMIT 3
-                ) AS keep
-            )
-        """, (user["id"], user["id"]))
-        # Also delete scan data for deleted pins
-        cur.execute("""
-            DELETE FROM scans WHERE pin NOT IN (SELECT pin FROM pins)
-        """)
+            DELETE FROM pins
+            WHERE agent_id = %s
+              AND used = 0
+              AND pin != %s
+              AND id NOT IN (
+                  SELECT id FROM pins
+                  WHERE agent_id = %s AND used = 0
+                  ORDER BY id DESC
+                  LIMIT 3
+              )
+        """, (user["id"], pin, user["id"]))
+        conn.commit()
     except Exception:
-        pass  # Non-critical cleanup
-    conn.commit(); cur.close(); conn.close()
+        try: conn.rollback()
+        except Exception: pass
+
+    cur.close(); conn.close()
     return jsonify({"pin":pin,"league":league,"expires":expires,
                     "results_url": f"/results/{pin}"})
 
@@ -640,6 +650,21 @@ def api_admin_delete_user(uid):
     conn.commit(); cur.close(); conn.close()
     return jsonify({"ok":True})
 
+
+
+@app.route("/api/debug/pin/<pin_code>")
+@login_required
+@owner_required
+def debug_pin(pin_code):
+    """Debug: show exact DB state of a PIN."""
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT * FROM pins WHERE pin=%s", (pin_code.upper(),))
+    row = row_to_dict(cur.fetchone(), cur)
+    cur.close(); conn.close()
+    if not row: return jsonify({"found": False, "pin": pin_code.upper()})
+    return jsonify({"found": True, "pin": row["pin"], "league": row["league"],
+                    "used": row["used"], "expires": row["expires"],
+                    "created": row["created"], "agent_id": row["agent_id"]})
 
 # ── Public pages ─────────────────────────────────────────────
 @app.route("/download")
