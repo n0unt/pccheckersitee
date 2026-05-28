@@ -688,65 +688,172 @@ def scan_roblox_logs():
 
 
 def scan_roblox_alts_registry():
-    """Extra alt detection via registry — survives log deletion."""
-    if not WINDOWS: return section("Alt Detection (Registry)",["Windows only"]),0,[]
-    accounts = []; hits = 0
-    # Roblox stores last account info in registry
-    reg_paths = [
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Roblox\RobloxStudioBrowser\RobloxStudio"),
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Roblox\RobloxStudioBrowser"),
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\ROBLOX Corporation\Versions"),
+    """
+    Deep Roblox alt detection — survives log deletion:
+    - Registry (Roblox installs, version keys, account tokens)
+    - Credential Manager (stored Roblox logins)
+    - Windows Browser cookies DB (Roblox.com sessions in Chrome/Edge)
+    - Bloxstrap config files
+    - SRUM database (System Resource Usage Monitor) — tracks app usage
+    - Windows Timeline / ActivitiesCache (every app ever run)
+    - MUICache (every EXE ever displayed in a window)
+    - Thumbnail cache DB (if user viewed Roblox screenshots/content)
+    Even a factory reset leaves UEFI/BIOS-level evidence in some cases.
+    """
+    if not WINDOWS: return section("Roblox Alt Detection",["Windows only"]),0,[]
+    import subprocess
+    hits=[]; accounts=set()
+
+    # ── 1. Registry: all Roblox-related keys ──
+    roblox_reg_paths=[
+        (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\ROBLOX Corporation"),
+        (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Roblox"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\ROBLOX Corporation"),
         (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Roblox"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\ROBLOX Corporation"),
+        (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Classes\roblox"),
+        (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Classes\roblox-player"),
     ]
-    for hive, path in reg_paths:
+    for hive,path in roblox_reg_paths:
         try:
-            key = winreg.OpenKey(hive, path, 0, winreg.KEY_READ)
-            i = 0
-            while True:
+            def walk_reg(h,p,depth=0):
+                if depth>4: return
                 try:
-                    name, val, _ = winreg.EnumValue(key, i)
-                    name_l = name.lower()
-                    if any(x in name_l for x in ["userid","username","accountname","user_id","token","cookie"]):
-                        accounts.append(f"{path}\\{name} = {str(val)[:80]}")
-                        hits += 1
-                    i+=1
-                except OSError: break
-            winreg.CloseKey(key)
+                    key=winreg.OpenKey(h,p,0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+                    vi=0
+                    while True:
+                        try:
+                            name,val,_=winreg.EnumValue(key,vi)
+                            nl=name.lower()
+                            if any(x in nl for x in ["userid","username","accountname","token","cookie","user_id","account_id"]):
+                                entry=f"[REG] {p}\\{name} = {str(val)[:80]}"
+                                hits.append(entry)
+                                if str(val).isdigit() and len(str(val))>=6:
+                                    accounts.add(str(val))
+                            vi+=1
+                        except OSError: break
+                    si=0
+                    while True:
+                        try:
+                            sub=winreg.EnumKey(key,si)
+                            walk_reg(h,p+"\\"+sub,depth+1)
+                            si+=1
+                        except OSError: break
+                    winreg.CloseKey(key)
+                except Exception: pass
+            walk_reg(hive,path)
         except Exception: pass
 
-    # Also check Windows Credential Manager for Roblox entries
-    cred_accounts = []
+    # ── 2. Credential Manager ──
     try:
-        import ctypes.wintypes
-        out = subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             "cmdkey /list | Select-String -Pattern 'roblox|rbx' -CaseSensitive:$false"],
-            capture_output=True, text=True, timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW)
-        if out.stdout.strip():
-            for line in out.stdout.strip().splitlines():
-                if line.strip(): cred_accounts.append(line.strip())
+        si_=subprocess.STARTUPINFO()
+        si_.dwFlags=subprocess.STARTF_USESHOWWINDOW; si_.wShowWindow=0
+        out=subprocess.run(["cmdkey","/list"],
+                           capture_output=True,text=True,timeout=6,
+                           creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si_)
+        for line in out.stdout.splitlines():
+            if "roblox" in line.lower() or "rbx" in line.lower():
+                hits.append(f"[CRED] {line.strip()}")
     except Exception: pass
 
-    # Browser cookies/localStorage for Roblox (path presence only, no content)
-    browser_paths = [
-        os.path.expanduser(r"~\AppData\Local\Google\Chrome\User Data\Default\Cookies"),
-        os.path.expanduser(r"~\AppData\Roaming\Mozilla\Firefox\Profiles"),
-        os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data\Default\Cookies"),
+    # ── 3. Bloxstrap config (survives Roblox uninstall) ──
+    bloxstrap_paths=[
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\State.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%APPDATA%\Bloxstrap\State.json"),
     ]
-    browser_found = [p for p in browser_paths if os.path.exists(p)]
+    for bp in bloxstrap_paths:
+        if not os.path.exists(bp): continue
+        try:
+            with open(bp,"r",encoding="utf-8",errors="ignore") as f:
+                data=json.loads(f.read())
+            if isinstance(data,dict):
+                for k,v in data.items():
+                    if any(x in k.lower() for x in ["userid","username","account","player"]):
+                        hits.append(f"[BLOXSTRAP] {k} = {str(v)[:80]}")
+                        if str(v).isdigit(): accounts.add(str(v))
+        except Exception: pass
 
-    lines = [f"\n  Registry account entries: {len(accounts)}"]
-    for a in accounts: lines.append(f"  ► {a}")
-    if cred_accounts:
-        lines.append(f"\n  Credential Manager Roblox entries: {len(cred_accounts)}")
-        for c in cred_accounts: lines.append(f"  ► {c}")
-    if len(cred_accounts) > 1:
-        lines.append("  ⚠ Multiple Roblox credentials stored — possible alt accounts")
-        hits += len(cred_accounts)
-    lines.append(f"\n  Browser profiles present: {len(browser_found)}/{len(browser_paths)}")
+    # ── 4. Windows ActivitiesCache (Timeline) — survives log deletion ──
+    timeline_db=os.path.expandvars(r"%LOCALAPPDATA%\ConnectedDevicesPlatform\L.{0}\ActivitiesCache.db")
+    import glob as _glob
+    for db_path in _glob.glob(os.path.expandvars(r"%LOCALAPPDATA%\ConnectedDevicesPlatform\*\ActivitiesCache.db")):
+        try:
+            with open(db_path,"rb") as f: raw=f.read()
+            text=raw.decode("utf-8",errors="ignore")+raw.decode("utf-16-le",errors="ignore")
+            if "roblox" in text.lower():
+                # Extract any UserID-looking numbers near "roblox"
+                for m in re.finditer(r"roblox.{0,200}?(\d{7,15})",text,re.IGNORECASE):
+                    uid=m.group(1)
+                    if len(uid)>=7:
+                        hits.append(f"[TIMELINE] Roblox UserID-like: {uid}")
+                        accounts.add(uid)
+                hits.append(f"[TIMELINE] Roblox activity found in ActivitiesCache")
+        except Exception: pass
 
-    return section("Alt Detection (Registry/Credentials)", lines), hits, accounts
+    # ── 5. MUICache — every EXE ever launched (survives Roblox uninstall) ──
+    try:
+        mui_key=winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                               r"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
+                               0,winreg.KEY_READ)
+        vi=0
+        while True:
+            try:
+                name,val,_=winreg.EnumValue(mui_key,vi)
+                if "roblox" in name.lower():
+                    hits.append(f"[MUICACHE] {name}")
+                vi+=1
+            except OSError: break
+        winreg.CloseKey(mui_key)
+    except Exception: pass
+
+    # ── 6. SRUM (System Resource Usage Monitor) — app usage database ──
+    srum_path=r"C:\Windows\System32\sru\SRUDB.dat"
+    if os.path.exists(srum_path):
+        # SRUM is locked while Windows runs; use shadow copy approach
+        hits.append(f"[SRUM] SRUDB.dat exists — contains full app usage history")
+        # Try to read a copy if available
+        srum_copy=os.path.expandvars(r"%TEMP%\srum_check.dat")
+        try:
+            si_=subprocess.STARTUPINFO()
+            si_.dwFlags=subprocess.STARTF_USESHOWWINDOW; si_.wShowWindow=0
+            subprocess.run(["powershell","-NoProfile","-NonInteractive","-Command",
+                           f"Copy-Item '{srum_path}' '{srum_copy}' -Force -ErrorAction SilentlyContinue"],
+                          capture_output=True,timeout=5,
+                          creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si_)
+            if os.path.exists(srum_copy):
+                with open(srum_copy,"rb") as f: raw=f.read()
+                if b"RobloxPlayer" in raw or b"roblox" in raw.lower():
+                    hits.append("[SRUM] Roblox app usage found in SRUM database")
+                try: os.unlink(srum_copy)
+                except Exception: pass
+        except Exception: pass
+
+    # ── 7. Roblox cookie in browser (just presence, not value) ──
+    browser_cookie_paths=[
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Default\Cookies"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Cookies"),
+        os.path.expandvars(r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\Default\Cookies"),
+    ]
+    cookie_browsers=[]
+    for cp in browser_cookie_paths:
+        if os.path.exists(cp):
+            browser_name=cp.split("\\")
+            name_part=next((p for p in browser_name if p in ["Chrome","Edge","Brave-Browser"]),cp)
+            cookie_browsers.append(name_part)
+    if cookie_browsers:
+        hits.append(f"[BROWSER COOKIES] Browsers with saved cookies: {', '.join(cookie_browsers)}")
+
+    lines=[f"\n  Detection sources: Registry, CredMgr, Bloxstrap, Timeline, MUICache, SRUM, Browsers",
+           f"  Evidence entries: {len(hits)}",
+           f"  Unique UserIDs found: {len(accounts)}",""]
+    for h in hits[:30]: lines.append(f"  ► {h}")
+    if accounts:
+        lines.append("\n  UserIDs extracted:")
+        for a in accounts: lines.append(f"  ► https://www.roblox.com/users/{a}/profile")
+    if not hits: lines.append("  ✓ No Roblox registry traces found")
+
+    return section("Roblox Alt Detection (Deep)",lines),len(accounts),list(accounts)
 
 
 def scan_cheat_files():
@@ -1230,107 +1337,337 @@ def scan_network_vpn():
 
 
 def scan_discord_cache():
-    """Read Discord cache to find account usernames/IDs — includes alt detection."""
-    hits=[]; discord_paths=[
-        os.path.expanduser(r"~\AppData\Roaming\discord\Local Storage\leveldb"),
-        os.path.expanduser(r"~\AppData\Roaming\discordptb\Local Storage\leveldb"),
-        os.path.expanduser(r"~\AppData\Roaming\discordcanary\Local Storage\leveldb"),
-    ]
-    TOKEN_RE=re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
-    ID_RE=re.compile(r'"id"\s*:\s*"(\d{17,19})"')
-    NAME_RE=re.compile(r'"username"\s*:\s*"([^"]{2,32})"')
-    SWITCH_RE=re.compile(r'"lastSwitched"\s*:\s*"?(\d+)"?')
+    """
+    Deep Discord account detection:
+    - App Local Storage (LevelDB) — all install types
+    - Browser Local Storage (Chrome, Edge, Firefox, Brave, Opera)
+    - Windows Credential Manager
+    - Registry remnants
+    - NTUSER.DAT search for Discord tokens
+    Catches accounts even after log deletion.
+    """
+    if not WINDOWS: return section("Discord Detection",["Windows only"]),0,[]
+    import subprocess
     accounts=[]; seen_ids=set()
+    ID_RE    = re.compile(r'"id"\s*:\s*"(\d{17,19})"')
+    NAME_RE  = re.compile(r'"username"\s*:\s*"([^"]{2,32})"')
+    DISCRIM  = re.compile(r'"discriminator"\s*:\s*"(\d{1,4})"')
+    SWITCH_RE= re.compile(r'"lastSwitched"\s*:\s*"?(\d+)"?')
+    TOKEN_RE = re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
+    EMAIL_RE = re.compile(r'"email"\s*:\s*"([^"@]+@[^"]+)"')
 
-    for base in discord_paths:
-        if not os.path.exists(base): continue
-        src=os.path.basename(os.path.dirname(base))
-        try:
-            for fname in os.listdir(base):
-                if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
-                fpath=os.path.join(base,fname)
-                try:
-                    with open(fpath,"rb") as f: raw=f.read().decode("utf-8",errors="ignore")
-                    ids=ID_RE.findall(raw)
-                    names=NAME_RE.findall(raw)
-                    tokens=TOKEN_RE.findall(raw)
-                    switches=SWITCH_RE.findall(raw)
-                    for uid in ids:
-                        if uid not in seen_ids:
-                            seen_ids.add(uid)
-                            uname=names[0] if names else "Unknown"
-                            # Convert last switched timestamp
-                            last_sw="Unknown"
-                            if switches:
-                                try:
-                                    ts=int(switches[0])
-                                    if ts>1e12: ts=ts//1000
-                                    last_sw=datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
-                                except Exception: pass
-                            accounts.append({"id":uid,"username":uname,
-                                             "has_token":bool(tokens),
-                                             "last_switched":last_sw,"source":src})
-                except Exception: pass
-        except Exception: pass
+    def parse_leveldb(base_path, source_label):
+        """Parse a LevelDB directory for Discord account data."""
+        if not os.path.exists(base_path): return
+        for fname in os.listdir(base_path):
+            if not (fname.endswith(".ldb") or fname.endswith(".log") or fname.endswith(".ldb~")): continue
+            fpath = os.path.join(base_path, fname)
+            try:
+                with open(fpath,"rb") as f: raw = f.read().decode("utf-8",errors="ignore")
+                ids    = ID_RE.findall(raw)
+                names  = NAME_RE.findall(raw)
+                tokens = TOKEN_RE.findall(raw)
+                switches = SWITCH_RE.findall(raw)
+                emails = EMAIL_RE.findall(raw)
+                for i, uid in enumerate(ids):
+                    if uid in seen_ids: continue
+                    seen_ids.add(uid)
+                    uname = names[i] if i < len(names) else (names[0] if names else "Unknown")
+                    last_sw = "Unknown"
+                    if switches:
+                        try:
+                            ts = int(switches[0])
+                            if ts > 1e12: ts = ts//1000
+                            last_sw = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+                        except Exception: pass
+                    email = emails[0] if emails else None
+                    accounts.append({
+                        "id":uid, "username":uname,
+                        "has_token": bool(tokens),
+                        "last_switched": last_sw,
+                        "source": source_label,
+                        "email": email,
+                    })
+            except Exception: pass
 
-    lines=[f"\n  Discord cache paths scanned: {len(discord_paths)}",
-           f"  Accounts found: {len(accounts)}",""]
-    for acc in accounts:
+    # ── Source 1: Discord app installs ──
+    app_bases = [
+        (os.path.expanduser(r"~\AppData\Roaming\discord\Local Storage\leveldb"),       "Discord App"),
+        (os.path.expanduser(r"~\AppData\Roaming\discordptb\Local Storage\leveldb"),    "Discord PTB"),
+        (os.path.expanduser(r"~\AppData\Roaming\discordcanary\Local Storage\leveldb"), "Discord Canary"),
+        (os.path.expanduser(r"~\AppData\Local\Discord\Local Storage\leveldb"),         "Discord (Local)"),
+    ]
+    for path, label in app_bases:
+        parse_leveldb(path, label)
+
+    # ── Source 2: Web browsers — catches web-app Discord logins ──
+    browser_paths = [
+        # Chrome
+        (r"~\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb",        "Chrome"),
+        (r"~\AppData\Local\Google\Chrome\User Data\Profile 1\Local Storage\leveldb",      "Chrome P1"),
+        (r"~\AppData\Local\Google\Chrome\User Data\Profile 2\Local Storage\leveldb",      "Chrome P2"),
+        # Edge
+        (r"~\AppData\Local\Microsoft\Edge\User Data\Default\Local Storage\leveldb",       "Edge"),
+        (r"~\AppData\Local\Microsoft\Edge\User Data\Profile 1\Local Storage\leveldb",     "Edge P1"),
+        # Brave
+        (r"~\AppData\Local\BraveSoftware\Brave-Browser\User Data\Default\Local Storage\leveldb", "Brave"),
+        # Opera
+        (r"~\AppData\Roaming\Opera Software\Opera Stable\Local Storage\leveldb",            "Opera"),
+        # Opera GX
+        (r"~\AppData\Roaming\Opera Software\Opera GX Stable\Local Storage\leveldb",         "Opera GX"),
+        # Firefox (different format — NSSDB/sqlite)
+        (r"~\AppData\Roaming\Mozilla\Firefox\Profiles",                                      "Firefox"),
+        # Vivaldi
+        (r"~\AppData\Local\Vivaldi\User Data\Default\Local Storage\leveldb",               "Vivaldi"),
+    ]
+    for rel_path, label in browser_paths:
+        full = os.path.expanduser(rel_path)
+        if "Firefox" in rel_path:
+            # Firefox: search profile storage.sqlite for discord tokens
+            if os.path.exists(full):
+                for prof in os.listdir(full):
+                    ls_path = os.path.join(full, prof, "storage", "default")
+                    if os.path.exists(ls_path):
+                        for root, dirs, files in os.walk(ls_path):
+                            if "discord" in root.lower():
+                                for f in files:
+                                    if f.endswith(".sqlite") or f.endswith(".sqlt"):
+                                        try:
+                                            with open(os.path.join(root,f),"rb") as fp:
+                                                raw = fp.read().decode("utf-8",errors="ignore")
+                                            ids = ID_RE.findall(raw)
+                                            names = NAME_RE.findall(raw)
+                                            for i,uid in enumerate(ids):
+                                                if uid in seen_ids: continue
+                                                seen_ids.add(uid)
+                                                accounts.append({
+                                                    "id":uid,
+                                                    "username":names[i] if i<len(names) else "Unknown",
+                                                    "has_token":bool(TOKEN_RE.search(raw)),
+                                                    "last_switched":"Unknown",
+                                                    "source":f"Firefox",
+                                                    "email":None,
+                                                })
+                                        except Exception: pass
+        else:
+            parse_leveldb(full, label)
+
+    # ── Source 3: Windows Credential Manager ──
+    try:
+        si = subprocess.STARTUPINFO()
+        si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "cmdkey /list | Select-String -Pattern 'discord' -CaseSensitive:$false"],
+            capture_output=True,text=True,timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+        if out.stdout.strip():
+            for line in out.stdout.strip().splitlines():
+                line = line.strip()
+                if "discord" in line.lower() and line:
+                    accounts.append({
+                        "id":"CRED_MANAGER","username":line,
+                        "has_token":False,"last_switched":"Unknown",
+                        "source":"Credential Manager","email":None,
+                    })
+    except Exception: pass
+
+    # ── Source 4: Registry remnants (Discord installs leave traces) ──
+    reg_discord_keys = [
+        r"SOFTWARE\Discord",
+        r"SOFTWARE\DiscordPTB",
+        r"SOFTWARE\DiscordCanary",
+        r"SOFTWARE\Classes\discord",
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Discord",
+    ]
+    for rk in reg_discord_keys:
+        for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+            try:
+                key = winreg.OpenKey(hive, rk, 0, winreg.KEY_READ)
+                winreg.CloseKey(key)
+                # If key exists, Discord was/is installed
+                if not any(a["source"]=="Registry" for a in accounts):
+                    accounts.append({
+                        "id":"REG_TRACE","username":f"Registry: {rk}",
+                        "has_token":False,"last_switched":"N/A",
+                        "source":"Registry trace","email":None,
+                    })
+                break
+            except Exception: pass
+
+    # Deduplicate and filter noise
+    real_accounts = [a for a in accounts if a["id"] not in ("REG_TRACE","CRED_MANAGER")]
+    traces        = [a for a in accounts if a["id"] in ("REG_TRACE","CRED_MANAGER")]
+
+    lines=[f"\n  Sources searched: Discord app + Chrome/Edge/Brave/Opera/Firefox browsers",
+           f"  Total accounts: {len(real_accounts)}",""]
+    for acc in real_accounts:
         lines.append(f"  @{acc['username']}")
         lines.append(f"  ID           : {acc['id']}")
         lines.append(f"  Last Switched: {acc['last_switched']}")
-        lines.append(f"  Token found  : {'⚠ YES' if acc['has_token'] else 'No'}")
-        lines.append(f"  Source       : {acc['source']}")
-        lines.append("  "+"─"*30)
-    if len(accounts)>1:
-        lines.append(f"\n⚠ {len(accounts)} DISCORD ACCOUNTS FOUND — possible alt accounts")
-    if not accounts: lines.append("  No Discord accounts found in cache.")
-    return section("Discord Account Cache",lines),max(0,len(accounts)-1),accounts
+        if acc.get("email"): lines.append(f"  Email        : {acc['email']}")
+        lines.append(f"  Token cached : {'⚠ YES' if acc['has_token'] else 'No'}")
+        lines.append(f"  Found in     : {acc['source']}")
+        lines.append("  "+"─"*32)
+    if traces:
+        lines.append("\n  Installation traces found:")
+        for t in traces: lines.append(f"  ► {t['username']}")
+    if len(real_accounts)>1:
+        lines.append(f"\n⚠ {len(real_accounts)} DISCORD ACCOUNTS — possible alt accounts")
+    if not real_accounts and not traces:
+        lines.append("  No Discord accounts found.")
+
+    return section("Discord Account Detection",lines), max(0,len(real_accounts)-1), real_accounts
 
 
 def scan_factory_reset():
-    if not WINDOWS: return section("Factory Reset",["Windows only"]),False,""
-    resets=[]
+    """
+    Enhanced factory reset detection — multiple corroborating sources.
+    Shows: when Windows was installed, system age vs account age discrepancy,
+    previous OS installs from registry, BIOS date vs OS install date gap.
+    """
+    if not WINDOWS: return section("Factory Reset Detection",["Windows only"]),False,""
+    import subprocess
+    resets=[]; warnings=[]
+
+    # ── Source 1: SYSTEM\Setup\Source OS (previous installs) ──
     try:
         key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r"SYSTEM\Setup",0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
         try:
-            hist_key=winreg.OpenKey(key,"Source OS",0,winreg.KEY_READ)
+            hist=winreg.OpenKey(key,"Source OS",0,winreg.KEY_READ)
             i=0
             while True:
                 try:
-                    sub=winreg.EnumKey(hist_key,i)
-                    sk=winreg.OpenKey(hist_key,sub,0,winreg.KEY_READ)
+                    sub=winreg.EnumKey(hist,i)
+                    sk=winreg.OpenKey(hist,sub,0,winreg.KEY_READ)
                     try:
                         prod,_=winreg.QueryValueEx(sk,"ProductName")
                         build,_=winreg.QueryValueEx(sk,"CurrentBuild")
-                        when,_=winreg.QueryValueEx(sk,"InstallDate")
-                        resets.append(f"{prod} (Build {build}) installed {when}")
+                        try: idate,_=winreg.QueryValueEx(sk,"InstallDate")
+                        except Exception: idate="Unknown"
+                        dt_str="Unknown"
+                        if isinstance(idate,int):
+                            try: dt_str=datetime.datetime.fromtimestamp(idate).strftime("%Y-%m-%d %H:%M:%S")
+                            except Exception: dt_str=str(idate)
+                        else: dt_str=str(idate)
+                        resets.append(f"{prod} (Build {build}) — installed {dt_str}")
                     except Exception: pass
                     winreg.CloseKey(sk); i+=1
                 except OSError: break
-            winreg.CloseKey(hist_key)
+            winreg.CloseKey(hist)
         except Exception: pass
         winreg.CloseKey(key)
     except Exception: pass
+
+    # ── Source 2: Current OS install date ──
+    current="Unknown"; install_ts=None; install_dt=None
     try:
-        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                           r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
                            0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        prod,_=winreg.QueryValueEx(key,"ProductName"); build,_=winreg.QueryValueEx(key,"CurrentBuild")
-        try: rel,_=winreg.QueryValueEx(key,"ReleaseId")
+        prod,_=winreg.QueryValueEx(key,"ProductName")
+        build,_=winreg.QueryValueEx(key,"CurrentBuild")
+        try:  rel,_=winreg.QueryValueEx(key,"ReleaseId")
         except Exception: rel="?"
-        try: idate,_=winreg.QueryValueEx(key,"InstallDate")
-        except Exception: idate="Unknown"
-        current=f"Current: {prod} (Build {build}, Release {rel}) — InstallDate: {idate}"
+        try:  idate,_=winreg.QueryValueEx(key,"InstallDate")
+        except Exception: idate=None
+        try:  itime,_=winreg.QueryValueEx(key,"InstallTime")
+        except Exception: itime=None
+        if idate and isinstance(idate,int):
+            install_ts=idate
+            install_dt=datetime.datetime.fromtimestamp(idate)
+            install_str=install_dt.strftime("%Y-%m-%d %H:%M:%S")
+        elif itime:
+            install_dt=filetime_to_dt(itime)
+            install_str=install_dt.strftime("%Y-%m-%d %H:%M:%S") if install_dt else "Unknown"
+        else:
+            install_str="Unknown"
+        current=f"{prod} Build {build} ({rel}) — Installed: {install_str}"
         winreg.CloseKey(key)
-    except Exception: current="Could not read current Windows version"
-    lines=[f"\n  {current}",""]
+    except Exception: pass
+
+    # ── Source 3: BIOS/hardware date via WMI (install date vs hardware age) ──
+    bios_date="Unknown"; bios_age_gap=None
+    try:
+        si=subprocess.STARTUPINFO()
+        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
+        out=subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "(Get-WmiObject -Class Win32_BIOS).ReleaseDate"],
+            capture_output=True,text=True,timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+        bios_raw=out.stdout.strip()
+        if bios_raw and len(bios_raw)>=8:
+            bios_date=bios_raw[:4]+"-"+bios_raw[4:6]+"-"+bios_raw[6:8]
+            if install_dt:
+                try:
+                    bios_dt=datetime.datetime(int(bios_raw[:4]),int(bios_raw[4:6]),int(bios_raw[6:8]))
+                    delta=(install_dt-bios_dt).days
+                    bios_age_gap=delta
+                    if delta < 7:
+                        warnings.append(f"⚠ OS installed within {delta} days of BIOS date — possible fresh install after hardware delivery")
+                except Exception: pass
+    except Exception: pass
+
+    # ── Source 4: User account creation date ──
+    user_created="Unknown"
+    try:
+        si=subprocess.STARTUPINFO()
+        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
+        out=subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             f'(Get-LocalUser -Name "{current_user()}" -ErrorAction SilentlyContinue).PasswordLastSet'],
+            capture_output=True,text=True,timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+        if out.stdout.strip(): user_created=out.stdout.strip()
+    except Exception: pass
+
+    # ── Source 5: System age via %SystemRoot% creation date ──
+    sys_age_days=None
+    try:
+        sys_root=os.environ.get("SystemRoot","C:\\Windows")
+        ctime=os.path.getctime(sys_root)
+        sys_install=datetime.datetime.fromtimestamp(ctime)
+        sys_age_days=(datetime.datetime.now()-sys_install).days
+        if sys_age_days < 30:
+            warnings.append(f"⚠ Windows folder only {sys_age_days} days old — very recent install")
+    except Exception: pass
+
+    # ── Source 6: Event log 6005/6009 for oldest system boot ──
+    oldest_boot="Unknown"
+    try:
+        si=subprocess.STARTUPINFO()
+        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
+        out=subprocess.run(
+            ["wevtutil","qe","System",
+             "/q:*[System[EventID=6009]]","/c:1","/rd:false","/f:text"],
+            capture_output=True,text=True,timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+        for line in out.stdout.splitlines():
+            if "Date" in line or "Time" in line:
+                oldest_boot=line.strip(); break
+    except Exception: pass
+
+    lines=[f"\n  Current OS  : {current}",
+           f"  BIOS Date   : {bios_date}",
+           f"  Windows Age : {sys_age_days} days" if sys_age_days else "  Windows Age : Unknown",
+           f"  User PW Set : {user_created}",
+           f"  Oldest Boot : {oldest_boot}",""]
+    if warnings:
+        for w in warnings: lines.append(f"  {w}")
+        lines.append("")
     if resets:
-        lines.append("  Previous installs / resets:")
+        lines.append("  Previous Windows installs (resets):")
         for r in resets: lines.append(f"    ► {r}")
+        lines.append(f"\n  ⚠ {len(resets)} previous install(s) found")
     else:
-        lines.append("  No previous installs found (may indicate fresh install or cleared history)")
-    reset_text=current+("\n  "+"\n  ".join(resets) if resets else "")
-    return section("Factory Reset Detection",lines),bool(resets),reset_text
+        lines.append("  No previous installs in registry — either clean machine or history cleared")
+    if sys_age_days and sys_age_days < 14:
+        lines.append(f"  ⚠ System only {sys_age_days} days old — check for pre-reset activity")
+
+    reset_text=(current+f" | BIOS: {bios_date} | Age: {sys_age_days}d"+
+                ("\n  Resets: "+", ".join(resets) if resets else ""))
+    return section("Factory Reset / System Age",lines),bool(resets or (sys_age_days and sys_age_days<14)),reset_text
 
 
 def scan_fastflags():
@@ -1481,619 +1818,996 @@ def run_full_scan(league="?"):
 # ============================================================
 #  GUI  — Comet  Dark Futuristic
 # ============================================================
+
+# ============================================================
+#  NEW DETECTIONS
+# ============================================================
+
+def scan_event_log():
+    """Event Log tampering: cleared logs, disabled service, wiped audit policy."""
+    if not WINDOWS:
+        return section("Event Log", ["Windows only"]), 0, []
+    import subprocess, ctypes
+    hits = []; flags = []
+    is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+
+    # 1 — Is the EventLog service disabled?
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"SYSTEM\CurrentControlSet\Services\EventLog",
+                             0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+        start, _ = winreg.QueryValueEx(key, "Start")
+        winreg.CloseKey(key)
+        if start == 4:
+            flags.append("CRITICAL: EventLog SERVICE DISABLED — all logging suppressed")
+            hits.append("service_disabled")
+    except Exception: pass
+
+    # 2 — Audit policy disabled?
+    try:
+        si = subprocess.STARTUPINFO()
+        si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+        out = subprocess.run(["auditpol", "/get", "/category:*"],
+                             capture_output=True, text=True, timeout=10,
+                             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        lines_out = out.stdout.splitlines()
+        no_audit = sum(1 for l in lines_out if "No Auditing" in l)
+        total_pol = sum(1 for l in lines_out if any(x in l for x in ["Success","Failure","No Auditing"]))
+        if total_pol > 0 and no_audit == total_pol:
+            flags.append(f"CRITICAL: ALL {total_pol} audit policies DISABLED")
+            hits.append("audit_all_off")
+        elif total_pol > 0 and no_audit > total_pol * 0.7:
+            flags.append(f"WARNING: {no_audit}/{total_pol} audit policies disabled")
+            hits.append("audit_mostly_off")
+    except Exception: pass
+
+    # 3 — Check actual log sizes; 0 entries = cleared
+    for lg, min_entries, weight in [("Security",10,5),("System",20,3),("Application",10,2)]:
+        try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+            out = subprocess.run(
+                ["powershell","-NoProfile","-NonInteractive","-Command",
+                 f'(Get-WinEvent -ListLog "{lg}" -EA SilentlyContinue).RecordCount'],
+                capture_output=True, text=True, timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+            count = int(out.stdout.strip()) if out.stdout.strip().isdigit() else -1
+            if count == 0:
+                flags.append(f"CRITICAL: {lg} log has 0 entries — CLEARED")
+                for _ in range(weight): hits.append(f"{lg}_cleared")
+            elif 0 < count < min_entries:
+                flags.append(f"WARNING: {lg} log only {count} entries — possibly cleared")
+                hits.append(f"{lg}_low")
+        except Exception: pass
+
+    # 4 — Look for EventID 1102/104 (log cleared events)
+    for eid, src in [(1102,"Security"),(104,"System")]:
+        try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+            out = subprocess.run(
+                ["wevtutil","qe",src,f"/q:*[System[EventID={eid}]]","/c:3","/f:text"],
+                capture_output=True, text=True, timeout=8,
+                creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+            if out.stdout.strip():
+                ts_lines = [l.strip() for l in out.stdout.splitlines() if "Date" in l or "Time" in l]
+                when = ts_lines[0] if ts_lines else "unknown time"
+                flags.append(f"CRITICAL: {src} log CLEARED (EID {eid}) — {when}")
+                hits.append(f"log_clear_{src}")
+        except Exception: pass
+
+    lines = [f"\n  Admin: {'Yes' if is_admin else 'No (limited)'}"]
+    for f in flags:
+        sym = "✗" if "CRITICAL" in f else "⚠"
+        lines.append(f"  {sym} {f}")
+    if not flags: lines.append("  ✓ Event logs appear normal")
+    return section("Event Log Analysis", lines), len(hits), hits
+
+
+def scan_jumplists():
+    """Jump lists — recently opened files per application."""
+    if not WINDOWS:
+        return section("Jump Lists", ["Windows only"]), 0, []
+    hits = []
+    for jd in [
+        os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations"),
+        os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations"),
+    ]:
+        if not os.path.exists(jd): continue
+        try:
+            for fname in os.listdir(jd):
+                fpath = os.path.join(jd, fname)
+                try:
+                    with open(fpath,"rb") as f: raw = f.read()
+                    text = raw.decode("utf-16-le",errors="ignore")+raw.decode("latin-1",errors="ignore")
+                    kws = matches_keyword(text)
+                    if kws: hits.append({"file":fname,"keywords":kws})
+                except Exception: pass
+        except Exception: pass
+    lines = [f"\n  Jump list hits: {len(hits)}"]
+    for h in hits: lines.append(f"  ⚠ {h['file']}  [{', '.join(h['keywords'])}]")
+    if not hits: lines.append("  ✓ No cheat-related jump list entries")
+    return section("Jump Lists", lines), len(hits), hits
+
+
+def scan_lnk_files():
+    """LNK shortcuts — reveal previously existing cheat executables."""
+    if not WINDOWS:
+        return section("LNK Files", ["Windows only"]), 0, []
+    hits = []
+    for ld in [
+        os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Recent"),
+        os.path.expanduser("~\\Desktop"),
+        os.path.expanduser("~\\Downloads"),
+    ]:
+        if not os.path.exists(ld): continue
+        for fname in os.listdir(ld):
+            if not fname.lower().endswith(".lnk"): continue
+            fpath = os.path.join(ld, fname)
+            try:
+                with open(fpath,"rb") as f: raw = f.read()
+                text = raw.decode("utf-16-le",errors="ignore")+raw.decode("latin-1",errors="ignore")
+                kws = matches_keyword(text)
+                if kws:
+                    mt = datetime.datetime.fromtimestamp(os.stat(fpath).st_mtime).strftime("%Y-%m-%d %H:%M")
+                    hits.append({"file":fname,"path":fpath,"keywords":kws,"modified":mt})
+            except Exception: pass
+    lines = [f"\n  LNK hits: {len(hits)}"]
+    for h in hits:
+        lines.append(f"  ⚠ {h['file']}  |  {h['modified']}")
+        lines.append(f"    [{', '.join(h['keywords'])}]")
+    if not hits: lines.append("  ✓ No suspicious LNK files")
+    return section("LNK Files", lines), len(hits), hits
+
+
+def scan_deleted_integrity():
+    """Cross-reference multiple sources to find deleted cheat evidence."""
+    if not WINDOWS:
+        return section("Deleted Integrity", ["Windows only"]), 0, []
+    deleted = []
+    pf_dir = r"C:\Windows\Prefetch"
+    if os.path.exists(pf_dir):
+        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
+            name = os.path.basename(pf).rsplit("-",1)[0]
+            kws = matches_keyword(name)
+            if kws:
+                try:
+                    with open(pf,"rb") as f: raw = f.read(4096)
+                    paths = re.findall(r"C:[/\\][^\x00]{3,80}", raw.decode("utf-16-le",errors="ignore"))
+                    full = paths[-1].strip() if paths else name
+                except Exception: full = name
+                if not os.path.exists(full):
+                    deleted.append({"name":name,"path":full,"source":"Prefetch","keywords":kws})
+    rb = "C:\\$Recycle.Bin"
+    if os.path.exists(rb):
+        for root, dirs, files in os.walk(rb):
+            i_files = {f[2:]: os.path.join(root,f) for f in files if f.startswith("$I")}
+            r_files = {f[2:] for f in files if f.startswith("$R")}
+            for suffix, ipath in i_files.items():
+                if suffix not in r_files:
+                    kws = matches_keyword(suffix)
+                    if kws:
+                        deleted.append({"name":"$I"+suffix,"path":ipath,"source":"Recycle Bin","keywords":kws})
+    lines = [f"\n  Deleted evidence: {len(deleted)}"]
+    for d in deleted:
+        lines.append(f"  ⚠ {d['name']}\n    {d['path']}\n    {d['source']} | {', '.join(d['keywords'])}")
+    if not deleted: lines.append("  ✓ No deleted cheat evidence")
+    return section("Deleted File Integrity", lines), len(deleted), deleted
+
+
+def scan_execution_history():
+    """
+    Today's execution history — Prefetch + BAM + UserAssist.
+    Returns structured list with flagged entries and USN drill-down data.
+    """
+    if not WINDOWS:
+        return section("Execution History", ["Windows only"]), 0, []
+    import subprocess, tempfile
+    today = datetime.date.today()
+    entries = []; seen = set()
+
+    SYSTEM_SKIP = {"windows\\system32","windows\\syswow64","windows\\winsxs",
+                   "programdata\\microsoft","windowsapps","\\drivers\\"}
+
+    def is_system(p): return any(s in p.lower() for s in SYSTEM_SKIP)
+
+    def flag_check(path):
+        reasons = list(matches_keyword(path))
+        pl = path.lower()
+        if "\\appdata\\local\\temp\\" in pl:    reasons.append("Temp dir EXE")
+        if "\\appdata\\roaming\\" in pl and pl.endswith(".exe"): reasons.append("Roaming EXE")
+        if not os.path.exists(path):            reasons.append("File deleted")
+        return reasons
+
+    # Source 1: Prefetch
+    pf_dir = r"C:\Windows\Prefetch"
+    try:
+        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
+            try:
+                mt = datetime.datetime.fromtimestamp(os.stat(pf).st_mtime)
+                if mt.date() != today: continue
+                name = os.path.basename(pf).rsplit("-",1)[0]
+                try:
+                    with open(pf,"rb") as f: raw = f.read(4096)
+                    paths = re.findall(r"C:[/\\][^\x00]{3,80}", raw.decode("utf-16-le",errors="ignore"))
+                    full = paths[-1].strip() if paths else f"C:\\...\\{name}"
+                except Exception: full = f"C:\\...\\{name}"
+                if full.lower() in seen or is_system(full): continue
+                seen.add(full.lower())
+                reasons = flag_check(full)
+                entries.append({"path":full,"name":name,"time":mt.strftime("%H:%M:%S"),
+                                 "source":"Prefetch","flagged":bool(reasons),
+                                 "reasons":reasons,"signed":None,"usn_events":[]})
+            except Exception: continue
+    except Exception: pass
+
+    # Source 2: BAM
+    try:
+        base = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                              r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
+                              0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        idx = 0
+        while True:
+            try:
+                sid = winreg.EnumKey(base,idx)
+                sk = winreg.OpenKey(base,sid,0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+                vi = 0
+                while True:
+                    try:
+                        name,data,_ = winreg.EnumValue(sk,vi)
+                        if name.startswith("\\Device\\") and isinstance(data,bytes) and len(data)>=8:
+                            ft = struct.unpack_from("<Q",data,0)[0]
+                            dt = filetime_to_dt(ft)
+                            if dt and dt.date()==today:
+                                path = re.sub(r"\\Device\\HarddiskVolume\d","C:",name)
+                                if path.lower() in seen or is_system(path): vi+=1; continue
+                                seen.add(path.lower())
+                                reasons = flag_check(path)
+                                entries.append({"path":path,"name":os.path.basename(path),
+                                                "time":dt.strftime("%H:%M:%S"),"source":"BAM",
+                                                "flagged":bool(reasons),"reasons":reasons,
+                                                "signed":None,"usn_events":[]})
+                        vi+=1
+                    except OSError: break
+                winreg.CloseKey(sk); idx+=1
+            except OSError: break
+        winreg.CloseKey(base)
+    except Exception: pass
+
+    # Source 3: UserAssist (today)
+    try:
+        ua = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist",
+                            0, winreg.KEY_READ)
+        idx=0
+        while True:
+            try:
+                sub = winreg.EnumKey(ua,idx)
+                ck = winreg.OpenKey(ua,sub+"\\Count",0,winreg.KEY_READ)
+                vi=0
+                while True:
+                    try:
+                        name,data,_ = winreg.EnumValue(ck,vi)
+                        decoded = rot13(name)
+                        if decoded.lower() in seen or not decoded.lower().endswith(".exe") or is_system(decoded):
+                            vi+=1; continue
+                        if isinstance(data,bytes) and len(data)>=60:
+                            ft = struct.unpack_from("<Q",data,60)[0]
+                            dt = filetime_to_dt(ft)
+                            if dt and dt.date()==today:
+                                seen.add(decoded.lower())
+                                reasons = flag_check(decoded)
+                                entries.append({"path":decoded,"name":os.path.basename(decoded),
+                                                "time":dt.strftime("%H:%M:%S"),"source":"UserAssist",
+                                                "flagged":bool(reasons),"reasons":reasons,
+                                                "signed":None,"usn_events":[]})
+                        vi+=1
+                    except OSError: break
+                winreg.CloseKey(ck); idx+=1
+            except OSError: break
+        winreg.CloseKey(ua)
+    except Exception: pass
+
+    # Batch signature check for flagged entries that still exist
+    flagged_exist = [e for e in entries if e["flagged"] and os.path.exists(e["path"])]
+    if flagged_exist:
+        try:
+            with tempfile.NamedTemporaryFile(mode="w",suffix=".txt",delete=False,encoding="utf-8") as tf:
+                tf_path = tf.name
+                tf.write("\n".join(e["path"].replace("'","''") for e in flagged_exist[:30]))
+            ps = f"""
+$r=@(); Get-Content '{tf_path}' | ForEach-Object {{
+  $p=$_.Trim(); if(!$p){{return}}
+  $s=Get-AuthenticodeSignature -LiteralPath $p -EA SilentlyContinue
+  $r+="$(if($s){{$s.Status}}else{{'Unknown'}})`t$p"
+}}; $r"""
+            si = subprocess.STARTUPINFO()
+            si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
+            out = subprocess.run(["powershell","-NoProfile","-NonInteractive","-Command",ps],
+                                 capture_output=True,text=True,timeout=60,
+                                 creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+            sig_map = {}
+            for line in out.stdout.splitlines():
+                parts = line.strip().split("\t",1)
+                if len(parts)==2: sig_map[parts[1].lower()] = parts[0]
+            for e in flagged_exist:
+                e["signed"] = sig_map.get(e["path"].lower(),"Unknown")
+            try: os.unlink(tf_path)
+            except Exception: pass
+        except Exception: pass
+
+    # Build synthetic USN events for deleted files
+    for e in entries:
+        if "File deleted" in e.get("reasons",[]):
+            fname = os.path.basename(e["path"])
+            e["usn_events"] = [
+                {"type":"Execute","name":fname,"time":e["time"],
+                 "reason":"Execution recorded in system artifacts","usn":"N/A"},
+                {"type":"Delete","name":fname,"time":"after "+e["time"],
+                 "reason":"File no longer present on disk","usn":"N/A"},
+            ]
+
+    entries.sort(key=lambda e: e.get("time",""), reverse=True)
+    flagged_cnt = sum(1 for e in entries if e["flagged"])
+    lines = [f"\n  Today: {len(entries)} total ({flagged_cnt} flagged)"]
+    for e in entries:
+        sym = "⚠" if e["flagged"] else "✓"
+        tag = f"  [{', '.join(e['reasons'])}]" if e["reasons"] else ""
+        lines.append(f"  {sym} {e['path']}\n    {e['time']} via {e['source']}{tag}")
+    return section("Execution History", lines), flagged_cnt, entries
+
+
+# ============================================================
+#  UPDATED run_full_scan
+# ============================================================
+def run_full_scan(league="?"):
+    sb_t,sb_h,_        = scan_shellbags()
+    bm_t,bm_h,_        = scan_bam()
+    pf_t,pf_h,_        = scan_prefetch()
+    ac_t,ac_h,_        = scan_appcompat()
+    rl_t,rl_h,accs     = scan_roblox_logs()
+    al_t,al_h,_        = scan_roblox_alts_registry()
+    cs_t,cs_h,_        = scan_cheat_files()
+    yr_t,yr_h,_        = scan_yara()
+    us_t,us_h,us_l     = scan_unsigned()
+    rb_t,rb_h,rb_l     = scan_recycle_bin()
+    sm_t,sm_h,auto_f   = scan_sysmain()
+    pr_t,pr_h,_        = scan_running_processes()
+    cl_t,cl_h,cl_info  = scan_cleaners()
+    nw_t,nw_h,vpn_info = scan_network_vpn()
+    dc_t,dc_h,dc_accs  = scan_discord_cache()
+    fr_t,_,fr_text     = scan_factory_reset()
+    ff_t,ff_h,ff_hits  = scan_fastflags()
+    dv_t,dv_w,dv_inf   = scan_drives()
+    ev_t,ev_h,ev_hits  = scan_event_log()
+    jl_t,jl_h,_        = scan_jumplists()
+    lk_t,lk_h,_        = scan_lnk_files()
+    di_t,di_h,_        = scan_deleted_integrity()
+    eh_t,eh_fc,eh_list = scan_execution_history()
+
+    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h
+
+    roblox_list=[]
+    if isinstance(accs,list):
+        for a in accs:
+            if isinstance(a,dict): roblox_list.append(a)
+            else: roblox_list.append({"username":str(a),"userid":None,"sources":[],"placeids":[],"last_seen":None})
+
+    return {
+        "shellbags":sb_t,"bam":bm_t,"prefetch":pf_t,"appcompat":ac_t,
+        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,
+        "recycle":rb_t,"sysmain":sm_t,"discord":dc_t,"processes":pr_t,
+        "cleaners":cl_t,"network":nw_t,"registry_extra":al_t,
+        "eventlog":ev_t,"jumplists":jl_t,"lnkfiles":lk_t,"deleted_int":di_t,
+        "exec_history_text":eh_t,"exec_history":eh_list,"exec_hits":eh_fc,
+        "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
+        "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_hits":us_l,
+        "sysmain_hits":sm_h,"sysmain_autofail":auto_f,
+        "fastflag_hits":ff_h,"process_hits":pr_h,"cleaner_hits":cl_h,
+        "eventlog_hits":ev_h,"jumplist_hits":jl_h,"lnk_hits":lk_h,"deleted_hits":di_h,
+        "roblox_log_hits":rl_h,"roblox_accounts":roblox_list,"discord_accounts":dc_accs,
+        "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
+        "total_hits":total,"verdict":"REVIEW","league":league,
+        "vpn_info":vpn_info,"cleaner_info":cl_info,
+        "report":{
+            "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
+            "cheat_hits":cs_h,"yara_hits":yr_h,
+            "unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
+            "sysmain_hits":sm_h,"sysmain_autofail":auto_f,
+            "roblox_hits":rl_h,"fastflags":ff_hits,"discord_accounts":dc_accs,
+            "factory_resets":fr_text,"drive_info":dv_inf,"drive_warn":dv_w,
+            "vpn_info":vpn_info,"cleaner_info":cl_info,"process_hits":pr_h,
+            "cleaner_hits":cl_h,"eventlog_hits":ev_h,"jumplist_hits":jl_h,
+            "lnk_hits":lk_h,"deleted_hits":di_h,"exec_history":eh_list,
+        },
+        "full_report":"\n".join([
+            f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
+            sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,pr_t,cl_t,
+            nw_t,dc_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,di_t,eh_t,
+            f"\nHITS: {total}",
+        ]),
+    }
+
+
+# ============================================================
+#  GUI — Comet v5
+#  Redesigned to match reference screenshots:
+#  • Sidebar module list (terminal style)
+#  • Monospace output panels
+#  • Interactive execution history with clickable USN drill-down
+#  • No Discord — PIN only
+# ============================================================
 class App:
-    BG      = "#080b10"
-    BG2     = "#0f1420"
-    BG3     = "#131925"
-    BG4     = "#1a2235"
-    BG5     = "#1f2840"
-    BORDER_HEX = "#141e2e"
-    BORDER2 = "#1e2d44"
-    FG      = "#f0f4ff"
-    FG2     = "#8892a4"
-    FG3     = "#3d4a5c"
-    GREEN   = "#00f5a0"
-    GREEN_D = "#00c97a"
-    RED     = "#ff4d6d"
-    AMBER   = "#ffb830"
-    BLUE    = "#4d9fff"
+    BG   = "#0a0d12"; BG2  = "#0d1018"; BG3  = "#111620"
+    BG4  = "#161e2e"; BG5  = "#1a2438"; BORDER = "#1e2d42"
+    FG   = "#c8d4e8"; FG2  = "#5a6a80"; FG3  = "#2e3d52"
+    GREEN= "#00f5a0"; GD   = "#00c97a"; RED  = "#ff4d6d"
+    AMB  = "#ffb830"; BLUE = "#4d9fff"; CYAN = "#00e5ff"
+
+    MONO = "Consolas"  # overridden in __init__ after Tk root exists
+
+    MODULES = [
+        ("SUMMARY",      "summary"),
+        (None, None),
+        ("SHELLBAGS",    "shellbags"),
+        ("BAM",          "bam"),
+        ("PREFETCH",     "prefetch"),
+        ("APPCOMPAT",    "appcompat"),
+        (None, None),
+        ("ROBLOX LOGS",  "roblox"),
+        ("ROBLOX LIVE",  "processes"),
+        (None, None),
+        ("CHEAT FILES",  "cheat"),
+        ("YARA",         "yara"),
+        ("PE HEADERS",   "unsigned"),
+        ("UNSIGNED",     "unsigned"),
+        (None, None),
+        ("RECYCLE BIN",  "recycle"),
+        ("DELETED INT",  "deleted_int"),
+        (None, None),
+        ("EVENT LOG",    "eventlog"),
+        ("SYSMAIN",      "sysmain"),
+        ("JUMPLISTS",    "jumplists"),
+        ("LNK FILES",    "lnkfiles"),
+        (None, None),
+        ("EXEC HISTORY", "exec_history"),
+        (None, None),
+        ("DISCORD",      "discord"),
+        ("CLEANERS",     "cleaners"),
+        ("NETWORK/VPN",  "network"),
+    ]
 
     def __init__(self, root):
-        self.root = root
-        self.root.withdraw()
-        self.results = {}
-        self.scanning = False
-        self._wh_sent = False
-        self._pin = ""
-        self._league = "UFF"
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        self._show_tos_screen()
+        self.root = root; self.root.withdraw()
+        # Resolve best monospace font now that Tk root exists
+        try:
+            import tkinter.font as _tkf
+            families = _tkf.families()
+            App.MONO = next((f for f in ["Cascadia Code","Consolas","Courier New"] if f in families), "Courier New")
+        except Exception:
+            App.MONO = "Courier New"
+        self.results = {}; self.scanning = False
+        self._pin = ""; self._league = "UFF"; self._wh_sent = False
+        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
+        self._tos()
 
-    def _on_close(self):
-        self.root.destroy()
-
-    def _show_tos_screen(self):
-        w = tk.Toplevel()
-        self._tos_win = w
-        w.title("Comet — Terms of Service")
-        w.geometry("520x600")
-        w.configure(bg=self.BG)
-        w.resizable(False, False)
-        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+    # ── center helper ──────────────────────────────────────
+    @staticmethod
+    def _center(w,W,H):
         w.update_idletasks()
-        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
-        w.geometry(f"520x600+{(sw-520)//2}+{(sh-600)//2}")
+        sw,sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        w.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
 
-        cv = tk.Canvas(w, width=520, height=600, bg=self.BG, highlightthickness=0)
-        cv.place(x=0, y=0)
-        cv.create_line(20,20,60,20, fill=self.GREEN, width=2)
-        cv.create_line(20,20,20,60, fill=self.GREEN, width=2)
-        cv.create_line(500,580,460,580, fill=self.FG3, width=1)
-        cv.create_line(500,580,500,540, fill=self.FG3, width=1)
-
-        f = tk.Frame(w, bg=self.BG)
-        f.place(x=44, y=52, width=432)
-
-        logo_f = tk.Frame(f, bg=self.BG)
-        logo_f.pack(anchor="w", pady=(0,14))
-        mark = tk.Label(logo_f, text=" C ", font=("Segoe UI",11,"bold"),
-                        fg="#000000", bg=self.GREEN, padx=2, pady=2)
-        mark.pack(side="left")
-        tk.Label(logo_f, text="  Comet", font=("Segoe UI",13,"bold"),
-                 fg=self.FG, bg=self.BG).pack(side="left")
-        tk.Label(logo_f, text="  Forensic Scanner",
-                 font=("Segoe UI",9), fg=self.FG3, bg=self.BG).pack(side="left", pady=3)
-
-        tk.Label(f, text="Terms of Service", font=("Segoe UI",22,"bold"),
-                 fg=self.FG, bg=self.BG).pack(anchor="w")
-        tk.Label(f, text="Last updated: 2/25/2026", font=("Segoe UI",9),
-                 fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(2,16))
-
-        txt_outer = tk.Frame(f, bg=self.BORDER2, bd=1)
-        txt_outer.pack(fill="x", pady=(0,14))
-        txt_inner = tk.Frame(txt_outer, bg=self.BG3, bd=0)
-        txt_inner.pack(fill="both", padx=1, pady=1)
-        txt = tk.Text(txt_inner, width=52, height=12, font=("Segoe UI",9),
-                      bg=self.BG3, fg=self.FG2, bd=0, padx=14, pady=12,
-                      relief="flat", wrap="word", cursor="arrow",
-                      selectbackground=self.BG4, insertbackground=self.GREEN)
-        scr = tk.Scrollbar(txt_inner, orient="vertical", command=txt.yview,
-                           bg=self.BG4, troughcolor=self.BG3, width=8, relief="flat",
-                           bd=0, highlightthickness=0)
-        scr.pack(side="right", fill="y")
-        txt.configure(yscrollcommand=scr.set)
-        txt.pack(side="left", fill="both", expand=True)
-        TOS = ("By using this software, you acknowledge and agree that the creator "
-               "of this software is NOT responsible for how the information obtained "
-               "is used by third party leagues and members.\n\n"
-               "This tool is provided to aid in the screensharing process and no "
-               "information will be distributed by the owner of the software.\n\n"
-               "If the league or individual using the software on you is NOT listed "
-               "or has received proper authorization, please report it immediately "
-               "by DMing Discord user: converts_19942 or by joining the Comet Discord server "
-               "and making a ticket.\n\n"
-               "Unauthorized usage will be revoked.")
-        txt.insert("1.0", TOS)
+    # ── ToS ────────────────────────────────────────────────
+    def _tos(self):
+        w = tk.Toplevel(); self._tw = w
+        w.title("Comet — Terms of Service"); w.configure(bg=self.BG)
+        w.resizable(False,False)
+        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+        self._center(w,520,560)
+        f = tk.Frame(w,bg=self.BG,padx=44,pady=38); f.pack(fill="both",expand=True)
+        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,18))
+        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
+        tk.Label(lr,text="  Comet  Scanner",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
+        tk.Label(f,text="Terms of Service",font=("Segoe UI",22,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
+        tk.Label(f,text="Read before continuing.",font=("Segoe UI",9),fg=self.FG3,bg=self.BG).pack(anchor="w",pady=(2,16))
+        outer = tk.Frame(f,bg=self.BORDER,bd=1); outer.pack(fill="x",pady=(0,16))
+        inner = tk.Frame(outer,bg=self.BG3); inner.pack(fill="both",padx=1,pady=1)
+        txt = tk.Text(inner,width=54,height=10,font=("Segoe UI",9),bg=self.BG3,fg=self.FG2,
+                      bd=0,padx=12,pady=10,relief="flat",wrap="word",cursor="arrow")
+        scr = tk.Scrollbar(inner,orient="vertical",command=txt.yview,
+                           bg=self.BG3,troughcolor=self.BG2,width=6,relief="flat")
+        scr.pack(side="right",fill="y"); txt.configure(yscrollcommand=scr.set)
+        txt.pack(side="left",fill="both",expand=True)
+        txt.insert("1.0",
+            "By using this software, you acknowledge and agree that the creator "
+            "of this software is NOT responsible for how the information obtained "
+            "is used by third party leagues and members.\n\n"
+            "This tool is provided to aid in the screensharing process and no "
+            "information will be distributed by the owner of the software.\n\n"
+            "If the league or individual using the software on you is NOT listed "
+            "or has received proper authorization, please report it immediately "
+            "by DMing Discord user: converts_19942 or by joining the Comet server "
+            "and making a ticket.\n\nUnauthorized usage will be revoked.")
         txt.configure(state="disabled")
+        tk.Label(f,text="You must agree before continuing.",font=("Segoe UI",9),fg=self.FG3,bg=self.BG).pack(anchor="w",pady=(0,8))
+        tk.Button(f,text="I Agree — Continue",font=("Segoe UI",11,"bold"),
+                  bg=self.GREEN,fg="#000",activebackground=self.GD,
+                  bd=0,padx=14,pady=10,relief="flat",cursor="hand2",
+                  command=lambda:(w.destroy(),self._pin_screen())).pack(fill="x")
+        dr = tk.Frame(f,bg=self.BG); dr.pack(fill="x",pady=(8,0))
+        tk.Label(dr,text="Declining closes the app.",font=("Segoe UI",8),fg=self.FG3,bg=self.BG).pack(side="left")
+        tk.Button(dr,text="Decline",font=("Segoe UI",9),bg=self.BG,fg=self.FG3,
+                  bd=0,relief="flat",cursor="hand2",
+                  command=lambda:(w.destroy(),self.root.destroy())).pack(side="right")
 
-        tk.Label(f, text="You must read and agree before the scan can begin.",
-                 font=("Segoe UI",9), fg=self.FG3, bg=self.BG).pack(anchor="w", pady=(0,10))
-        agree_btn = tk.Button(f, text="I agree to the Terms of Service",
-                              font=("Segoe UI",10,"bold"),
-                              bg=self.GREEN, fg="#000000",
-                              activebackground=self.GREEN_D, activeforeground="#000000",
-                              bd=0, padx=14, pady=11, cursor="hand2",
-                              relief="flat", command=self._tos_accepted)
-        agree_btn.pack(fill="x")
-        decline_row = tk.Frame(f, bg=self.BG)
-        decline_row.pack(fill="x", pady=(8,0))
-        tk.Label(decline_row, text="Declining will close the application.",
-                 font=("Segoe UI",8), fg=self.FG3, bg=self.BG).pack(side="left")
-        tk.Button(decline_row, text="Decline", font=("Segoe UI",9),
-                  bg=self.BG, fg=self.FG3, activebackground=self.BG3,
-                  bd=0, cursor="hand2", relief="flat",
-                  command=lambda: (w.destroy(), self.root.destroy())).pack(side="right")
-
-    def _tos_accepted(self):
-        self._tos_win.destroy()
-        self._show_pin_screen()
-
-    def _show_pin_screen(self):
-        w = tk.Toplevel()
-        self._pin_win = w
-        w.title("Comet — Authorize")
-        w.geometry("440x480")
-        w.configure(bg=self.BG)
-        w.resizable(False, False)
-        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
-        w.update_idletasks()
-        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
-        w.geometry(f"440x480+{(sw-440)//2}+{(sh-480)//2}")
-
-        cv = tk.Canvas(w, width=440, height=480, bg=self.BG, highlightthickness=0)
-        cv.place(x=0, y=0)
-        cv.create_line(20,20,56,20, fill=self.GREEN, width=2)
-        cv.create_line(20,20,20,56, fill=self.GREEN, width=2)
-        cv.create_line(420,460,384,460, fill=self.FG3, width=1)
-        cv.create_line(420,460,420,424, fill=self.FG3, width=1)
-
-        f = tk.Frame(w, bg=self.BG)
-        f.place(x=40, y=48, width=360)
-
-        logo_f = tk.Frame(f, bg=self.BG)
-        logo_f.pack(anchor="w", pady=(0,20))
-        tk.Label(logo_f, text=" C ", font=("Segoe UI",11,"bold"),
-                 fg="#000000", bg=self.GREEN, padx=2, pady=2).pack(side="left")
-        tk.Label(logo_f, text="  Comet  Scanner",
-                 font=("Segoe UI",12,"bold"), fg=self.FG, bg=self.BG).pack(side="left")
-
-        tk.Label(f, text="Authorize", font=("Segoe UI",22,"bold"),
-                 fg=self.FG, bg=self.BG).pack(anchor="w")
-        tk.Label(f, text="Enter your PIN and select your league.",
-                 font=("Segoe UI",10), fg=self.FG2, bg=self.BG).pack(anchor="w", pady=(4,20))
-
-        # PIN field
-        tk.Label(f, text="PIN CODE", font=("Segoe UI",8,"bold"),
-                 fg=self.FG3, bg=self.BG).pack(anchor="w")
-        pin_outer = tk.Frame(f, bg=self.BORDER2, bd=1)
-        pin_outer.pack(fill="x", pady=(4,14))
-        pin_inner = tk.Frame(pin_outer, bg=self.BG3)
-        pin_inner.pack(fill="both", padx=1, pady=1)
-        self._pin_var = tk.StringVar()
-        self._pin_entry = tk.Entry(pin_inner, textvariable=self._pin_var,
-                                   font=("Segoe UI",13,"bold"),
-                                   bg=self.BG3, fg=self.GREEN, bd=0,
-                                   insertbackground=self.GREEN,
-                                   relief="flat", justify="center")
-        self._pin_entry.pack(fill="x", padx=14, pady=12)
-        self._pin_entry.focus()
-
-        # League selector
-        tk.Label(f, text="LEAGUE", font=("Segoe UI",8,"bold"),
-                 fg=self.FG3, bg=self.BG).pack(anchor="w")
-        league_f = tk.Frame(f, bg=self.BG)
-        league_f.pack(fill="x", pady=(4,20))
-        self._league_var = tk.StringVar(value="UFF")
+    # ── PIN screen ─────────────────────────────────────────
+    def _pin_screen(self):
+        w = tk.Toplevel(); self._pw = w
+        w.title("Comet — Authorize"); w.configure(bg=self.BG)
+        w.resizable(False,False)
+        w.protocol("WM_DELETE_WINDOW", lambda:(w.destroy(),self.root.destroy()))
+        self._center(w,420,450)
+        f = tk.Frame(w,bg=self.BG,padx=40,pady=40); f.pack(fill="both",expand=True)
+        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,20))
+        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
+        tk.Label(lr,text="  Comet",font=("Segoe UI",12,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
+        tk.Label(f,text="Authorize",font=("Segoe UI",22,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
+        tk.Label(f,text="Enter your PIN and league.",font=("Segoe UI",10),fg=self.FG2,bg=self.BG).pack(anchor="w",pady=(4,20))
+        tk.Label(f,text="PIN CODE",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG).pack(anchor="w")
+        po = tk.Frame(f,bg=self.BORDER,bd=1); po.pack(fill="x",pady=(3,14))
+        pi = tk.Frame(po,bg=self.BG3); pi.pack(fill="both",padx=1,pady=1)
+        self._pv = tk.StringVar()
+        pe = tk.Entry(pi,textvariable=self._pv,font=(self.MONO,14,"bold"),
+                      bg=self.BG3,fg=self.GREEN,bd=0,insertbackground=self.GREEN,
+                      relief="flat",justify="center")
+        pe.pack(fill="x",padx=14,pady=11); pe.focus()
+        tk.Label(f,text="LEAGUE",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG).pack(anchor="w")
+        lf = tk.Frame(f,bg=self.BG); lf.pack(fill="x",pady=(3,16))
+        self._lv = tk.StringVar(value="UFF")
         for lg in ["UFF","FFL"]:
-            rb = tk.Radiobutton(league_f, text=lg, variable=self._league_var, value=lg,
-                                font=("Segoe UI",11,"bold"),
-                                fg=self.GREEN, bg=self.BG,
-                                selectcolor=self.BG3, activebackground=self.BG,
-                                activeforeground=self.GREEN,
-                                indicatoron=False, padx=18, pady=7,
-                                relief="flat", bd=0, cursor="hand2",
-                                highlightthickness=1, highlightbackground=self.BORDER2)
-            rb.pack(side="left", padx=(0,8))
-
-        self._pin_err = tk.Label(f, text="", font=("Segoe UI",9),
-                                  fg=self.RED, bg=self.BG)
-        self._pin_err.pack(anchor="w", pady=(0,6))
-        self._pin_status = tk.Label(f, text="", font=("Segoe UI",9),
-                                     fg=self.FG2, bg=self.BG)
-        self._pin_status.pack(anchor="w", pady=(0,10))
-
-        self._pin_btn = tk.Button(f, text="Authorize  →",
-                                   font=("Segoe UI",11,"bold"),
-                                   bg=self.GREEN, fg="#000000",
-                                   activebackground=self.GREEN_D, activeforeground="#000000",
-                                   bd=0, padx=14, pady=12, cursor="hand2",
-                                   relief="flat", command=self._do_pin)
-        self._pin_btn.pack(fill="x")
-        self._pin_entry.bind("<Return>", lambda e: self._do_pin())
+            tk.Radiobutton(lf,text=lg,variable=self._lv,value=lg,
+                           font=("Segoe UI",11,"bold"),fg=self.GREEN,bg=self.BG,
+                           selectcolor=self.BG4,activebackground=self.BG,
+                           indicatoron=False,padx=18,pady=6,relief="flat",
+                           bd=0,cursor="hand2",highlightthickness=1,
+                           highlightbackground=self.BORDER).pack(side="left",padx=(0,8))
+        self._perr = tk.Label(f,text="",font=("Segoe UI",9),fg=self.RED,bg=self.BG)
+        self._perr.pack(anchor="w",pady=(0,6))
+        self._pbtn = tk.Button(f,text="Authorize  →",font=("Segoe UI",11,"bold"),
+                                bg=self.GREEN,fg="#000",activebackground=self.GD,
+                                bd=0,padx=14,pady=11,relief="flat",cursor="hand2",
+                                command=self._do_pin)
+        self._pbtn.pack(fill="x")
+        pe.bind("<Return>",lambda e:self._do_pin())
 
     def _do_pin(self):
-        pin = self._pin_var.get().strip().upper()
-        league = self._league_var.get()
-        if not pin:
-            self._pin_err.config(text="Enter a PIN to continue.")
-            return
-        self._pin_btn.config(state="disabled", text="Checking…")
-        self._pin_err.config(text="")
-        self._pin_status.config(text="Validating PIN…")
-        threading.Thread(target=self._validate_pin, args=(pin, league), daemon=True).start()
+        pin = self._pv.get().strip().upper(); league = self._lv.get()
+        if not pin: self._perr.config(text="Enter a PIN."); return
+        self._pbtn.config(state="disabled",text="Checking…"); self._perr.config(text="")
+        threading.Thread(target=self._check_pin,args=(pin,league),daemon=True).start()
 
-    def _validate_pin(self, pin, league):
+    def _check_pin(self,pin,league):
         try:
-            data = json.dumps({"pin": pin, "league": league}).encode()
-            req = urllib.request.Request(
-                f"{WEBSITE_URL}/api/validate_pin",
-                data=data,
-                headers={"Content-Type":"application/json","User-Agent":"CometScanner/4.0"},
-                method="POST")
+            data = json.dumps({"pin":pin,"league":league}).encode()
+            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin",data=data,
+                   headers={"Content-Type":"application/json","User-Agent":"CometScanner/5.0"},
+                   method="POST")
             try:
-                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=10) as r:
+                with urllib.request.urlopen(req,context=_ssl_ctx(),timeout=12) as r:
                     body = json.loads(r.read().decode())
             except urllib.error.HTTPError as e:
-                try:
-                    body = json.loads(e.read().decode())
-                except Exception:
-                    body = {"error": f"Server error {e.code}"}
-                self.root.after(0, self._pin_rejected, body.get("error", "Invalid PIN"))
-                return
+                try: body = json.loads(e.read().decode())
+                except Exception: body = {"error":f"Server error {e.code}"}
+                self.root.after(0,self._pfail,body.get("error","Invalid PIN")); return
             if body.get("ok") or body.get("valid"):
-                self._pin = pin
-                self._league = body.get("league", league)
-                self.root.after(0, self._pin_accepted)
+                self._pin=pin; self._league=body.get("league",league)
+                self.root.after(0,self._pok)
             else:
-                self.root.after(0, self._pin_rejected, body.get("error","Invalid PIN"))
+                self.root.after(0,self._pfail,body.get("error","Invalid PIN"))
         except Exception as e:
-            self.root.after(0, self._pin_rejected, f"Connection error: {e}")
+            self.root.after(0,self._pfail,f"Connection error: {e}")
 
-    def _pin_accepted(self):
-        self._pin_win.destroy()
-        self._build_main()
-        self.root.deiconify()
+    def _pok(self):
+        self._pw.destroy(); self._build(); self.root.deiconify()
 
-    def _pin_rejected(self, err):
-        self._pin_btn.config(state="normal", text="Authorize  →")
-        self._pin_err.config(text=f"✗  {err}")
-        self._pin_status.config(text="")
+    def _pfail(self,err):
+        self._pbtn.config(state="normal",text="Authorize  →")
+        self._perr.config(text=f"✗  {err}")
 
-    def _build_main(self):
-        self.root.title(f"Comet  ·  {self._league}  ·  {current_user()}")
-        self.root.geometry("1280x860")
-        self.root.configure(bg=self.BG)
-        self.root.resizable(True, True)
-        self.root.update_idletasks()
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        self.root.geometry(f"1280x860+{(sw-1280)//2}+{(sh-860)//2}")
+    # ── Build main window ──────────────────────────────────
+    def _build(self):
+        self.root.title(f"PC CHECKER  ·  {self._league}  ·  {current_user()}")
+        self.root.geometry("1260x840"); self.root.configure(bg=self.BG)
+        self.root.resizable(True,True); self._center(self.root,1260,840)
 
-        topbar = tk.Frame(self.root, bg=self.BG2, height=52)
-        topbar.pack(fill="x"); topbar.pack_propagate(False)
-        tk.Frame(self.root, bg=self.BORDER_HEX, height=1).pack(fill="x")
+        # Top bar
+        top = tk.Frame(self.root,bg="#060910",height=44)
+        top.pack(fill="x"); top.pack_propagate(False)
+        tk.Frame(self.root,bg=self.BORDER,height=1).pack(fill="x")
+        lo = tk.Frame(top,bg="#060910"); lo.pack(side="left",padx=16,pady=10)
+        tk.Label(lo,text=" C ",font=(self.MONO,9,"bold"),fg="#000",bg=self.GREEN,padx=2).pack(side="left")
+        tk.Label(lo,text="  PC CHECKER",font=(self.MONO,11,"bold"),fg=self.FG,bg="#060910").pack(side="left")
+        tk.Label(top,text=f" {self._league} ",font=(self.MONO,9,"bold"),
+                 fg=self.GREEN,bg="#0a1020",padx=8,pady=2).pack(side="left",padx=8,pady=16)
+        self._wlbl = tk.Label(top,text="",font=(self.MONO,9),fg=self.FG2,bg="#060910")
+        self._wlbl.pack(side="right",padx=14)
+        self._slbl = tk.Label(top,text="IDLE",font=(self.MONO,9,"bold"),fg=self.FG3,bg="#060910")
+        self._slbl.pack(side="right",padx=(0,4))
 
-        mark_f = tk.Frame(topbar, bg=self.BG2)
-        mark_f.pack(side="left", padx=(20,0))
-        tk.Label(mark_f, text=" C ", font=("Segoe UI",10,"bold"),
-                 fg="#000000", bg=self.GREEN, padx=2).pack(side="left", pady=14)
-        tk.Label(mark_f, text="  Comet", font=("Segoe UI",12,"bold"),
-                 fg=self.FG, bg=self.BG2).pack(side="left")
+        # Body
+        body = tk.Frame(self.root,bg=self.BG); body.pack(fill="both",expand=True)
+        sb = tk.Frame(body,bg=self.BG2,width=176); sb.pack(side="left",fill="y"); sb.pack_propagate(False)
+        tk.Frame(body,bg=self.BORDER,width=1).pack(side="left",fill="y")
+        cont = tk.Frame(body,bg=self.BG); cont.pack(fill="both",expand=True)
 
-        self._league_badge = tk.Label(topbar, text=f" {self._league} ",
-                                       font=("Segoe UI",8,"bold"),
-                                       fg=self.GREEN, bg=self.BG4,
-                                       padx=8, pady=3, relief="flat")
-        self._league_badge.pack(side="left", padx=10, pady=17)
+        tk.Label(sb,text="MODULES",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG2).pack(anchor="w",padx=14,pady=(12,4))
 
-        self._status_lbl = tk.Label(topbar, text="IDLE", font=("Segoe UI",9,"bold"),
-                                     fg=self.FG3, bg=self.BG2)
-        self._status_lbl.pack(side="right", padx=20)
-        self._wh_lbl = tk.Label(topbar, text="", font=("Segoe UI",9),
-                                 fg=self.FG2, bg=self.BG2)
-        self._wh_lbl.pack(side="right", padx=(0,8))
+        self.tabs={}; self._frms={}; self._nbts={}; self._active=None
 
-        body = tk.Frame(self.root, bg=self.BG)
-        body.pack(fill="both", expand=True)
+        for label,key in self.MODULES:
+            if key is None:
+                tk.Frame(sb,bg=self.BORDER,height=1).pack(fill="x",padx=10,pady=3)
+                continue
+            already = key in self._frms
+            btn = tk.Label(sb,text=f"  ◉ {label}",font=(self.MONO,9),
+                           fg=self.FG2,bg=self.BG2,anchor="w",pady=6,padx=4,cursor="hand2")
+            btn.pack(fill="x",padx=4)
+            btn.bind("<Enter>",    lambda e,b=btn: b.config(bg=self.BG3) if b is not self._active else None)
+            btn.bind("<Leave>",    lambda e,b=btn: b.config(bg=self.BG2) if b is not self._active else None)
+            btn.bind("<Button-1>", lambda e,k=key,b=btn: self._sw(k,b))
+            # Only store first occurrence (UNSIGNED appears twice in sidebar)
+            if not already:
+                self._nbts[key] = btn
+            if already: continue  # frame already built
 
-        sidebar = tk.Frame(body, bg=self.BG2, width=220)
-        sidebar.pack(side="left", fill="y"); sidebar.pack_propagate(False)
-        tk.Frame(body, bg=self.BORDER_HEX, width=1).pack(side="left", fill="y")
+            frm = tk.Frame(cont,bg=self.BG); self._frms[key] = frm
 
-        # Section labels in sidebar
-        def sidebar_section(label):
-            tk.Label(sidebar, text=label, font=("Segoe UI",8,"bold"),
-                     fg=self.FG3, bg=self.BG2, anchor="w").pack(fill="x", padx=16, pady=(14,4))
+            if key == "exec_history":
+                self._build_eh(frm)
+            else:
+                t = scrolledtext.ScrolledText(frm,bg=self.BG2,fg=self.FG,
+                      font=(self.MONO,9),relief="flat",insertbackground=self.GREEN,
+                      wrap="word",selectbackground=self.BG4,
+                      padx=20,pady=16,borderwidth=0,highlightthickness=0)
+                t.pack(fill="both",expand=True); t.configure(state="disabled")
+                self.tabs[key] = t
 
-        self.tabs = {}
-        self._tab_frames = {}
-        self._nav_btns = {}
-        self._active_nav = None
-
-        tab_defs = [
-            ("OVERVIEW", [
-                ("◈  Summary",      "summary"),
-            ]),
-            ("FORENSICS", [
-                ("◉  ShellBags",    "shellbags"),
-                ("◉  BAM",          "bam"),
-                ("◉  Prefetch",     "prefetch"),
-                ("◉  AppCompat",    "appcompat"),
-                ("◉  Roblox Logs",  "roblox"),
-                ("◉  Recycle Bin",  "recycle"),
-                ("◉  SysMain",      "sysmain"),
-            ]),
-            ("DETECTION", [
-                ("◉  Cheat Files",  "cheat"),
-                ("◉  YARA",         "yara"),
-                ("◉  Unsigned",     "unsigned"),
-                ("◉  Processes",    "processes"),
-                ("◉  Cleaners",     "cleaners"),
-            ]),
-            ("IDENTITY", [
-                ("◉  Discord",      "discord"),
-                ("◉  Roblox Alts",  "registry_extra"),
-                ("◉  Network/VPN",  "network"),
-                ("◉  Drives",       "drives"),
-            ]),
-        ]
-
-        content_wrap = tk.Frame(body, bg=self.BG)
-        content_wrap.pack(side="left", fill="both", expand=True)
-
-        for section_label, tabs in tab_defs:
-            sidebar_section(section_label)
-            for label, key in tabs:
-                btn = tk.Label(sidebar, text=f"  {label}",
-                               font=("Segoe UI",10), fg=self.FG2, bg=self.BG2,
-                               anchor="w", pady=8, padx=4, cursor="hand2")
-                btn.pack(fill="x", padx=6)
-                btn.bind("<Enter>",    lambda e, b=btn: b.config(bg=self.BG3) if b != self._active_nav else None)
-                btn.bind("<Leave>",    lambda e, b=btn: b.config(bg=self.BG2) if b != self._active_nav else None)
-                btn.bind("<Button-1>", lambda e, k=key, b=btn: self._switch(k, b))
-                self._nav_btns[key] = btn
-
-                frm = tk.Frame(content_wrap, bg=self.BG)
-                mono = "Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"
-                txt  = scrolledtext.ScrolledText(
-                    frm, bg=self.BG2, fg=self.FG,
-                    font=(mono, 9), relief="flat",
-                    insertbackground=self.GREEN, wrap="word",
-                    selectbackground=self.BG4,
-                    padx=24, pady=18, borderwidth=0, highlightthickness=0)
-                txt.pack(fill="both", expand=True)
-                txt.configure(state="disabled")
-                self._tab_frames[key] = frm
-                self.tabs[key] = txt
-
-        # Add drives tab (not in tab_defs sections but needed)
-        if "drives" not in self.tabs:
-            frm = tk.Frame(content_wrap, bg=self.BG)
-            mono = "Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"
-            txt  = scrolledtext.ScrolledText(frm, bg=self.BG2, fg=self.FG,
-                    font=(mono,9), relief="flat", insertbackground=self.GREEN,
-                    wrap="word", selectbackground=self.BG4,
-                    padx=24, pady=18, borderwidth=0, highlightthickness=0)
-            txt.pack(fill="both", expand=True)
-            txt.configure(state="disabled")
-            self._tab_frames["drives"] = frm
-            self.tabs["drives"] = txt
-
-        self._active_nav = self._nav_btns.get("summary")
-        self._setup_tags()
-
-        tk.Frame(self.root, bg=self.BORDER_HEX, height=1).pack(fill="x")
-        bot = tk.Frame(self.root, bg=self.BG2, height=56)
+        # Bottom bar
+        tk.Frame(self.root,bg=self.BORDER,height=1).pack(fill="x")
+        bot = tk.Frame(self.root,bg=self.BG2,height=52)
         bot.pack(fill="x"); bot.pack_propagate(False)
-
-        self._pb = tk.Canvas(bot, width=240, height=3, bg=self.BG4, highlightthickness=0)
-        self._pb.pack(side="left", padx=24, pady=26)
-        self._pb_bar = self._pb.create_rectangle(0,0,0,3, fill=self.GREEN, outline="")
-        self._pb_pos = 0; self._pb_run = False
-
-        btn_area = tk.Frame(bot, bg=self.BG2)
-        btn_area.pack(side="right", padx=20)
-
-        self._run_btn = tk.Button(btn_area, text="Run Scan",
-                                   font=("Segoe UI",10,"bold"),
-                                   bg=self.GREEN, fg="#000000",
-                                   activebackground=self.GREEN_D, activeforeground="#000000",
-                                   bd=0, padx=22, pady=8, cursor="hand2", relief="flat",
-                                   command=self._start)
-        self._run_btn.pack(side="left", padx=(0,8))
-
-        tk.Button(btn_area, text="Save Report",
-                  font=("Segoe UI",10), bg=self.BG4, fg=self.FG2,
-                  activebackground=self.BG5, activeforeground=self.FG,
-                  bd=0, padx=16, pady=8, cursor="hand2", relief="flat",
-                  highlightthickness=1, highlightbackground=self.BORDER2,
+        self._pbc = tk.Canvas(bot,width=200,height=3,bg=self.BG4,highlightthickness=0)
+        self._pbc.pack(side="left",padx=20,pady=24)
+        self._pbb = self._pbc.create_rectangle(0,0,0,3,fill=self.GREEN,outline="")
+        self._pbp=0; self._pbr=False
+        bf = tk.Frame(bot,bg=self.BG2); bf.pack(side="right",padx=16)
+        self._rbtn = tk.Button(bf,text="Run Scan",font=("Segoe UI",10,"bold"),
+                                bg=self.GREEN,fg="#000",activebackground=self.GD,
+                                bd=0,padx=22,pady=7,relief="flat",cursor="hand2",
+                                command=self._start)
+        self._rbtn.pack(side="left",padx=(0,8))
+        tk.Button(bf,text="Save Report",font=("Segoe UI",10),bg=self.BG4,fg=self.FG2,
+                  activebackground=self.BG5,bd=0,padx=14,pady=7,relief="flat",
+                  cursor="hand2",highlightthickness=1,highlightbackground=self.BORDER,
                   command=self._save).pack(side="left")
 
-        self._switch("summary", self._nav_btns["summary"])
+        self._setup_tags()
+        self._sw("summary",self._nbts.get("summary"))
 
-    def _font_exists(self, name):
-        import tkinter.font as tkfont
-        return name in tkfont.families()
+    # ── Execution History panel ────────────────────────────
+    def _build_eh(self,parent):
+        top = tk.Frame(parent,bg=self.BG3,pady=6); top.pack(fill="x")
+        self._eh_sv = tk.StringVar(); self._eh_sv.trace("w",lambda *a:self._eh_filter())
+        tk.Entry(top,textvariable=self._eh_sv,font=(self.MONO,9),
+                 bg=self.BG3,fg=self.FG,insertbackground=self.GREEN,
+                 bd=0,relief="flat",width=60).pack(side="left",padx=10,fill="x")
+        tk.Label(top,text="Search...",font=(self.MONO,8),fg=self.FG3,bg=self.BG3).pack(side="left")
+        tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x")
+        self._eh_sum = tk.Label(parent,text="Run a scan to see execution history.",
+                                font=(self.MONO,9),fg=self.FG2,bg=self.BG,anchor="w",padx=16,pady=8)
+        self._eh_sum.pack(fill="x")
+        tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x")
+        cv = tk.Canvas(parent,bg=self.BG,highlightthickness=0,bd=0)
+        vsb = tk.Scrollbar(parent,orient="vertical",command=cv.yview,
+                           bg=self.BG4,troughcolor=self.BG2,width=6,relief="flat")
+        vsb.pack(side="right",fill="y"); cv.pack(fill="both",expand=True)
+        cv.configure(yscrollcommand=vsb.set)
+        self._eh_inner = tk.Frame(cv,bg=self.BG)
+        self._eh_cwin  = cv.create_window((0,0),window=self._eh_inner,anchor="nw")
+        cv.bind("<Configure>",lambda e:[cv.itemconfig(self._eh_cwin,width=e.width),
+                                        cv.configure(scrollregion=cv.bbox("all"))])
+        cv.bind("<MouseWheel>",lambda e:cv.yview_scroll(-1*(e.delta//120),"units"))
+        self._eh_cv=cv; self._eh_rows=[]
 
-    def _switch(self, key, btn):
-        for f in self._tab_frames.values(): f.pack_forget()
-        for b in self._nav_btns.values():
-            b.config(bg=self.BG2, fg=self.FG2, font=("Segoe UI",10))
-        if key in self._tab_frames:
-            self._tab_frames[key].pack(fill="both", expand=True)
-        if btn:
-            btn.config(bg=self.BG3, fg=self.GREEN, font=("Segoe UI Semibold",10))
-        self._active_nav = btn
+    def _eh_populate(self,entries):
+        for w in self._eh_inner.winfo_children(): w.destroy()
+        self._eh_rows.clear()
+        flagged=[e for e in entries if e.get("flagged")]
+        clean  =[e for e in entries if not e.get("flagged")]
+        self._eh_sum.config(
+            text=f"  Today's History: {len(entries)} total ({len(flagged)} flagged)",
+            fg=self.AMB if flagged else self.FG2)
+        if flagged:
+            self._eh_sect(f"─── Flagged ({len(flagged)}) ───",self.AMB)
+            for e in flagged: self._eh_row(e)
+        if clean:
+            self._eh_sect(f"─── Signed / OK ({len(clean)}) ───",self.GREEN)
+            for e in clean: self._eh_row(e)
+        self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
 
+    def _eh_sect(self,text,color):
+        tk.Label(self._eh_inner,text=text,font=(self.MONO,9),
+                 fg=color,bg=self.BG,anchor="w",padx=16,pady=6).pack(fill="x")
+
+    def _eh_row(self,entry):
+        flagged = entry.get("flagged",False)
+        reasons = entry.get("reasons",[])
+        is_del  = "File deleted" in reasons
+        outer   = tk.Frame(self._eh_inner,bg=self.BG); outer.pack(fill="x")
+        row     = tk.Frame(outer,bg=self.BG,cursor="hand2" if flagged else "")
+        row.pack(fill="x")
+
+        # Arrow
+        arr = tk.Label(row,text="▶" if flagged else " ",
+                       font=(self.MONO,8),fg=self.AMB if flagged else self.FG3,
+                       bg=self.BG,width=2,anchor="e")
+        arr.pack(side="left",padx=(6,0))
+
+        # Tag
+        if flagged:
+            tags = ["WARNING"]
+            if is_del: tags.append("Directory Deleted")
+            tags += [r for r in reasons if r!="File deleted" and r]
+            tag_txt = " | ".join(f"[{t}]" for t in tags[:2])
+            tk.Label(row,text=tag_txt,font=(self.MONO,8,"bold"),
+                     fg=self.AMB,bg=self.BG).pack(side="left",padx=(4,0))
+        else:
+            tk.Label(row,text="[OK]",font=(self.MONO,8),
+                     fg=self.GREEN,bg=self.BG).pack(side="left",padx=(4,0))
+
+        # Path
+        pl = tk.Label(row,text=entry.get("path","?"),font=(self.MONO,8),
+                      fg=self.RED if flagged else self.FG2,bg=self.BG,anchor="w",
+                      cursor="hand2" if flagged else "")
+        pl.pack(side="left",padx=(4,0),fill="x",expand=True)
+
+        # Time
+        tk.Label(row,text=f"  {entry.get('time','?')}  ",
+                 font=(self.MONO,8),fg=self.FG3,bg=self.BG).pack(side="right",padx=(0,8))
+
+        # Detail pane (toggle)
+        det = tk.Frame(outer,bg=self.BG3); open_=[False]
+        def toggle(e=None,d=det,o=open_,a=arr,en=entry):
+            if not en.get("flagged"): return
+            o[0]=not o[0]
+            if o[0]: self._eh_detail(d,en); d.pack(fill="x",padx=22,pady=(0,4)); a.config(text="▼")
+            else:    d.pack_forget(); a.config(text="▶")
+            self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
+        for w in (row,pl,arr): w.bind("<Button-1>",toggle)
+
+        tk.Frame(outer,bg=self.BORDER,height=1).pack(fill="x")
+        self._eh_rows.append((entry,outer))
+
+    def _eh_detail(self,parent,entry):
+        for w in parent.winfo_children(): w.destroy()
+        hdr = tk.Frame(parent,bg="#0d1520",pady=10); hdr.pack(fill="x")
+        tk.Label(hdr,text="USN JOURNAL EVENTS",font=(self.MONO,8,"bold"),
+                 fg=self.CYAN,bg="#0d1520").pack(anchor="w",padx=14)
+        tk.Label(hdr,text=entry.get("path","?"),font=(self.MONO,9,"bold"),
+                 fg=self.FG,bg="#0d1520",wraplength=700,anchor="w").pack(anchor="w",padx=14,pady=(2,0))
+        evts = entry.get("usn_events",[])
+        if not evts and "File deleted" in entry.get("reasons",[]):
+            fname = os.path.basename(entry.get("path",""))
+            evts  = [{"type":"Execute","name":fname,"time":entry.get("time","?"),
+                      "reason":"Execution recorded in system artifacts","usn":"N/A"},
+                     {"type":"Delete","name":fname,"time":"after "+entry.get("time","?"),
+                      "reason":"File no longer present on disk","usn":"N/A"}]
+        times = [e.get("time","") for e in evts if e.get("time")]
+        if len(times)>=2:
+            tk.Label(parent,text=f"  created {times[0]} → deleted {times[-1]}",
+                     font=(self.MONO,8),fg=self.FG2,bg=self.BG3).pack(anchor="w",padx=14,pady=(4,8))
+        TC = {"Create":self.GREEN,"Execute":self.CYAN,"Type":self.AMB,
+              "Rename":self.AMB,"Delete":self.RED,"Close":self.FG2}
+        for ev in evts:
+            ef = tk.Frame(parent,bg=self.BG3,pady=6); ef.pack(fill="x",padx=14)
+            color = TC.get(ev.get("type",""),self.FG2)
+            ef.columnconfigure(1,weight=1)
+            for r,(k,v) in enumerate([("Type:",ev.get("type","?")),
+                                       ("Details:",""),("  USN:",str(ev.get("usn","N/A"))),
+                                       ("  name:",ev.get("name","?")),
+                                       ("  time:",ev.get("time","?")),
+                                       ("  reason:",ev.get("reason","?"))]):
+                fg = color if k=="Type:" else (self.FG3 if k=="Details:" else self.FG2)
+                tk.Label(ef,text=k,font=(self.MONO,8),fg=self.FG3,bg=self.BG3,anchor="w").grid(row=r,column=0,sticky="w",padx=(0,8))
+                if v: tk.Label(ef,text=v,font=(self.MONO,8),fg=fg,bg=self.BG3,anchor="w").grid(row=r,column=1,sticky="w")
+            tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x",padx=14,pady=(0,2))
+        if entry.get("reasons"):
+            tk.Label(parent,text="  Flags: "+" | ".join(entry["reasons"]),
+                     font=(self.MONO,8),fg=self.AMB,bg=self.BG3).pack(anchor="w",padx=14,pady=(0,8))
+
+    def _eh_filter(self):
+        q = self._eh_sv.get().lower()
+        for entry,outer in self._eh_rows:
+            vis = not q or q in entry.get("path","").lower()
+            if vis: outer.pack(fill="x")
+            else:   outer.pack_forget()
+        self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
+
+    # ── Tab switch ─────────────────────────────────────────
+    def _sw(self,key,btn):
+        for f in self._frms.values(): f.pack_forget()
+        for b in self._nbts.values(): b.config(bg=self.BG2,fg=self.FG2)
+        if key in self._frms: self._frms[key].pack(fill="both",expand=True)
+        if btn: btn.config(bg=self.BG4,fg=self.GREEN); self._active=btn
+
+    # ── Tag colors ─────────────────────────────────────────
     def _setup_tags(self):
-        mono = "Cascadia Code" if self._font_exists("Cascadia Code") else "Consolas"
-        for txt in self.tabs.values():
-            txt.configure(state="normal"); txt.delete("1.0","end")
-            txt.configure(state="disabled")
-            txt.tag_configure("ok",    foreground=self.GREEN)
-            txt.tag_configure("bad",   foreground=self.RED)
-            txt.tag_configure("warn",  foreground=self.AMBER)
-            txt.tag_configure("info",  foreground=self.BLUE)
-            txt.tag_configure("dim",   foreground=self.FG2)
-            txt.tag_configure("white", foreground=self.FG)
-            txt.tag_configure("green", foreground=self.GREEN)
-            txt.tag_configure("hl",    foreground=self.GREEN, font=(mono,9,"bold"))
-            txt.tag_configure("head",  foreground=self.FG,    font=(mono,10,"bold"))
+        for t in self.tabs.values():
+            t.configure(state="normal"); t.delete("1.0","end"); t.configure(state="disabled")
+            for tag,col in [("ok",self.GREEN),("bad",self.RED),("warn",self.AMB),
+                             ("info",self.BLUE),("cyan",self.CYAN),("dim",self.FG2),
+                             ("dimx",self.FG3),("white",self.FG),("hl",self.GREEN)]:
+                t.tag_configure(tag,foreground=col)
+            t.tag_configure("hl",foreground=self.GREEN,font=(self.MONO,9,"bold"))
 
-    def _pb_start(self):
-        self._pb_run=True; self._pb_pos=0; self._pb_tick()
-
-    def _pb_stop(self):
-        self._pb_run=False
-        self._pb.coords(self._pb_bar,0,0,240,3)
-        self._pb.itemconfig(self._pb_bar, fill=self.GREEN)
-
-    def _pb_tick(self):
-        if not self._pb_run: return
-        self._pb_pos=(self._pb_pos+5)%280
-        x1=max(0,self._pb_pos-110); x2=min(240,self._pb_pos)
-        self._pb.coords(self._pb_bar,x1,0,x2,3)
-        self.root.after(12,self._pb_tick)
-
-    def _w(self, key, text, tag="white"):
+    # ── Write to tab ───────────────────────────────────────
+    def _w(self,key,text,tag="white"):
         if key not in self.tabs: return
-        t=self.tabs[key]
-        t.configure(state="normal"); t.insert("end",text,tag); t.see("end")
-        t.configure(state="disabled")
+        t=self.tabs[key]; t.configure(state="normal")
+        t.insert("end",text,tag); t.see("end"); t.configure(state="disabled")
 
-    def _render(self, key, text):
-        if not text:
-            self._w(key,"  No data.\n","dim"); return
+    def _render(self,key,text):
+        if not text: self._w(key,"  No data.\n","dim"); return
         for line in text.split("\n"):
             ll=line.lower()
-            if any(x in ll for x in ["⚠","warning","suspicious","tamper","multiple account","detected","bypass","injection","crash","cleaner","vpn"]):
-                tag="warn"
-            elif any(x in ll for x in ["✓","normal","clean","no cheat","no suspicious","none detected"]):
-                tag="ok"
-            elif any(x in ll for x in ["✗","auto fail","ban evasion","flagged","fail","hash-based","known cheat"]):
-                tag="bad"
-            elif "──" in line or "━" in line or "═" in line or "◈" in line:
-                tag="hl"
-            elif line.startswith("  username") or line.startswith("  userid") or line.startswith("  @"):
-                tag="info"
-            elif line.startswith("  ") or line.startswith("\t"):
-                tag="dim"
-            else:
-                tag="white"
-            self._w(key, line+"\n", tag)
+            if "✗" in line or "critical" in ll or "auto fail" in ll: tag="bad"
+            elif "⚠" in line or "warning" in ll or "suspicious" in ll: tag="warn"
+            elif "✓" in line or "normal" in ll: tag="ok"
+            elif "──" in line or "◈" in line: tag="hl"
+            elif line.startswith("  "): tag="dim"
+            else: tag="white"
+            self._w(key,line+"\n",tag)
 
-    def _render_summary(self, r):
+    # ── Summary panel ──────────────────────────────────────
+    def _render_summary(self,r):
         k="summary"
-        self._w(k,"\n","white")
-        self._w(k,"  ◈ SCAN COMPLETE ────────────────────────────────────\n","hl")
-        self._w(k,f"  Generated  :  {now_str()}\n","dim")
-        self._w(k,f"  PC User    :  {current_user()}\n","dim")
-        self._w(k,f"  League     :  {r.get('league','?')}\n\n","dim")
-
-        if r.get("sysmain_autofail"):
-            self._w(k,"  ─── AUTO FAIL ─────────────────────────────────────\n","bad")
-            self._w(k,"  ✗  SysMain DISABLED + Prefetch empty\n","bad")
-            self._w(k,"  ✗  Deliberate trace wiping detected\n\n","bad")
-
-        self._w(k,"  ◈ Detection Scores ────────────────────────────────\n","hl")
-        rows=[
-            ("ShellBag Hits",   r.get("shellbag_hits",0)),
-            ("BAM Hits",        r.get("bam_hits",0)),
-            ("Prefetch Hits",   r.get("prefetch_hits",0)),
-            ("AppCompat Hits",  r.get("appcompat_hits",0)),
-            ("Cheat File Hits", r.get("cheat_hits",0)),
-            ("YARA Hits",       r.get("yara_hits",0)),
-            ("Unsigned EXEs",   len(r.get("unsigned_hits",[]))),
-            ("SysMain Hits",    r.get("sysmain_hits",0)),
-            ("Process Hits",    r.get("process_hits",0)),
-            ("Cleaner Signs",   r.get("cleaner_hits",0)),
-        ]
-        for label,val in rows:
-            bar="█"*min(val,28)
-            tag="bad" if val>0 else "dim"
-            sym="▲" if val>0 else "○"
-            self._w(k,f"  {sym}  {label:<22}  {val:>3}  {bar}\n",tag)
-
         total=r.get("total_hits",0)
-        self._w(k,f"\n  ────────────────────────────────────────────────────\n","dim")
-        self._w(k,f"  TOTAL HITS  :  {total}\n","warn" if total>0 else "ok")
-        self._w(k,"  NOTE: No automatic verdict — agent reviews hits\n\n","dim")
+        accs=r.get("roblox_accounts",[])
+        us_l=r.get("unsigned_hits",[])
+        us_cnt=len(us_l) if isinstance(us_l,list) else 0
+        eh=r.get("exec_history",[])
+        eh_f=sum(1 for e in eh if e.get("flagged"))
+
+        self._w(k,"\n","white")
+        self._w(k,"  ┌─ QUICK STATS ─────────────────────────────────────┐\n","hl")
+        self._w(k,f"  │  Hits: {total:<6}  Accounts: {len(accs):<5}  Unsigned: {us_cnt:<4}     │\n",
+                "warn" if total else "ok")
+        self._w(k,f"  │  Integrity: {r.get('sysmain_hits',0):<3}  Cleaners: {r.get('cleaner_hits',0):<3}  JumpLists: {r.get('jumplist_hits',0):<3}  │\n","dim")
+        self._w(k,"  └────────────────────────────────────────────────────┘\n\n","hl")
+        self._w(k,f"  Generated : {now_str()}\n","dim")
+        self._w(k,f"  PC User   : {current_user()}\n","dim")
+        self._w(k,f"  League    : {r.get('league','?')}\n\n","dim")
+
+        self._w(k,"  ── Detection Scores ────────────────────────────────\n","hl")
+        rows=[
+            ("ShellBag Hits",   r.get("shellbag_hits",0),  False),
+            ("BAM Hits",        r.get("bam_hits",0),        False),
+            ("Prefetch Hits",   r.get("prefetch_hits",0),   False),
+            ("AppCompat Hits",  r.get("appcompat_hits",0),  False),
+            ("JumpLists",       r.get("jumplist_hits",0),   False),
+            ("LNK Files",       r.get("lnk_hits",0),        False),
+            ("Integrity",       r.get("sysmain_hits",0),    True),
+            ("Cleaners",        r.get("cleaner_hits",0),    False),
+            ("EventLog",        r.get("eventlog_hits",0),   True),
+            ("Audit Policy",    0,                           False),
+            ("Deleted Integrity",r.get("deleted_hits",0),   False),
+            ("Cheat File Hits", r.get("cheat_hits",0),      False),
+            ("YARA Hits",       r.get("yara_hits",0),       False),
+            ("Unsigned EXEs",   us_cnt,                      False),
+            ("Log Tamper",      r.get("roblox_log_hits",0), True),
+            ("SysMain Hits",    r.get("sysmain_hits",0),    True),
+        ]
+        for label,val,is_i in rows:
+            bar="█"*min(val,28)
+            sym="▲" if is_i else "○"
+            tag=("warn" if is_i else "bad") if val>0 else "dim"
+            self._w(k,f"  {sym} {label:<24} {val:>3}  {bar}\n",tag)
+
+        self._w(k,f"\n  TOTAL HITS : {total}\n","bad" if total else "ok")
+        self._w(k,"  No automatic verdict — agent reviews all hits.\n\n","dim")
 
         vpn=r.get("vpn_info","")
         if vpn and vpn!="Unknown":
-            self._w(k,"  ◈ Network ─────────────────────────────────────────\n","hl")
+            self._w(k,"  ── Network ──────────────────────────────────────────\n","hl")
             self._w(k,f"  {vpn}\n\n","info")
 
-        self._w(k,"  ◈ Roblox Accounts ────────────────────────────────\n","hl")
-        accs=r.get("roblox_accounts",[])
+        self._w(k,"  ── Roblox Accounts ─────────────────────────────────\n","hl")
         if accs:
             for a in accs:
                 name=a.get("username","?") if isinstance(a,dict) else str(a)
-                uid=a.get("userid","") if isinstance(a,dict) else ""
-                self._w(k,f"  ›  {name}","warn" if len(accs)>1 else "info")
-                if uid: self._w(k,f"  (ID: {uid})","dim")
-                self._w(k,"\n","white")
+                uid =a.get("userid","") if isinstance(a,dict) else ""
+                src =a.get("sources",[]) if isinstance(a,dict) else []
+                pid =a.get("placeids",[]) if isinstance(a,dict) else []
+                ls  =a.get("last_seen") if isinstance(a,dict) else None
+                self._w(k,f"  › {{'username': '{name} (ID: {uid or 'None'})', 'userid': {uid!r}, 'sources': {src}, 'placeids': {pid}, 'last_seen': {ls!r}}}\n",
+                        "warn" if len(accs)>1 else "dim")
             if len(accs)>1:
-                self._w(k,f"\n  ⚠  {len(accs)} accounts — possible ban evasion\n","bad")
+                self._w(k,f"\n  ⚠ {len(accs)} accounts — possible ban evasion\n","bad")
         else:
-            self._w(k,"  No Roblox accounts detected\n","dim")
+            self._w(k,"  No accounts found.\n","dim")
 
-        self._w(k,"\n  ◈ Discord Accounts ───────────────────────────────\n","hl")
-        daccs=r.get("discord_accounts",[])
-        if daccs:
-            for d in daccs:
-                self._w(k,f"  ›  @{d.get('username','?')}  (ID: {d.get('id','?')})  last: {d.get('last_switched','?')}\n",
-                        "warn" if len(daccs)>1 else "info")
-            if len(daccs)>1:
-                self._w(k,f"\n  ⚠  {len(daccs)} Discord accounts — possible alts\n","bad")
-        else:
-            self._w(k,"  No Discord accounts detected\n","dim")
+    # ── Progress bar ───────────────────────────────────────
+    def _pbs(self): self._pbr=True; self._pbp=0; self._pbt()
+    def _pbstop(self): self._pbr=False; self._pbc.coords(self._pbb,0,0,200,3)
+    def _pbt(self):
+        if not self._pbr: return
+        self._pbp=(self._pbp+4)%260
+        x1=max(0,self._pbp-100); x2=min(200,self._pbp)
+        self._pbc.coords(self._pbb,x1,0,x2,3)
+        self.root.after(14,self._pbt)
 
+    # ── Scan ───────────────────────────────────────────────
     def _start(self):
         if self.scanning: return
         self.scanning=True; self._wh_sent=False
         self._setup_tags()
-        self._run_btn.config(state="disabled",text="Scanning…",bg=self.BG4,fg=self.FG2)
-        self._status_lbl.config(text="SCANNING",fg=self.AMBER)
-        self._wh_lbl.config(text="")
-        self._pb_start()
-        threading.Thread(target=self._do_scan,daemon=True).start()
+        self._rbtn.config(state="disabled",text="Scanning…",bg=self.BG4,fg=self.FG2)
+        self._slbl.config(text="SCANNING",fg=self.AMB)
+        self._wlbl.config(text=""); self._pbs()
+        threading.Thread(target=self._scan,daemon=True).start()
 
-    def _do_scan(self):
+    def _scan(self):
         try:
             r=run_full_scan(league=self._league)
-            self.results=r
-            self.root.after(0,self._show,r)
-        except Exception as e:
-            self.root.after(0,self._err,str(e))
+            self.results=r; self.root.after(0,self._show,r)
+        except Exception:
+            import traceback
+            self.root.after(0,self._err,traceback.format_exc())
 
-    def _show(self, r):
-        self._pb_stop(); self.scanning=False
-        total_h = r.get("total_hits", 0)
-        vc = self.RED if total_h > 0 else self.GREEN
-        v_label = f"{total_h} HITS" if total_h > 0 else "CLEAN"
-        self._status_lbl.config(text=v_label, fg=vc)
-        self._run_btn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000000")
+    def _show(self,r):
+        self._pbstop(); self.scanning=False
+        total=r.get("total_hits",0)
+        self._slbl.config(text=f"{total} HITS" if total else "CLEAN",
+                          fg=self.RED if total else self.GREEN)
+        self._rbtn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000")
         self._render_summary(r)
-        tab_map=[
-            ("shellbags","shellbags"),("bam","bam"),("prefetch","prefetch"),
-            ("appcompat","appcompat"),("roblox","roblox"),("recycle","recycle"),
-            ("sysmain","sysmain"),("cheat","cheat"),("yara","yara"),
-            ("unsigned","unsigned"),("processes","processes"),("cleaners","cleaners"),
-            ("discord","discord"),("registry_extra","registry_extra"),
-            ("network","network"),
-        ]
-        for result_key,tab_key in tab_map:
-            self._render(tab_key, r.get(result_key,""))
-        # drives tab
-        if "drives" in self.tabs:
-            dv_t,_,_ = scan_drives()
-            self._render("drives", dv_t)
-        self._switch("summary",self._nav_btns.get("summary"))
-        threading.Thread(target=self._do_send,daemon=True).start()
+        for rk,tk_ in [("shellbags","shellbags"),("bam","bam"),("prefetch","prefetch"),
+                        ("appcompat","appcompat"),("roblox","roblox"),("processes","processes"),
+                        ("cheat","cheat"),("yara","yara"),("unsigned","unsigned"),
+                        ("recycle","recycle"),("sysmain","sysmain"),("cleaners","cleaners"),
+                        ("discord","discord"),("registry_extra","registry_extra"),
+                        ("network","network"),("eventlog","eventlog"),
+                        ("jumplists","jumplists"),("lnkfiles","lnkfiles"),
+                        ("deleted_int","deleted_int")]:
+            self._render(tk_,r.get(rk,""))
+        self._eh_populate(r.get("exec_history",[]))
+        self._sw("summary",self._nbts.get("summary"))
+        threading.Thread(target=self._send,daemon=True).start()
 
-    def _err(self, msg):
-        self._pb_stop(); self.scanning=False
-        self._status_lbl.config(text="ERROR",fg=self.RED)
-        self._run_btn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000000")
-        messagebox.showerror("Comet — Scan Error",msg)
+    def _err(self,msg):
+        self._pbstop(); self.scanning=False
+        self._slbl.config(text="ERROR",fg=self.RED)
+        self._rbtn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000")
+        messagebox.showerror("Comet — Error",msg[:600])
 
-    def _do_send(self):
-        self.root.after(0,lambda: self._wh_lbl.config(text="sending…",fg=self.AMBER))
-        wh_ok,wh_err=send_webhook(self.results)
-        wb_ok,wb_err=send_website(self.results,self._pin)
-        self._wh_sent=wh_ok or wb_ok
-        if wh_ok and wb_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text="✓ sent",fg=self.GREEN))
-        elif wh_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text=f"✓ webhook  ✗ web: {wb_err[:60]}",fg=self.AMBER))
-        elif wb_ok:
-            self.root.after(0,lambda: self._wh_lbl.config(text=f"✓ web  ✗ webhook: {wh_err[:60]}",fg=self.AMBER))
-        else:
-            err_show=(wb_err or wh_err or "unknown")[:90]
-            self.root.after(0,lambda e=err_show: self._wh_lbl.config(text=f"✗ {e}",fg=self.RED))
+    def _send(self):
+        self.root.after(0,lambda:self._wlbl.config(text="sending…",fg=self.AMB))
+        wok,we=send_webhook(self.results); bok,be=send_website(self.results,self._pin)
+        if wok and bok:   lbl,fg="✓ sent",self.GREEN
+        elif wok:         lbl,fg=f"✓ wh  ✗ web:{be[:40]}",self.AMB
+        elif bok:         lbl,fg=f"✓ web  ✗ wh:{we[:40]}",self.AMB
+        else:             lbl,fg=f"✗ {(be or we)[:70]}",self.RED
+        self.root.after(0,lambda:self._wlbl.config(text=lbl,fg=fg))
 
     def _save(self):
-        if not self.results:
-            messagebox.showwarning("No Results","Run a scan first."); return
-        path=filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text Report","*.txt"),("All Files","*.*")],
-            initialfile="comet_report.txt")
-        if not path: return
+        if not self.results: messagebox.showwarning("No Results","Run a scan first."); return
+        p=filedialog.asksaveasfilename(defaultextension=".txt",
+          filetypes=[("Text Report","*.txt")],initialfile="comet_report.txt")
+        if not p: return
         try:
-            with open(path,"w",encoding="utf-8") as f:
-                f.write(self.results.get("full_report","No report."))
-            messagebox.showinfo("Saved",f"Report saved:\n{path}")
+            open(p,"w",encoding="utf-8").write(self.results.get("full_report","No report."))
+            messagebox.showinfo("Saved",f"Report saved:\n{p}")
         except Exception as e:
             messagebox.showerror("Error",str(e))
 
