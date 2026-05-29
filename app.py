@@ -666,6 +666,246 @@ def debug_pin(pin_code):
                     "used": row["used"], "expires": row["expires"],
                     "created": row["created"], "agent_id": row["agent_id"]})
 
+
+@app.route("/api/scans/<int:scan_id>", methods=["DELETE"])
+@login_required
+def api_delete_scan(scan_id):
+    user = get_user()
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT * FROM scans WHERE id=%s", (scan_id,))
+    row = row_to_dict(cur.fetchone(), cur)
+    if not row: cur.close(); conn.close(); return jsonify({"error":"Not found"}), 404
+    if not can_access_league(user, row["league"]): cur.close(); conn.close(); abort(403)
+    # Delete the scan
+    cur.execute("DELETE FROM scans WHERE id=%s", (scan_id,))
+    # Also unlink the pin (set scan_id=NULL, mark as unused so it shows no results)
+    cur.execute("UPDATE pins SET scan_id=NULL WHERE scan_id=%s", (scan_id,))
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/scans/bulk-delete", methods=["POST"])
+@login_required
+@owner_required
+def api_bulk_delete_scans():
+    """Delete multiple scans at once — owner only."""
+    data = request.json or {}
+    ids = data.get("ids", [])
+    if not ids: return jsonify({"error": "No IDs provided"}), 400
+    conn = get_db(); cur = conn.cursor()
+    ph = ",".join(["%s"] * len(ids))
+    cur.execute(f"UPDATE pins SET scan_id=NULL WHERE scan_id IN ({ph})", ids)
+    cur.execute(f"DELETE FROM scans WHERE id IN ({ph})", ids)
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({"ok": True, "deleted": len(ids)})
+
+
+@app.route("/results/<pin>/download")
+@login_required
+def download_report(pin):
+    """Generate and download a formatted HTML report for a scan."""
+    user = get_user()
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT * FROM pins WHERE pin=%s", (pin.upper(),))
+    pin_row = row_to_dict(cur.fetchone(), cur)
+    if not pin_row: cur.close(); conn.close(); abort(404)
+    if not can_access_league(user, pin_row["league"]): abort(403)
+    scan = None
+    if pin_row.get("scan_id"):
+        cur.execute("SELECT * FROM scans WHERE id=%s", (pin_row["scan_id"],))
+        scan = row_to_dict(cur.fetchone(), cur)
+        if scan and scan.get("report_json"):
+            scan["report"] = json.loads(scan["report_json"])
+        if scan and scan.get("roblox_accs"):
+            scan["roblox_accounts"] = json.loads(scan["roblox_accs"])
+    cur.close(); conn.close()
+    if not scan:
+        abort(404)
+
+    report = scan.get("report", {})
+    roblox_accounts = scan.get("roblox_accounts", [])
+    discord_accounts = report.get("discord_accounts", [])
+
+    def esc(s):
+        s = str(s or "")
+        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+    def section(title, content_html, color="#58a6ff"):
+        return f"""<section>
+<h2 style="color:{color}">{esc(title)}</h2>
+{content_html}
+</section>"""
+
+    def pre(text):
+        if not text or str(text).strip() in ("", "No data."):
+            return '<pre style="color:#6e7681">No data collected.</pre>'
+        return f"<pre>{esc(str(text))}</pre>"
+
+    # Build Roblox accounts section
+    roblox_html = "<ul>"
+    if roblox_accounts:
+        for acc in roblox_accounts:
+            if isinstance(acc, dict):
+                uname = acc.get("username","Unknown")
+                uid   = acc.get("userid","")
+                ls    = acc.get("last_seen","")
+                srcs  = ", ".join(acc.get("sources",[]))
+                url   = f"https://www.roblox.com/users/{uid}/profile" if uid else "#"
+                roblox_html += f'<li><a href="{url}" target="_blank">{esc(uname)}</a>'
+                if uid:   roblox_html += f' <span style="color:#6e7681">(ID: {esc(uid)})</span>'
+                if ls:    roblox_html += f' — Last seen: {esc(ls)}'
+                if srcs:  roblox_html += f' <span style="color:#6e7681">[{esc(srcs)}]</span>'
+                roblox_html += "</li>"
+            else:
+                roblox_html += f"<li>{esc(str(acc))}</li>"
+    else:
+        roblox_html += "<li style='color:#6e7681'>No accounts detected</li>"
+    roblox_html += "</ul>"
+
+    # Build Discord accounts section
+    disc_html = "<ul>"
+    if discord_accounts:
+        for d in discord_accounts:
+            if isinstance(d, dict):
+                uname = d.get("username","Unknown")
+                uid   = d.get("id","")
+                ls    = d.get("last_switched","")
+                src   = d.get("source","")
+                token = d.get("has_token", False)
+                disc_html += f'<li>@{esc(uname)}'
+                if uid: disc_html += f' <span style="color:#6e7681">(ID: {esc(uid)})</span>'
+                if ls:  disc_html += f' — Last switched: {esc(ls)}'
+                if src: disc_html += f' [{esc(src)}]'
+                if token: disc_html += ' <span style="color:#f87171">⚠ TOKEN FOUND</span>'
+                disc_html += "</li>"
+            else:
+                disc_html += f"<li>{esc(str(d))}</li>"
+    else:
+        disc_html += "<li style='color:#6e7681'>No Discord accounts detected</li>"
+    disc_html += "</ul>"
+
+    # Hit score bars
+    hit_rows = [
+        ("ShellBag",     report.get("shellbag_hits",0)),
+        ("BAM",          report.get("bam_hits",0)),
+        ("Prefetch",     report.get("prefetch_hits",0)),
+        ("AppCompat",    report.get("appcompat_hits",0)),
+        ("Cheat Files",  report.get("cheat_hits",0)),
+        ("YARA",         report.get("yara_hits",0)),
+        ("Unsigned",     report.get("unsigned_count",0)),
+        ("SysMain",      report.get("sysmain_hits",0)),
+        ("Event Log",    report.get("eventlog_hits",0)),
+        ("Cleaners",     report.get("cleaner_hits",0)),
+        ("Log Tamper",   report.get("roblox_hits",0)),
+        ("FastFlags",    len(report.get("fastflags",[]))),
+    ]
+    score_html = "<table style='width:100%;border-collapse:collapse;font-size:0.8rem'>"
+    for label, val in hit_rows:
+        bar_w = min(int(val) * 8, 200)
+        color = "#f87171" if val > 0 else "#3d4a5c"
+        score_html += f"""<tr style="border-bottom:1px solid #21262d">
+  <td style="padding:5px 10px 5px 0;color:#8b949e;width:140px">{esc(label)}</td>
+  <td style="padding:5px;width:220px"><div style="background:#21262d;height:6px;border-radius:3px">
+    <div style="background:{color};width:{bar_w}px;height:6px;border-radius:3px;max-width:200px"></div></div></td>
+  <td style="padding:5px;color:{color};font-weight:bold">{val}</td>
+</tr>"""
+    score_html += f"""<tr style="border-top:2px solid #30363d;margin-top:8px">
+  <td style="padding:8px 10px 5px 0;color:#c9d1d9;font-weight:bold">TOTAL HITS</td>
+  <td></td>
+  <td style="padding:8px 5px;color:{'#f87171' if scan['total_hits']>0 else '#34d399'};font-size:1.1rem;font-weight:bold">{scan["total_hits"]}</td>
+</tr></table>"""
+
+    # Tab sections
+    tab_sections = [
+        ("ShellBags",         report.get("shellbags_raw") or report.get("shellbags","")),
+        ("BAM",               report.get("bam_raw") or report.get("bam","")),
+        ("Prefetch",          report.get("prefetch_raw") or report.get("prefetch","")),
+        ("AppCompat",         report.get("appcompat_raw") or report.get("appcompat","")),
+        ("Roblox Logs",       report.get("roblox_raw") or report.get("roblox","")),
+        ("Cheat Files",       report.get("cheat_raw") or report.get("cheat","")),
+        ("YARA / Heuristic",  report.get("yara_raw") or report.get("yara","")),
+        ("Unsigned Files",    report.get("unsigned_raw") or report.get("unsigned","")),
+        ("Recycle Bin",       report.get("recycle_raw") or report.get("recycle","")),
+        ("SysMain / Bypass",  report.get("sysmain_raw") or report.get("sysmain","")),
+        ("Running Processes", report.get("processes_raw") or report.get("processes","")),
+        ("Cleaners",          report.get("cleaners_raw") or report.get("cleaners","")),
+        ("Network / VPN",     report.get("network_raw") or report.get("network","")),
+        ("Event Log",         report.get("eventlog_raw") or report.get("eventlog","")),
+        ("Jump Lists",        report.get("jumplists_raw") or report.get("jumplists","")),
+        ("LNK Files",         report.get("lnkfiles_raw") or report.get("lnkfiles","")),
+        ("Deleted Integrity", report.get("deleted_int_raw") or report.get("deleted_int","")),
+        ("Roblox Alt Detection", report.get("registry_extra_raw") or report.get("registry_extra","")),
+        ("Factory Reset",     report.get("factory_resets","")),
+        ("Drive / USB",       report.get("drive_info","")),
+        ("FastFlags",         str(report.get("fastflags",""))),
+        ("Full Raw Report",   report.get("full_report","")),
+    ]
+
+    sections_html = section("Roblox Accounts", roblox_html, "#34d399")
+    sections_html += section("Discord Accounts", disc_html, "#818cf8")
+    sections_html += section("Detection Scores", score_html, "#f59e0b")
+    for title, text in tab_sections:
+        if text and str(text).strip() and str(text).strip() not in ("None","[]","{}",""):
+            sections_html += section(title, pre(text))
+
+    vpn = report.get("vpn_info","")
+    cleaner = report.get("cleaner_info","")
+    if vpn or cleaner:
+        info_html = ""
+        if vpn:     info_html += f"<p><b>VPN/Network:</b> {esc(str(vpn))}</p>"
+        if cleaner: info_html += f"<p><b>Cleaner:</b> {esc(str(cleaner))}</p>"
+        sections_html += section("Network & Cleaner Info", info_html, "#f59e0b")
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Comet Scan Report — {esc(pin.upper())}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{background:#0d1117;color:#c9d1d9;font-family:'Cascadia Code','Consolas',monospace;padding:2rem;max-width:980px;margin:auto;line-height:1.6}}
+  h1{{color:#00f5a0;font-size:1.5rem;margin-bottom:.2rem;letter-spacing:.04em}}
+  .meta{{color:#6e7681;font-size:.8rem;margin-bottom:.3rem}}
+  .badges{{margin:1rem 0 2rem;display:flex;gap:10px;flex-wrap:wrap}}
+  .badge{{padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}}
+  .badge.REVIEW,.badge.UNKNOWN{{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}}
+  .badge.CLEAN{{background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25)}}
+  .badge.CHEATER,.badge.AUTO-FAIL,.badge.AUTO_FAIL{{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25)}}
+  .badge.hits{{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25)}}
+  .badge.league{{background:rgba(0,245,160,.1);color:#00f5a0;border:1px solid rgba(0,245,160,.2)}}
+  h2{{font-size:.9rem;margin:0 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid #21262d;letter-spacing:.04em}}
+  section{{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:1.25rem;margin-bottom:1rem}}
+  pre{{white-space:pre-wrap;word-break:break-word;font-size:.78rem;line-height:1.7;color:#c9d1d9}}
+  ul{{margin:.25rem 0;padding-left:1.5rem;font-size:.85rem}}
+  li{{margin-bottom:.35rem;line-height:1.5}}
+  a{{color:#58a6ff;text-decoration:none}}
+  a:hover{{text-decoration:underline}}
+  .divider{{border:none;border-top:1px solid #21262d;margin:1.5rem 0}}
+  @media print{{body{{background:#fff;color:#000}} section{{border:1px solid #ccc}}}}
+</style>
+</head>
+<body>
+<h1>◈ Comet Forensic Report</h1>
+<p class="meta">PIN: {esc(pin.upper())} &nbsp;|&nbsp; Agent: {esc(scan.get("pc_user","?"))} &nbsp;|&nbsp; Submitted: {esc(scan.get("submitted","?"))} UTC &nbsp;|&nbsp; League: {esc(scan.get("league","?"))}</p>
+<p class="meta">Generated: {datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC &nbsp;|&nbsp; Comet Scanner v5</p>
+<div class="badges">
+  <span class="badge {esc(scan.get('verdict','UNKNOWN').replace(' ','-'))}">{esc(scan.get("verdict","UNKNOWN"))}</span>
+  <span class="badge hits">{scan.get("total_hits",0)} HITS</span>
+  <span class="badge league">{esc(scan.get("league","?"))}</span>
+</div>
+{sections_html}
+<hr class="divider">
+<p style="color:#3d4a5c;font-size:.75rem;text-align:center">Comet Forensic Scanner &nbsp;·&nbsp; Report generated {datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC</p>
+</body>
+</html>"""
+
+    from flask import Response
+    filename = f"comet-report-{pin.upper()}-{scan.get('pc_user','unknown')}.html"
+    return Response(
+        html,
+        mimetype="text/html",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ── Public pages ─────────────────────────────────────────────
 @app.route("/download")
 def download_page():
