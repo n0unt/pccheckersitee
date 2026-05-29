@@ -318,7 +318,7 @@ async function loadStats(){
   }catch(e){}
 }
 function vc(v){if(!v)return"UNKNOWN";return v.toUpperCase().replace(/\s+/g,"-");}
-async function loadScans(panel,league){
+async function loadScans(panel,league){currentPanel=panel;currentLeague=league;
   const url="/api/scans"+(league?"?league="+league:"");
   try{
     const scans=await(await fetch(url)).json();
@@ -335,7 +335,10 @@ async function loadScans(panel,league){
         <td class="mono" style="color:${s.total_hits>0?"var(--red)":"var(--fg3)"}">${s.total_hits}</td>
         <td class="dim" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(accs)}</td>
         <td class="dim">${s.submitted}</td>
-        <td>${s.pin_used?`<a href="/results/${s.pin_used}" style="color:var(--blue);font-size:11px;text-decoration:none" target="_blank" onclick="event.stopPropagation()">View →</a>`:'<span style="color:var(--fg3);font-size:11px">—</span>'}</td>
+        <td style="display:flex;gap:6px;align-items:center">
+          ${s.pin_used?`<a href="/results/${s.pin_used}" style="color:var(--blue);font-size:11px;text-decoration:none" target="_blank" onclick="event.stopPropagation()">View →</a>`:''}
+          ${s.id?`<button onclick="event.stopPropagation();delScan(${s.id})" style="background:none;border:1px solid rgba(255,77,109,.2);color:rgba(255,77,109,.6);border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">✕</button>`:''}
+        </td>
       </tr>`;
     }).join("");
   }catch(e){console.error(e);}
@@ -389,6 +392,13 @@ async function loadAdmin(){
     </tr>`).join("");
   }catch(e){}
 }
+async function delScan(id){
+  if(!confirm('Delete this scan?'))return;
+  const r=await fetch(`/api/scans/${id}`,{method:'DELETE'});
+  if((await r.json()).ok){showToast('Scan deleted');loadScans(currentPanel,currentLeague);}
+  else showToast('Error deleting scan');
+}
+let currentPanel='overview',currentLeague='';
 async function updUser(id,f,v){await fetch(`/api/admin/users/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({[f]:v})});showToast("Saved");}
 async function delUser(id,n){if(!confirm(`Remove "${n}"?`))return;await fetch(`/api/admin/users/${id}`,{method:"DELETE"});loadAdmin();showToast("Removed");}
 async function createUser(){
