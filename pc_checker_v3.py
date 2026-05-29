@@ -20,7 +20,7 @@ _KW_ENC = [
     "aW5qZWN0b3I=","Y2hlYXRlbmdpbmU=","YXJ0aWZpY2lhbGFpbQ==",
     "c3luYXBzZXg=","a3JuczQ=","ZXhlY3V0b3J4","c2t5aHVieA==",
 ]
-KEYWORDS = [_d(k) for k in _KW_ENC]
+KEYWORDS = [_d(k) for k in _KW_ENC] + ["strap"]  # bloxstrap cheat loader
 
 # Known cheat file HASHES (SHA1) — rename won't help
 KNOWN_CHEAT_HASHES = set()  # Add SHA1s here as you collect them
@@ -203,7 +203,7 @@ def send_webhook(results):
                 {"name":"YARA",           "value":str(results.get("yara_hits",0)),        "inline":True},
                 {"name":"Unsigned",       "value":str(len(unsigned)),                     "inline":True},
                 {"name":"Cleaner Found",  "value":cleaner_info[:100],                     "inline":True},
-                {"name":"VPN/Network",    "value":vpn_info[:200],                         "inline":False},
+                {"name":"VPN Detected",   "value":"Yes" if vpn_info and "vpn" in vpn_info.lower() else "No",  "inline":True},
                 {"name":"Roblox Accounts","value":acc_str[:1024],                         "inline":False},
                 {"name":"Discord Accounts","value":disc_str[:512],                        "inline":False},
                 {"name":"Unsigned EXEs",  "value":us_str[:512],                           "inline":False},
@@ -334,9 +334,10 @@ def scan_shellbags():
         kws = matches_keyword(path)
         if kws: hits.append((path, "N/A", kws))
 
-    lines = [f"{'Path':<70}|Timestamp", "-"*90]
+    lines = [f"{'Path':<70}  Timestamp", "─"*90]
     for path, ts, kws in hits:
-        lines.append(f"{path:<70}|{ts}  [{', '.join(kws)}]")
+        ts_disp = ts if ts and ts != 'N/A' else 'No timestamp recorded'
+        lines.append(f"{path[:68]:<70}  {ts_disp}  [{', '.join(kws)}]")
     if gaps:
         lines.append(f"\n⚠ SHELLBAG INTEGRITY: {len(gaps)} MRU sequence gap(s) detected — possible selective deletion")
         for g in gaps[:5]: lines.append(f"  Gap at index: {g}")
@@ -595,7 +596,7 @@ def scan_roblox_logs():
         issues.append(("logs","N/A","Very few log files — possible manual deletion"))
         manual_delete_flag = True
 
-    for fpath in log_files[:30]:
+    for fpath in log_files[:60]:  # scan more logs to find all accounts
         fname = os.path.basename(fpath)
         try: fstat = os.stat(fpath)
         except Exception: continue
@@ -1354,7 +1355,7 @@ def scan_discord_cache():
     DISCRIM  = re.compile(r'"discriminator"\s*:\s*"(\d{1,4})"')
     SWITCH_RE= re.compile(r'"lastSwitched"\s*:\s*"?(\d+)"?')
     TOKEN_RE = re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
-    EMAIL_RE = re.compile(r'"email"\s*:\s*"([^"@]+@[^"]+)"')
+    # Email detection removed — not needed
 
     def parse_leveldb(base_path, source_label):
         """Parse a LevelDB directory for Discord account data."""
@@ -1368,7 +1369,7 @@ def scan_discord_cache():
                 names  = NAME_RE.findall(raw)
                 tokens = TOKEN_RE.findall(raw)
                 switches = SWITCH_RE.findall(raw)
-                emails = EMAIL_RE.findall(raw)
+                emails = []  # email detection disabled
                 for i, uid in enumerate(ids):
                     if uid in seen_ids: continue
                     seen_ids.add(uid)
@@ -1380,7 +1381,7 @@ def scan_discord_cache():
                             if ts > 1e12: ts = ts//1000
                             last_sw = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
                         except Exception: pass
-                    email = emails[0] if emails else None
+                    email = None  # emails not collected
                     accounts.append({
                         "id":uid, "username":uname,
                         "has_token": bool(tokens),
@@ -1797,7 +1798,8 @@ def run_full_scan(league="?"):
         "discord_accounts":dc_accs,
         "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
         "total_hits":total,"verdict":verdict,"league":league,
-        "vpn_info":vpn_info,"cleaner_info":cl_info,
+        "vpn_detected": bool(vpn_info and "vpn" in str(vpn_info).lower()),
+        "vpn_info":"[Redacted — see agent copy]","cleaner_info":cl_info,
         "report":{
             "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
             "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
