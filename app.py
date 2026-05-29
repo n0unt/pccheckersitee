@@ -536,15 +536,42 @@ def api_submit_scan():
         for tab_key in ALL_TABS:
             if tab_key in data:
                 report[tab_key+"_raw"] = data[tab_key]
-        for field in ["vpn_info","cleaner_info","process_hits","cleaner_hits",
+        for field in ["cleaner_info","process_hits","cleaner_hits",
                       "eventlog_hits","jumplist_hits","lnk_hits","deleted_hits",
-                      "exec_history","roblox_log_hits"]:
+                      "exec_history","roblox_log_hits","vpn_detected"]:
             if field in data: report[field] = data[field]
-        report_str = json.dumps(report)
-        if len(report_str) > 500000:
-            report = {"truncated": True, "verdict": data.get("verdict","?"),
-                     "shellbag_hits": data.get("report",{}).get("shellbag_hits",0),
-                     "bam_hits": data.get("report",{}).get("bam_hits",0)}
+        # Never store raw IP/VPN info - only store the flag
+        report.pop("vpn_info", None)
+        if "report" in data and isinstance(data["report"], dict):
+            data["report"].pop("vpn_info", None)
+        # Smart truncation: trim long tab text rather than wiping everything
+        # Truncate each raw tab to 30KB max, prioritising metadata over raw text
+        TAB_TRIM_ORDER = [
+            "cheat_raw","unsigned_raw","processes_raw","yara_raw",
+            "deleted_int_raw","lnkfiles_raw","jumplists_raw",
+            "appcompat_raw","shellbags_raw","prefetch_raw","bam_raw",
+            "roblox_raw","registry_extra_raw","discord_raw","sysmain_raw",
+            "recycle_raw","cleaners_raw","network_raw","eventlog_raw",
+        ]
+        for tab in TAB_TRIM_ORDER:
+            if tab in report and isinstance(report[tab], str):
+                report[tab] = report[tab][:30000]
+        # Also trim exec_history which can be huge
+        if "exec_history" in report and isinstance(report["exec_history"], list):
+            report["exec_history"] = report["exec_history"][:50]
+        report_str = json.dumps(report, default=str)
+        # If still too big after trimming, do a second aggressive trim
+        if len(report_str) > 900000:
+            for tab in TAB_TRIM_ORDER:
+                if tab in report:
+                    report[tab] = report.get(tab,"")[:8000]
+            report_str = json.dumps(report, default=str)
+        # Last resort - only if truly enormous
+        if len(report_str) > 1400000:
+            report["_truncated"] = True
+            for tab in TAB_TRIM_ORDER:
+                if tab in report: report[tab] = "[truncated — too large]"
+            report_str = json.dumps(report, default=str)
         cur.execute("""INSERT INTO scans (league,pc_user,verdict,total_hits,roblox_accs,report_json,pin_used,submitted)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (league or pin_row["league"],
@@ -847,13 +874,14 @@ def download_report(pin):
         if text and str(text).strip() and str(text).strip() not in ("None","[]","{}",""):
             sections_html += section(title, pre(text))
 
-    vpn = report.get("vpn_info","")
     cleaner = report.get("cleaner_info","")
-    if vpn or cleaner:
-        info_html = ""
-        if vpn:     info_html += f"<p><b>VPN/Network:</b> {esc(str(vpn))}</p>"
-        if cleaner: info_html += f"<p><b>Cleaner:</b> {esc(str(cleaner))}</p>"
-        sections_html += section("Network & Cleaner Info", info_html, "#f59e0b")
+    vpn_detected = report.get("vpn_detected", False)
+    # Only show VPN flag — never show raw IP
+    info_parts = []
+    if vpn_detected: info_parts.append("<p><b>VPN Detected:</b> <span style='color:#f87171'>Yes</span></p>")
+    if cleaner and cleaner != "None detected": info_parts.append(f"<p><b>Cleaner:</b> {esc(str(cleaner))}</p>")
+    if info_parts:
+        sections_html += section("Detection Extras", "".join(info_parts), "#f59e0b")
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
