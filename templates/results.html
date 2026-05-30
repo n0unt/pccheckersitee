@@ -202,6 +202,11 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
         {% if disc|length > 1 %}<span class="hc amb">{{ disc|length }}</span>
         {% elif disc|length == 1 %}<span class="hc dim">1</span>{% endif %}
       </div>
+      <div class="ti" onclick="sw('discord_memory',this)">
+        <div class="tlab">◉ Discord Downloads</div>
+        {% set dm_h = report.get('discord_memory_hits',0)|int %}
+        {% if dm_h > 0 %}<span class="hc red">{{ dm_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
+      </div>
       <div class="ti" onclick="sw('alts',this)"><div class="tlab">◉ Alt Detection</div></div>
 
       <div class="tsect">Forensics</div>
@@ -397,6 +402,14 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
       {% else %}
         <div style="color:var(--fg2);font-size:13px;padding:16px 0">No Discord accounts found in cache.</div>
       {% endif %}
+    </div>
+
+    <!-- DISCORD DOWNLOADS/MEMORY -->
+    <div class="panel" id="panel-discord_memory">
+      {% set dm_h = report.get('discord_memory_hits',0)|int %}
+      {% if dm_h > 0 %}<div class="wbox red">⚠ {{ dm_h }} suspicious Discord download(s) — cheat-related files found</div>{% endif %}
+      <div class="slabel">Discord CDN Download History</div>
+      <div class="rpre" id="pre-discord_memory">{{ report.get('discord_memory_raw','No data') }}</div>
     </div>
 
     <!-- ALT DETECTION -->
