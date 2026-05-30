@@ -531,7 +531,7 @@ def api_submit_scan():
         # Also store top-level scan tabs in report for results page
         ALL_TABS = ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
                     "unsigned","recycle","sysmain","processes","cleaners","network",
-                    "registry_extra","discord","eventlog","jumplists","lnkfiles",
+                    "registry_extra","discord","discord_memory","eventlog","jumplists","lnkfiles",
                     "deleted_int","exec_history_text"]
         for tab_key in ALL_TABS:
             if tab_key in data:
