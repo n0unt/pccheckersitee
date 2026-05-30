@@ -245,22 +245,46 @@ def send_webhook(results):
 def send_website(results, pin):
     if not pin: return False, "No PIN"
     try:
+        # Include all tab text sections so results page can display them
+        TAB_KEYS = [
+            "shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
+            "unsigned","recycle","sysmain","processes","cleaners",
+            "registry_extra","discord","discord_memory","eventlog","jumplists","lnkfiles",
+            "deleted_int","exec_history_text",
+        ]
         payload = {
-            "pin": pin, "league": results.get("league","UFF"),
-            "pc_user": current_user(),
-            "verdict": results.get("verdict","UNKNOWN"),
-            "total_hits": results.get("total_hits",0),
+            "pin":           pin,
+            "league":        results.get("league","UFF"),
+            "pc_user":       current_user(),
+            "verdict":       results.get("verdict","UNKNOWN"),
+            "total_hits":    results.get("total_hits",0),
             "roblox_accounts": results.get("roblox_accounts",[]),
-            "report": results.get("report",{}),
+            "report":        results.get("report",{}),
+            # top-level tab text — server stores as *_raw in report
+            "exec_history":  results.get("exec_history",[]),
         }
-        data = json.dumps(payload).encode("utf-8")
+        # Attach each tab's text
+        for k in TAB_KEYS:
+            val = results.get(k,"")
+            if val:
+                payload[k] = str(val)[:60000]  # cap each tab at 60 KB
+
+        raw = json.dumps(payload, default=str)
+        # If payload is too big, drop the longest tabs first
+        if len(raw) > 900000:
+            for k in ["unsigned","processes","yara","deleted_int","lnkfiles","jumplists"]:
+                if k in payload:
+                    del payload[k]
+            raw = json.dumps(payload, default=str)
+
+        data = raw.encode("utf-8")
         req = urllib.request.Request(
             f"{WEBSITE_URL}/api/submit",
             data=data,
             headers={"Content-Type":"application/json",
-                     "User-Agent":"CometScanner/4.0"},
+                     "User-Agent":"CometScanner/5.0"},
             method="POST")
-        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=20) as r:
+        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
             body = json.loads(r.read().decode())
             status = r.status
         if status == 200: return True, ""
@@ -495,10 +519,20 @@ def scan_appcompat():
                     vi = 0
                     while True:
                         try:
-                            name,_,_ = winreg.EnumValue(ck,vi)
+                            name,data,_ = winreg.EnumValue(ck,vi)
                             decoded = rot13(name)
                             kws = matches_keyword(decoded)
-                            if kws: ua_hits.append((decoded,kws))
+                            if kws:
+                                # Extract last run timestamp from UserAssist binary data
+                                ts_str = "Unknown"
+                                if isinstance(data, bytes) and len(data) >= 60:
+                                    try:
+                                        ft = struct.unpack_from("<Q", data, 60)[0]
+                                        dt = filetime_to_dt(ft)
+                                        if dt and dt.year > 2000:
+                                            ts_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                                    except Exception: pass
+                                ua_hits.append((decoded, kws, ts_str))
                             vi+=1
                         except OSError: break
                     winreg.CloseKey(ck)
@@ -531,161 +565,312 @@ def scan_appcompat():
 
     lines = []
     for path,kws in ac_hits: lines.append(f"  AppCompat: {path}  [{', '.join(kws)}]")
-    for path,kws in ua_hits: lines.append(f"  UserAssist: {path}  [{', '.join(kws)}]")
+    for path,kws,ts in ua_hits: lines.append(f"  UserAssist: {path}\n    LastRun: {ts}  [{', '.join(kws)}]")
     if extra_reg:
         lines.append("\n  Registry cross-references:")
         for r in extra_reg: lines.append(f"    ► {r}")
     if not lines: lines.append("  ✓ No matches")
-    return section("AppCompat / UserAssist", lines), len(ac_hits)+len(ua_hits), ac_hits+ua_hits
+    return section("AppCompat / UserAssist", lines), len(ac_hits)+len(ua_hits), ac_hits+[(p,k) for p,k,_ in ua_hits]
 
 
 def scan_roblox_logs():
+    """
+    Deep Roblox account + FastFlag detection.
+    Sources (all checked even if logs deleted):
+    1. Roblox standard log dir
+    2. Bloxstrap log dir
+    3. UWP package log dir
+    4. Bloxstrap State.json (persists after log wipe)
+    5. Roblox ClientSettings FastFlags (persists after log wipe)
+    6. Windows Thumbnail cache (Roblox profile images)
+    7. AppData cache dirs with Roblox tokens
+    8. Browser local storage for roblox.com
+    9. Windows ActivitiesCache (every account session)
+    """
+    import subprocess
     issues=[]; all_logs=[]; account_map={}
-    possible_dirs=[
-        os.path.expanduser(r"~\AppData\Local\Roblox\logs"),
-        os.path.expanduser(r"~\AppData\Local\Packages\ROBLOXCORPORATION.ROBLOX_55nm5eh3cm0pr\LocalState\logs"),
-        r"C:\Program Files (x86)\Roblox\logs", r"C:\Program Files\Roblox\logs",
-    ]
-    log_dir = next((d for d in possible_dirs if os.path.exists(d)), None)
 
-    PAT_JOIN_PAIR   = re.compile(r'"UserId"%3a(\d{6,15})%2c"UserName"%3a"([A-Za-z0-9_]{3,20})"')
-    PAT_REPORT_UID  = re.compile(r'\buserid:(\d{6,15})')
-    PAT_URL_UID     = re.compile(r'"UserId"%3a(\d{6,15})')
-    PAT_URL_UNAME   = re.compile(r'"UserName"%3a"([A-Za-z0-9_]{3,20})"')
-    PAT_PLAYER_GUI  = re.compile(r'Players\.([A-Za-z0-9_]{3,20})\.PlayerGui')
-    PAT_LOG_TIME    = re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})')
-    PAT_BLOXSTRAP_U = re.compile(r'"userId":\s*(\d{6,15})')
-    PAT_CRASH       = re.compile(r'(crash|exception|fatal error|unhandled exception)', re.I)
-    PAT_INJECT      = re.compile(r'(inject|dll attach|openprocess|writeprocess|createremote)', re.I)
+    PAT_JOIN   = re.compile(r'"UserId"%3a(\d{6,15})%2c"UserName"%3a"([A-Za-z0-9_]{3,20})"')
+    PAT_UID    = re.compile(r'"UserId"%3a(\d{6,15})')
+    PAT_UNAME  = re.compile(r'"UserName"%3a"([A-Za-z0-9_]{3,20})"')
+    PAT_GUI    = re.compile(r'Players\.([A-Za-z0-9_]{3,20})\.PlayerGui')
+    PAT_TIME   = re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})')
+    PAT_BSTRAP = re.compile(r'"userId":\s*(\d{6,15})')
+    PAT_BNAME  = re.compile(r'"username":\s*"([A-Za-z0-9_]{3,20})"')
+    PAT_CRASH  = re.compile(r'(crash|exception|fatal error|unhandled exception)', re.I)
+    PAT_INJECT = re.compile(r'(inject|dll attach|openprocess|writeprocess|createremote)', re.I)
+    PAT_FF_KEY = re.compile(r'"(F[FfBb][Aa-z]{3,40})"\s*:\s*([^,}\n]{1,60})')
+
+    # Roblox game/place IDs in URLs
+    PAT_PLACE  = re.compile(r'placeId=(\d{6,15})')
 
     USERNAME_NOISE = {
         "playerscripts","playermodules","loadingscreen","coregui","luaappscreengui",
         "robloxapp","robloxcrasher","robloxplayerbeta","notificationscriptscript",
         "experienceinvite","sharelinktabcontroller","controlscript",
-        "experiencetipsdisplaycontroller","experiencetipsdisplay",
+        "experiencetipsdisplaycontroller","experiencetipsdisplay","robloxgui",
+        "screengui","billboardgui","surfacegui","sparkles","smoke","fire",
     }
 
     manual_delete_flag = False
-    crash_inject_flag = False
+    crash_inject_flag  = False
+    fastflags_found    = {}
 
-    if not log_dir:
-        # No log dir = possible manual deletion
-        lines = ["⚠ Roblox log directory NOT FOUND"]
-        # Check if Roblox is installed at all
-        roblox_installed = any(os.path.exists(p) for p in [
-            os.path.expanduser(r"~\AppData\Local\Roblox"),
-            r"C:\Program Files (x86)\Roblox",
-            r"C:\Program Files\Roblox",
-        ])
-        if roblox_installed:
-            lines.append("⚠ Roblox IS installed but logs directory missing")
-            lines.append("⚠ MANUAL LOG DELETION DETECTED")
-            manual_delete_flag = True
+    def add_account(uid, uname, source, timestamp=None, placeid=None):
+        uid = str(uid)
+        if uname and uname.lower() in USERNAME_NOISE: return
+        if uid not in account_map:
+            account_map[uid] = {"username": uname or "Unknown",
+                                "timestamps":[], "placeids":[], "sources":set()}
         else:
-            lines.append("  Roblox does not appear to be installed")
-        return section("Roblox Log Analysis", lines), 2 if manual_delete_flag else 0, []
+            if uname and uname != "Unknown" and account_map[uid]["username"] == "Unknown":
+                account_map[uid]["username"] = uname
+        account_map[uid]["sources"].add(source)
+        if timestamp: account_map[uid]["timestamps"].append(timestamp)
+        if placeid and placeid not in account_map[uid]["placeids"]:
+            account_map[uid]["placeids"].append(placeid)
 
-    try:
-        log_files = sorted(glob.glob(os.path.join(log_dir,"*.log")) +
-                           glob.glob(os.path.join(log_dir,"*.txt")),
-                           key=lambda f: os.path.getmtime(f), reverse=True)
-    except Exception: log_files = []
+    # ── Source 1-3: All log directories ──────────────────
+    log_dirs = [
+        os.path.expanduser(r"~\AppData\Local\Roblox\logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Logs"),
+        os.path.expanduser(r"~\AppData\Local\Packages\ROBLOXCORPORATION.ROBLOX_55nm5eh3cm0pr\LocalState\logs"),
+        r"C:\Program Files (x86)\Roblox\logs",
+        r"C:\Program Files\Roblox\logs",
+    ]
+    existing_log_dirs = [d for d in log_dirs if os.path.exists(d)]
+    roblox_installed  = any(os.path.exists(p) for p in [
+        os.path.expanduser(r"~\AppData\Local\Roblox"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap"),
+        r"C:\Program Files (x86)\Roblox",
+    ])
 
-    # Check for missing recent logs (manual deletion detection)
-    if len(log_files) < 2:
-        issues.append(("logs","N/A","Very few log files — possible manual deletion"))
+    for log_dir in existing_log_dirs:
+        try:
+            log_files = sorted(
+                glob.glob(os.path.join(log_dir,"*.log")) +
+                glob.glob(os.path.join(log_dir,"*.txt")),
+                key=lambda f: os.path.getmtime(f), reverse=True)
+        except Exception:
+            log_files = []
+        all_logs.extend(log_files)
+
+        for fpath in log_files[:40]:
+            try:
+                with open(fpath,"r",encoding="utf-8",errors="ignore") as f:
+                    raw = f.read(500000)
+            except Exception:
+                continue
+            mtime_str = datetime.datetime.fromtimestamp(
+                os.path.getmtime(fpath)).strftime("%Y-%m-%d %H:%M:%S")
+
+            if PAT_CRASH.search(raw) and PAT_INJECT.search(raw):
+                crash_inject_flag = True
+                issues.append(("log", mtime_str, "CRASH + INJECTION — possible crash-on-inject"))
+
+            for m in PAT_JOIN.finditer(raw):
+                uid, uname = m.group(1), m.group(2)
+                ts_list = PAT_TIME.findall(raw[:m.start()+200])
+                ts = ts_list[-1] if ts_list else mtime_str
+                place_m = PAT_PLACE.search(raw[max(0,m.start()-200):m.start()+200])
+                pid = place_m.group(1) if place_m else None
+                add_account(uid, uname, "log", ts, pid)
+
+            for m in PAT_BSTRAP.finditer(raw):
+                uid = m.group(1)
+                name_m = PAT_BNAME.search(raw[max(0,m.start()-100):m.start()+200])
+                uname = name_m.group(1) if name_m else None
+                add_account(uid, uname, "bloxstrap_log", mtime_str)
+
+            for m in PAT_GUI.finditer(raw):
+                uname = m.group(1)
+                if uname.lower() not in USERNAME_NOISE:
+                    add_account(f"__u_{uname.lower()}", uname, "playergui", mtime_str)
+
+            # Grab FastFlags from log content
+            for m in PAT_FF_KEY.finditer(raw[:50000]):
+                k, v = m.group(1), m.group(2).strip().strip(",").strip('"')
+                if k not in fastflags_found:
+                    fastflags_found[k] = v
+
+    if not all_logs and roblox_installed:
+        issues.append(("logs","N/A","Log directories empty — MANUAL LOG DELETION DETECTED"))
+        manual_delete_flag = True
+    elif len(all_logs) < 2 and roblox_installed:
+        issues.append(("logs","N/A","Very few log files — possible partial deletion"))
         manual_delete_flag = True
 
-    for fpath in log_files[:60]:  # scan more logs to find all accounts
-        fname = os.path.basename(fpath)
-        try: fstat = os.stat(fpath)
-        except Exception: continue
-        fmtime = datetime.datetime.fromtimestamp(fstat.st_mtime)
-        all_logs.append(fpath)
+    # ── Source 4: Bloxstrap State.json ───────────────────
+    bloxstrap_state_paths = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\State.json"),
+        os.path.expandvars(r"%APPDATA%\Bloxstrap\State.json"),
+    ]
+    for sp in bloxstrap_state_paths:
+        if not os.path.exists(sp): continue
         try:
-            with open(fpath,"r",encoding="utf-8",errors="ignore") as f:
-                content = f.read(400000)
-        except Exception: continue
+            with open(sp,"r",encoding="utf-8",errors="ignore") as f:
+                state = json.loads(f.read())
+            # State.json stores last user info
+            for k,v in state.items() if isinstance(state,dict) else []:
+                kl = k.lower()
+                if "userid" in kl or "user_id" in kl:
+                    add_account(str(v), None, "bloxstrap_state")
+                elif "username" in kl or "displayname" in kl:
+                    # Try to find associated userid
+                    uid_key = k.replace("Name","Id").replace("name","id")
+                    uid = state.get(uid_key,"")
+                    if uid: add_account(str(uid), str(v), "bloxstrap_state")
+        except Exception: pass
 
-        # Crash-while-injecting detection
-        if PAT_CRASH.search(content) and PAT_INJECT.search(content):
-            crash_inject_flag = True
-            issues.append((fname, fmtime, "CRASH + INJECTION KEYWORDS — possible crash-on-inject"))
+    # ── Source 5: ClientSettings FastFlags ───────────────
+    ff_paths = [
+        os.path.expanduser(r"~\AppData\Local\Roblox\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\ClientSettings\ClientAppSettings.json"),
+    ]
+    SUSPICIOUS_FLAGS = {
+        "FFlagDebugGraphicsDisableDirect3D11": "Disables D3D11 (anti-cheat bypass)",
+        "FFlagDisableNewIGMinDUA":             "Disables input guard",
+        "DFStringTaskSchedulerTargetFps":      "Uncapped FPS exploit",
+        "FFlagDebugRenderingSetDeterministic": "Rendering manipulation",
+        "FFlagDisablePostFx":                  "Visual exploit flag",
+        "FFlagDebugDisableTelemetry":          "Disables telemetry reporting",
+        "FFlagEnableHyperscaleImpostors":      "Known exploit flag",
+        "FFlagFixGraphicsQuality":             "Graphics bypass",
+        "FFlagDisableNewAnimationSystem":      "Animation bypass",
+        "FFlagEnableNewAnimationSystem":       "Known exploit flag",
+        "DFIntTaskSchedulerTargetFps":         "FPS uncap",
+        "FFlagTaskSchedulerLimitTargetFps":    "FPS uncap",
+    }
+    suspicious_ff = []
+    for ffp in ff_paths:
+        if not os.path.exists(ffp): continue
+        try:
+            with open(ffp,"r",encoding="utf-8",errors="ignore") as f:
+                flags = json.loads(f.read())
+            if isinstance(flags, dict):
+                fastflags_found.update(flags)
+                for k,v in flags.items():
+                    if k in SUSPICIOUS_FLAGS:
+                        suspicious_ff.append(f"{k} = {v}  [{SUSPICIOUS_FLAGS[k]}]")
+        except Exception: pass
 
-        for m in PAT_JOIN_PAIR.finditer(content):
-            uid,uname = m.group(1), m.group(2)
-            if uname.lower() in USERNAME_NOISE: continue
-            if uid not in account_map:
-                account_map[uid] = {"username":uname,"timestamps":[],"placeids":[],"sources":set()}
-            else:
-                if not account_map[uid]["username"] or account_map[uid]["username"]=="Unknown":
-                    account_map[uid]["username"] = uname
-            account_map[uid]["sources"].add("log_join")
-            for t in PAT_LOG_TIME.findall(content)[:5]:
-                account_map[uid]["timestamps"].append(t)
+    # ── Source 6: Browser localStorage for roblox.com ────
+    browser_storage_paths = [
+        (os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Default\Local Storage\leveldb"), "Chrome"),
+        (os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Local Storage\leveldb"), "Edge"),
+        (os.path.expandvars(r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\Default\Local Storage\leveldb"), "Brave"),
+        (os.path.expandvars(r"%APPDATA%\Opera Software\Opera Stable\Local Storage\leveldb"), "Opera"),
+        (os.path.expandvars(r"%APPDATA%\Opera Software\Opera GX Stable\Local Storage\leveldb"), "Opera GX"),
+    ]
+    ROBLOX_ID_RE  = re.compile(r'"UserId"\s*:\s*(\d{6,15})')
+    ROBLOX_NM_RE  = re.compile(r'"Name"\s*:\s*"([A-Za-z0-9_]{3,20})"')
+    ROBLOX_TK_RE  = re.compile(r'_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.([A-Za-z0-9+/=_-]{20,600})')
+    for bpath, blabel in browser_storage_paths:
+        if not os.path.exists(bpath): continue
+        try:
+            for fname in os.listdir(bpath):
+                if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
+                fpath = os.path.join(bpath, fname)
+                try:
+                    with open(fpath,"rb") as f: raw = f.read().decode("utf-8",errors="ignore")
+                    if "roblox" not in raw.lower(): continue
+                    for m in ROBLOX_ID_RE.finditer(raw):
+                        uid = m.group(1)
+                        nm_m = ROBLOX_NM_RE.search(raw[max(0,m.start()-200):m.start()+200])
+                        uname = nm_m.group(1) if nm_m else None
+                        add_account(uid, uname, f"browser_{blabel.lower()}", None)
+                    if ROBLOX_TK_RE.search(raw):
+                        issues.append(("browser","N/A",
+                            f"Roblox .ROBLOSECURITY cookie found in {blabel} browser storage"))
+                except Exception: pass
+        except Exception: pass
 
-        for m in PAT_BLOXSTRAP_U.finditer(content):
-            uid = m.group(1)
-            if uid not in account_map:
-                account_map[uid] = {"username":"Unknown","timestamps":[],"placeids":[],"sources":set()}
-            account_map[uid]["sources"].add("bloxstrap")
+    # ── Source 7: Windows ActivitiesCache ────────────────
+    import glob as _glob2
+    for db_path in _glob2.glob(os.path.expandvars(
+            r"%LOCALAPPDATA%\ConnectedDevicesPlatform\*\ActivitiesCache.db")):
+        try:
+            with open(db_path,"rb") as f: raw = f.read()
+            text = raw.decode("utf-8",errors="ignore") + raw.decode("utf-16-le",errors="ignore")
+            if "roblox" not in text.lower(): continue
+            for m in re.finditer(r"roblox.{0,300}?(\d{7,15})", text, re.IGNORECASE):
+                uid = m.group(1)
+                if len(uid) >= 7:
+                    add_account(uid, None, "timeline_cache", None)
+        except Exception: pass
 
-        for m in PAT_PLAYER_GUI.finditer(content):
-            uname = m.group(1)
-            if uname.lower() in USERNAME_NOISE: continue
-            ukey = f"__u_{uname.lower()}"
-            if ukey not in account_map:
-                account_map[ukey] = {"username":uname,"timestamps":[],"placeids":[],"sources":set()}
-            account_map[ukey]["sources"].add("playergui")
-
+    # Build result accounts list
     result_accounts = []
-    seen = set()
+    seen_keys = set()
     for uid, data in account_map.items():
         uname = data["username"] or "Unknown"
-        clean_uid = uid if not uid.startswith("__") else None
+        clean_uid = None if uid.startswith("__") else uid
         key = (uname.lower(), clean_uid)
-        if key in seen: continue
-        seen.add(key)
+        if key in seen_keys: continue
+        seen_keys.add(key)
         ts_list = sorted(set(str(t) for t in data["timestamps"] if t), reverse=True)
         result_accounts.append({
-            "username":uname,"userid":clean_uid,
-            "placeids":sorted(data["placeids"]),
-            "last_seen":ts_list[0] if ts_list else "Unknown",
-            "sources":sorted(data["sources"]),
+            "username":   uname,
+            "userid":     clean_uid,
+            "placeids":   sorted(set(data["placeids"])),
+            "last_seen":  ts_list[0] if ts_list else "Unknown",
+            "sources":    sorted(data["sources"]),
         })
-    result_accounts.sort(key=lambda a:(0 if(a["userid"] and a["username"]!="Unknown") else 1 if a["userid"] else 2))
+    result_accounts.sort(key=lambda a: (
+        0 if (a["userid"] and a["username"] != "Unknown") else
+        1 if a["userid"] else 2))
 
-    named = [a for a in result_accounts if a["username"]!="Unknown"]
-    multi = len(named) > 1
+    named = [a for a in result_accounts if a["username"] != "Unknown"]
+    multi  = len(named) > 1
 
-    lines = [f"\nLog Dir: {log_dir}", f"Total Logs: {len(all_logs)}", f"Accounts: {len(result_accounts)}", ""]
-    if manual_delete_flag: lines.append("⚠ MANUAL LOG DELETION DETECTED\n")
-    if crash_inject_flag: lines.append("⚠ CRASH-WHILE-INJECTING PATTERN DETECTED\n")
-    if multi: lines.append(f"⚠ MULTIPLE ACCOUNTS ({len(named)}) — Possible ban evasion\n")
+    lines = [
+        f"\n  Log dirs found  : {len(existing_log_dirs)}",
+        f"  Total log files : {len(all_logs)}",
+        f"  Accounts found  : {len(result_accounts)}",
+        f"  FastFlags seen  : {len(fastflags_found)}",
+        "",
+    ]
+    if manual_delete_flag: lines.append("⚠ LOG DELETION DETECTED\n")
+    if crash_inject_flag:  lines.append("⚠ CRASH-WHILE-INJECTING PATTERN\n")
+    if multi:              lines.append(f"⚠ {len(named)} ACCOUNTS — possible ban evasion\n")
     if issues:
-        lines.append("⚠ INTEGRITY ISSUES:")
-        for fname,ts,reason in issues:
-            lines.append(f"  {fname} | {ts.strftime('%m/%d/%Y %H:%M') if hasattr(ts,'strftime') else ts} | {reason}")
+        lines.append("⚠ Issues:")
+        for src,ts,reason in issues:
+            lines.append(f"  {src} | {ts} | {reason}")
         lines.append("")
+    if suspicious_ff:
+        lines.append("⚠ SUSPICIOUS FASTFLAGS:")
+        for f in suspicious_ff: lines.append(f"  ✗ {f}")
+        lines.append("")
+
     lines.append("━"*50)
     for acc in result_accounts:
         lines.append(f"\n  Username : {acc['username']}")
         lines.append(f"  UserID   : {acc['userid'] or 'Unknown'}")
         lines.append(f"  Last Seen: {acc['last_seen']}")
-        lines.append(f"  Places   : {', '.join(acc['placeids']) or 'N/A'}")
+        lines.append(f"  Places   : {', '.join(acc['placeids'][:10]) or 'N/A'}")
         lines.append(f"  Sources  : {', '.join(acc['sources'])}")
         lines.append("  " + "─"*35)
-    if not result_accounts: lines.append("  No accounts found.")
+    if not result_accounts:
+        lines.append("  No accounts found.")
+    if fastflags_found:
+        lines.append("\n━"*25)
+        lines.append("\n  FastFlags (from logs/ClientSettings):")
+        for k,v in list(fastflags_found.items())[:30]:
+            lines.append(f"  {k} = {v}")
 
     flat = []
     for acc in result_accounts:
-        u=acc["username"]; i=acc["userid"] or ""
-        if u!="Unknown" and i: flat.append(f"{u} (ID: {i})")
-        elif u!="Unknown": flat.append(u)
-        elif i: flat.append(f"UserID: {i}")
+        u, i = acc["username"], acc["userid"] or ""
+        if u != "Unknown" and i: flat.append(f"{u} (ID: {i})")
+        elif u != "Unknown":     flat.append(u)
+        elif i:                  flat.append(f"UserID: {i}")
 
-    tamper_count = len(issues)+(1 if multi else 0)+(2 if manual_delete_flag else 0)+(2 if crash_inject_flag else 0)
-    return section("Roblox Log Analysis", lines), tamper_count, flat
+    tamper = (len(issues) + (1 if multi else 0) +
+              (2 if manual_delete_flag else 0) +
+              (2 if crash_inject_flag  else 0))
+    return section("Roblox Log Analysis", lines), tamper, flat
 
 
 def scan_roblox_alts_registry():
@@ -1521,6 +1706,146 @@ def scan_discord_cache():
     return section("Discord Account Detection",lines), max(0,len(real_accounts)-1), real_accounts
 
 
+
+def scan_discord_memory():
+    """
+    Discord memory + download history analysis.
+    Reads from Discord's cached media/downloads, message cache,
+    and in-memory artifacts to find:
+    - Files downloaded through Discord (with timestamps)
+    - Images/attachments accessed
+    - Server/DM metadata (no message content)
+    This catches people using Discord alts to share cheats.
+    """
+    if not WINDOWS: return section("Discord Memory/Downloads",["Windows only"]),0,[]
+    import subprocess
+    hits=[]; download_entries=[]; suspicious_entries=[]
+
+    DISCORD_ROOTS = [
+        os.path.expanduser(r"~\AppData\Roaming\discord"),
+        os.path.expanduser(r"~\AppData\Roaming\discordptb"),
+        os.path.expanduser(r"~\AppData\Roaming\discordcanary"),
+    ]
+
+    # Cheat file extensions/names to flag in download history
+    CHEAT_EXTS = {".exe",".dll",".lua",".luac",".rbxl",".rbxlx",".zip",".rar",".7z"}
+    CHEAT_NAMES_RE = re.compile(
+        r"(exploit|inject|cheat|hack|aimbot|executor|script|payload|bypass|"
+        r"volt|synapse|velocity|fluxus|krnl|delta|wave|script.*ware|"
+        r"froststrap|aimlock|esp|triggerbot|noclip|speed.*hack)",
+        re.IGNORECASE)
+
+    # Pattern to find CDN attachment URLs in LevelDB
+    CDN_RE    = re.compile(r"https://cdn[.]discordapp[.]com/attachments/(\d+)/(\d+)/([^\s]{2,120})")
+    MEDIA_RE  = re.compile(r"https://media[.]discordapp[.](?:net|com)/attachments/(\d+)/(\d+)/([^\s]{2,120})")
+    # Timestamps embedded in Discord snowflake IDs
+    def snowflake_to_dt(snowflake):
+        try:
+            ts_ms = (int(snowflake) >> 22) + 1420070400000
+            return datetime.datetime.utcfromtimestamp(ts_ms/1000).strftime("%Y-%m-%d %H:%M:%S UTC")
+        except Exception:
+            return "Unknown"
+
+    def scan_leveldb_dir(base_path, label):
+        if not os.path.exists(base_path): return
+        try:
+            for fname in os.listdir(base_path):
+                if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
+                fpath = os.path.join(base_path, fname)
+                try:
+                    with open(fpath,"rb") as f: raw = f.read(4*1024*1024)  # 4MB max
+                    text = raw.decode("utf-8", errors="ignore")
+                    # Find all CDN attachment URLs
+                    for m in CDN_RE.finditer(text):
+                        channel_id, msg_id, filename = m.group(1), m.group(2), m.group(3)
+                        clean_fn = filename.split("?")[0].strip()
+                        ts = snowflake_to_dt(msg_id)
+                        ext = os.path.splitext(clean_fn)[1].lower()
+                        is_sus = ext in CHEAT_EXTS or bool(CHEAT_NAMES_RE.search(clean_fn))
+                        entry = {
+                            "file": clean_fn, "channel": channel_id,
+                            "msg_id": msg_id, "timestamp": ts,
+                            "url": m.group(0).split("?")[0],
+                            "source": label, "suspicious": is_sus,
+                        }
+                        download_entries.append(entry)
+                        if is_sus: suspicious_entries.append(entry)
+                except Exception: pass
+        except Exception: pass
+
+    for root in DISCORD_ROOTS:
+        label = os.path.basename(root)
+        # Main LevelDB (localStorage)
+        scan_leveldb_dir(os.path.join(root,"Local Storage","leveldb"), label)
+        # Cache directories
+        for cache_sub in ["Cache","GPUCache","Code Cache","media-cache"]:
+            cache_path = os.path.join(root,cache_sub)
+            if os.path.exists(cache_path):
+                try:
+                    for cfile in os.listdir(cache_path):
+                        fpath = os.path.join(cache_path, cfile)
+                        try:
+                            with open(fpath,"rb") as f: raw = f.read(512*1024)  # 512KB
+                            text = raw.decode("utf-8", errors="ignore")
+                            for m in CDN_RE.finditer(text):
+                                channel_id, msg_id, filename = m.group(1), m.group(2), m.group(3)
+                                clean_fn = filename.split("?")[0].strip()
+                                ext = os.path.splitext(clean_fn)[1].lower()
+                                ts = snowflake_to_dt(msg_id)
+                                is_sus = ext in CHEAT_EXTS or bool(CHEAT_NAMES_RE.search(clean_fn))
+                                entry = {
+                                    "file":clean_fn,"channel":channel_id,"msg_id":msg_id,
+                                    "timestamp":ts,"url":m.group(0).split("?")[0],
+                                    "source":f"{label}/cache","suspicious":is_sus,
+                                }
+                                download_entries.append(entry)
+                                if is_sus: suspicious_entries.append(entry)
+                        except Exception: pass
+                except Exception: pass
+
+    # Deduplicate by URL
+    seen_urls = set()
+    unique_downloads = []
+    for e in download_entries:
+        if e["url"] not in seen_urls:
+            seen_urls.add(e["url"])
+            unique_downloads.append(e)
+    unique_downloads.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    # Deduplicate suspicious by URL too
+    seen_sus = set()
+    unique_sus = []
+    for e in suspicious_entries:
+        if e["url"] not in seen_sus:
+            seen_sus.add(e["url"])
+            unique_sus.append(e)
+
+    lines = [
+        f"\n  Discord CDN files found: {len(unique_downloads)}",
+        f"  Suspicious entries    : {len(unique_sus)}",
+        "",
+    ]
+    if unique_sus:
+        lines.append("⚠ SUSPICIOUS DOWNLOADS (cheat-related files):")
+        for e in unique_sus[:20]:
+            lines.append(f"  ✗ File     : {e['file']}")
+            lines.append(f"    Uploaded : {e['timestamp']}")
+            lines.append(f"    URL      : {e['url']}")
+            lines.append(f"    Source   : {e['source']}")
+            lines.append("")
+    lines.append("─"*50)
+    lines.append(f"\n  Recent Discord Downloads (all, newest first):")
+    for e in unique_downloads[:30]:
+        sym = "⚠" if e["suspicious"] else "  "
+        lines.append(f"  {sym} File: {e['file']}")
+        lines.append(f"     Uploaded: {e['timestamp']}")
+        lines.append(f"     URL: {e['url']}")
+    if not unique_downloads:
+        lines.append("  No Discord CDN file history found.")
+
+    return section("Discord Downloads/Memory", lines), len(unique_sus), unique_downloads
+
+
 def scan_factory_reset():
     """
     Enhanced factory reset detection — multiple corroborating sources.
@@ -2178,6 +2503,7 @@ def run_full_scan(league="?"):
     cl_t,cl_h,cl_info  = scan_cleaners()
     nw_t,nw_h,vpn_info = scan_network_vpn()
     dc_t,dc_h,dc_accs  = scan_discord_cache()
+    dm_t,dm_h,dm_list  = scan_discord_memory()
     fr_t,_,fr_text     = scan_factory_reset()
     ff_t,ff_h,ff_hits  = scan_fastflags()
     dv_t,dv_w,dv_inf   = scan_drives()
@@ -2187,7 +2513,7 @@ def run_full_scan(league="?"):
     di_t,di_h,_        = scan_deleted_integrity()
     eh_t,eh_fc,eh_list = scan_execution_history()
 
-    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h
+    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+dm_h
 
     roblox_list=[]
     if isinstance(accs,list):
@@ -2220,7 +2546,7 @@ def run_full_scan(league="?"):
             "factory_resets":fr_text,"drive_info":dv_inf,"drive_warn":dv_w,
             "vpn_info":vpn_info,"cleaner_info":cl_info,"process_hits":pr_h,
             "cleaner_hits":cl_h,"eventlog_hits":ev_h,"jumplist_hits":jl_h,
-            "lnk_hits":lk_h,"deleted_hits":di_h,"exec_history":eh_list,
+            "lnk_hits":lk_h,"deleted_hits":di_h,"discord_memory_hits":dm_h,"exec_history":eh_list,
         },
         "full_report":"\n".join([
             f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
@@ -2275,6 +2601,7 @@ class App:
         ("EXEC HISTORY", "exec_history"),
         (None, None),
         ("DISCORD",      "discord"),
+        ("DISC MEMORY",  "discord_memory"),
         ("CLEANERS",     "cleaners"),
         ("NETWORK/VPN",  "network"),
     ]
@@ -2778,7 +3105,7 @@ class App:
                         ("appcompat","appcompat"),("roblox","roblox"),("processes","processes"),
                         ("cheat","cheat"),("yara","yara"),("unsigned","unsigned"),
                         ("recycle","recycle"),("sysmain","sysmain"),("cleaners","cleaners"),
-                        ("discord","discord"),("registry_extra","registry_extra"),
+                        ("discord","discord"),("discord_memory","discord_memory"),("registry_extra","registry_extra"),
                         ("network","network"),("eventlog","eventlog"),
                         ("jumplists","jumplists"),("lnkfiles","lnkfiles"),
                         ("deleted_int","deleted_int")]:
