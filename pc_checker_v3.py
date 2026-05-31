@@ -20,7 +20,10 @@ _KW_ENC = [
     "aW5qZWN0b3I=","Y2hlYXRlbmdpbmU=","YXJ0aWZpY2lhbGFpbQ==",
     "c3luYXBzZXg=","a3JuczQ=","ZXhlY3V0b3J4","c2t5aHVieA==",
 ]
-KEYWORDS = [_d(k) for k in _KW_ENC] + ["strap"]  # bloxstrap cheat loader
+KEYWORDS = [_d(k) for k in _KW_ENC] + [
+    # Added executors (researched file/folder names):
+    "wave", "waveexecutor", "potassiumloader", "sirhurtlauncher", "solaraexecutor", "xenoexecutor", "cosmicexecutor", "cosmic", "madium", "madiumexecutor", "synapsez", "synapse_z", "jjsploit", "jjsploitexecutor", "wearedevs", "froststrap", "fishstrap", "krnl", "krnlss", "fluxus", "delta", "deltaexecutor", "solarabootstrapper", "solarav3", "awp", "awpexecutor", "hydrogen", "hydrogenexecutor", "codex", "codexexecutor", "nihon", "nezur", "macSploit", "trigon", "trigonevo", "sentinel", "arceusx", "arceus", "delta_executor", "volt_executor", "wave_executor",
+]
 
 # Known cheat file HASHES (SHA1) — rename won't help
 KNOWN_CHEAT_HASHES = set()  # Add SHA1s here as you collect them
@@ -46,10 +49,25 @@ FALSE_POSITIVE_PATHS = [
 ]
 
 LEGIT_APP_ALLOWLIST = {
-    "volt":     ["node_modules","volt-0.","volt-1.","volt-2.","\\volt\\resources"],
-    "velocity": ["\\velocity\\","vscodium","code\\extensions"],
-    "matrix":   ["element","matrix.org","\\matrix\\resources"],
+    "volt":     ["node_modules","volt-0.","volt-1.","volt-2.","\\volt\\resources","voltage","revolt","pivotal"],
+    "velocity": ["\\velocity\\","vscodium","code\\extensions","apache velocity"],
+    "matrix":   ["element","matrix.org","\\matrix\\resources","neo4j"],
     "cryptic":  ["champions online","star trek","neverwinter","crypticstudios"],
+    # New executor keywords — allowlist known-safe software
+    "wave":     ["\\obs\\","waveform","adobe audition","\\audio\\","cubase","wavelab",
+                 "waveshell","\\waves\\","wave editor","wave browser" ,"waveform","reaper"],
+    "delta":    ["microsoft\\edge\\","\\delta\\updates","deltacopy","\\git\\",
+                 "delta lake","databricks","\\delta\\resources"],
+    "cosmic":   ["cosmic desktop","\\system76\\","pop!_os","cosmic-term"],
+    "codex":    ["github\\copilot","openai","\\vscode\\","code-server","codexwriter"],
+    "sentinel":  ["\\sentinelone\\","sentinel labs","microsoft sentinel","azure sentinel"],
+    "arceus":   ["pokemon","nintendo","\\arceus\\game"],
+    "hydrogen":  ["\\hydrogen\\app","hydrogen music","musescore"],
+    "nihon":    ["\\japanese\\","nihongo","japan"],
+    "krnl":     [],  # no common false positives
+    "fluxus":   [],  # no common false positives
+    "jjsploit": [],  # no common false positives
+    "madium":   [],  # no common false positives
 }
 
 SUSPICIOUS_DIRS = {
