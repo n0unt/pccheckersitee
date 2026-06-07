@@ -259,6 +259,23 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
       </div>
       <div class="ti" onclick="sw('drives',this)"><div class="tlab">◉ USB / Drives</div></div>
 
+      <div class="tsect">2-PC & Recovery</div>
+      <div class="ti" onclick="sw('powerevents',this)">
+        <div class="tlab">◉ Power Timeline</div>
+        {% set pw_h = report.get('power_hits',0)|int %}
+        {% if pw_h > 0 %}<span class="hc amb">{{ pw_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
+      </div>
+      <div class="ti" onclick="sw('twopc',this)">
+        <div class="tlab">◉ 2-PC Bypass</div>
+        {% set tp_h = report.get('two_pc_hits',0)|int %}
+        {% if tp_h > 0 %}<span class="hc red">{{ tp_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
+      </div>
+      <div class="ti" onclick="sw('recovery',this)">
+        <div class="tlab">◉ Deleted Cheats</div>
+        {% set rc_h = report.get('recovery_hits',0)|int %}
+        {% if rc_h > 0 %}<span class="hc red">{{ rc_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
+      </div>
+
       <div class="tsect">Extra</div>
       <div class="ti" onclick="sw('fastflags',this)">
         <div class="tlab">◉ FastFlags</div>
@@ -511,6 +528,37 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
       </div>
       <div id="eh-summary" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--fg2);margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;"></div>
       <div id="eh-list"></div>
+    </div>
+
+    <!-- POWER EVENTS / PC TIMELINE -->
+    <div class="panel" id="panel-powerevents">
+      {% set pw_h = report.get('power_hits',0)|int %}
+      {% if pw_h > 0 %}<div class="wbox amb">⚠ {{ pw_h }} power anomaly/anomalies detected — check timeline for 2-PC gaps</div>{% endif %}
+      <div class="wbox blue" style="background:rgba(77,159,255,0.06);border-color:rgba(77,159,255,0.2);color:var(--blue);margin-bottom:16px">
+        ℹ If the PC was OFF during the screenshare window but the player claims they were on it — that's a 2-PC bypass.
+      </div>
+      <div class="slabel">PC Power On/Off Timeline</div>
+      <div class="rpre" id="pre-powerevents">{{ report.get('power_events_raw','No data') }}</div>
+    </div>
+
+    <!-- 2-PC BYPASS DETECTION -->
+    <div class="panel" id="panel-twopc">
+      {% set tp_h = report.get('two_pc_hits',0)|int %}
+      {% if tp_h > 0 %}
+      <div class="wbox red">⚠ {{ tp_h }} dual-PC / streaming indicator(s) found — possible bypass</div>
+      {% endif %}
+      <div class="slabel">Stream & Remote Desktop Detection</div>
+      <div class="rpre" id="pre-twopc">{{ report.get('two_pc_raw','No data') }}</div>
+    </div>
+
+    <!-- DELETED CHEAT RECOVERY -->
+    <div class="panel" id="panel-recovery">
+      {% set rc_h = report.get('recovery_hits',0)|int %}
+      {% if rc_h > 0 %}
+      <div class="wbox red">⚠ {{ rc_h }} deleted cheat file(s) found with forensic evidence — report saved to player's Desktop</div>
+      {% endif %}
+      <div class="slabel">Deleted/Missing Cheat File Evidence</div>
+      <div class="rpre" id="pre-recovery">{{ report.get('deleted_recovery_raw','No data') }}</div>
     </div>
 
     <!-- RAW REPORT -->
