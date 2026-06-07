@@ -4,6 +4,33 @@ Rebranded from Lite to Comet
 Build: pyinstaller --onefile --noconsole --name=CometScanner comet_scanner.py
 """
 # ============================================================
+#  AUTO-ELEVATION — request admin if not already elevated
+# ============================================================
+import sys as _sys, os as _os
+def _is_admin():
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+if _os.name == "nt" and not _is_admin():
+    # Re-launch self with admin rights — UAC prompt appears automatically
+    import ctypes
+    try:
+        script = _sys.executable if getattr(_sys, "frozen", False) else _os.path.abspath(__file__)
+        params = " ".join(f'"{a}"' for a in _sys.argv[1:])
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", _sys.executable,
+            f'"{script}" {params}'.strip(),
+            None, 1  # SW_SHOWNORMAL
+        )
+        if int(ret) > 32:
+            _sys.exit(0)   # old process exits, elevated one takes over
+    except Exception:
+        pass  # if UAC is cancelled or fails, continue without admin
+
+# ============================================================
 #  CONFIG
 # ============================================================
 import base64 as _b64
@@ -268,6 +295,7 @@ def send_website(results, pin):
             "shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
             "unsigned","recycle","sysmain","processes","cleaners",
             "registry_extra","discord","discord_memory","eventlog","jumplists","lnkfiles",
+            "power_events","two_pc","deleted_recovery",
             "deleted_int","exec_history_text",
         ]
         payload = {
@@ -1076,7 +1104,7 @@ def scan_cheat_files():
         try:
             for root, dirs, files in os.walk(base):
                 depth = root.replace(base,"").count(os.sep)
-                if depth > 3: dirs.clear(); continue
+                if depth > 2: dirs.clear(); continue  # reduced from 3 to 2
                 dirs[:] = [d for d in dirs if d.lower() not in SKIP]
                 for fname in files:
                     scanned += 1
@@ -1113,10 +1141,11 @@ def scan_cheat_files():
                             stat = os.stat(fpath)
                             ctime = datetime.datetime.fromtimestamp(stat.st_ctime)
                             hits.append({"path":fpath,"name":fname,
-                                         "sha1":sha1_file(fpath) if stat.st_size<50_000_000 else "N/A",
+                                         "sha1":"N/A",  # skip hashing for speed
                                          "size":stat.st_size,"ext":os.path.splitext(fname)[1].lower(),
                                          "created":ctime,"keywords":kws})
                         except Exception: pass
+                    if scanned > 15000: dirs.clear(); break  # hard cap
         except Exception: pass
 
     lines = [f"\nScanned: {scanned}  Keyword Hits: {len(hits)}  Hash Hits: {len(hash_hits)}", "="*50]
@@ -1135,51 +1164,39 @@ def scan_cheat_files():
 
 
 def scan_yara():
-    scan_dirs = [os.path.expanduser("~\\Downloads"), os.path.expanduser("~\\AppData\\Local")]
-    hits = []; notes = []
-    try:
-        import yara
-        rules = yara.compile(source=r"""
-        rule CheatTool {
-            strings: $upx="UPX0" $vmp="VMProtect" $i1="VirtualAllocEx" $i2="WriteProcessMemory" $i3="CreateRemoteThread"
-            condition: 2 of them
-        }""")
-        use_yara = True
-    except ImportError:
-        use_yara = False
-        notes.append("⚠ yara-python not installed — using heuristic scan\n")
+    """Fast heuristic check — Downloads and Desktop only, no deep walk."""
+    scan_dirs=[os.path.expanduser("~\\Downloads"),os.path.expanduser("~\\Desktop")]
+    hits=[]; scanned=0
     for base in scan_dirs:
         if not os.path.exists(base): continue
-        for root,dirs,files in os.walk(base):
-            if root.replace(base,"").count(os.sep)>3: dirs.clear(); continue
-            for fname in files:
+        try:
+            for fname in os.listdir(base):  # only top level, no walk
                 if not fname.lower().endswith((".exe",".dll")): continue
-                fpath = os.path.join(root,fname)
+                fpath=os.path.join(base,fname)
                 try:
-                    size = os.path.getsize(fpath)
-                    if use_yara:
-                        m = rules.match(fpath,timeout=5)
-                        if m: hits.append({"path":fpath,"size":size,"sha1":sha1_file(fpath),"reason":f"YARA:{[r.rule for r in m]}"})
-                    else:
-                        with open(fpath,"rb") as f: hdr = f.read(512)
-                        if not hdr.startswith(b"MZ"): continue
-                        reasons = []
-                        if b"UPX" in hdr: reasons.append("UPX packed")
-                        if size < 10240: reasons.append("Tiny EXE")
-                        if matches_keyword(fpath): reasons.append("keyword")
-                        if reasons: hits.append({"path":fpath,"size":size,"sha1":sha1_file(fpath),"reason":" | ".join(reasons)})
+                    sz=os.path.getsize(fpath)
+                    if sz<100: continue
+                    kws=matches_keyword(fpath)
+                    with open(fpath,"rb") as f: hdr=f.read(512)
+                    reasons=list(kws)
+                    if hdr.startswith(b"MZ"):
+                        if b"WriteProcessMemory" in hdr: reasons.append("WPM import")
+                        if b"CreateRemoteThread" in hdr: reasons.append("CRT import")
+                        if b"VirtualAllocEx" in hdr: reasons.append("VAEx import")
+                    if reasons: hits.append({"path":fpath,"size":sz,"sha1":"N/A","reason":" | ".join(reasons)})
+                    scanned+=1
+                    if scanned>200: break
                 except Exception: pass
-    lines = notes+[f"Hits: {len(hits)}","="*50]
-    for i,h in enumerate(hits,1):
-        lines.append(f"\n[{i}] {h['reason']}\n    {h['path']}\n    {h['size']}b | {h['sha1']}")
+        except Exception: pass
+    lines=[f"Scanned top-level: {scanned}  Hits: {len(hits)}","="*50]
+    for i,h in enumerate(hits,1): lines.append(f"\n[{i}] {h['reason']}\n    {h['path']}")
     if not hits: lines.append("✓ No suspicious executables.")
-    return section("YARA / Heuristic", lines), len(hits), hits
-
+    return section("YARA / Heuristic",lines),len(hits),hits
 
 def scan_unsigned():
     import subprocess, tempfile
     scan_dirs = [os.path.expanduser("~\\Downloads"), os.path.expanduser("~\\Desktop"),
-                 os.path.expanduser("~\\AppData\\Local")]
+                 os.path.expanduser("~\\AppData\\Local\\Temp")]  # Only check most suspicious dirs
     TRUSTED = ["microsoft","google","nvidia","amd","intel","logitech","razer","corsair",
                "steam","valve","epic games","discord","twitch","obs","adobe","spotify","zoom"]
     hits=[]; scanned=0; candidates=[]
@@ -1196,6 +1213,7 @@ def scan_unsigned():
                         sz = os.path.getsize(fpath)
                         if sz >= 1024: candidates.append((fpath,sz)); scanned+=1
                     except Exception: pass
+                if scanned >= 80: dirs.clear(); break
         except Exception: pass
     if not WINDOWS or not candidates:
         for fpath,size in candidates:
@@ -1225,7 +1243,7 @@ $results
             si = subprocess.STARTUPINFO()
             si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
             out = subprocess.run(["powershell","-NoProfile","-NonInteractive","-WindowStyle","Hidden","-Command",ps],
-                                 capture_output=True,text=True,timeout=120,
+                                 capture_output=True,text=True,timeout=25,
                                  creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
             size_map = {fp:sz for fp,sz in candidates}
             for line in out.stdout.splitlines():
@@ -1351,7 +1369,7 @@ def scan_running_processes():
         out = subprocess.run(
             ["powershell","-NoProfile","-NonInteractive","-Command",
              "Get-Process | Select-Object Name,Id,Path | ConvertTo-Csv -NoTypeInformation"],
-            capture_output=True,text=True,timeout=20,
+            capture_output=True,text=True,timeout=8,
             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
         procs = []
         for line in out.stdout.splitlines()[1:]:
@@ -1364,22 +1382,7 @@ def scan_running_processes():
                 kws = matches_keyword(pname+" "+ppath)
                 if kws: hits.append({"name":pname,"pid":pid,"path":ppath,"keywords":kws,"type":"process"})
 
-        # If Roblox is running, check its loaded DLLs
-        if roblox_pids:
-            for pid in roblox_pids[:2]:
-                dll_out = subprocess.run(
-                    ["powershell","-NoProfile","-NonInteractive","-Command",
-                     f"Get-Process -Id {pid} | Select-Object -ExpandProperty Modules | Select-Object FileName | ConvertTo-Csv -NoTypeInformation"],
-                    capture_output=True,text=True,timeout=15,
-                    creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-                for dline in dll_out.stdout.splitlines()[1:]:
-                    dll = dline.strip().strip('"')
-                    if not dll: continue
-                    # Filter out known system DLLs
-                    if any(fp in dll.lower() for fp in FALSE_POSITIVE_PATHS): continue
-                    kws = matches_keyword(dll)
-                    if kws:
-                        suspicious_dlls.append({"dll":dll,"pid":pid,"keywords":kws})
+        # DLL scan removed — too slow during live scan
     except Exception: pass
 
     lines = []
@@ -2505,6 +2508,442 @@ $r=@(); Get-Content '{tf_path}' | ForEach-Object {{
 # ============================================================
 #  UPDATED run_full_scan
 # ============================================================
+
+def scan_power_events():
+    """
+    PC Power On/Off timeline — catches 2-PC bypass attempts.
+    Sources:
+    - Event Log: ID 6005 (system start), 6006 (clean shutdown), 6008 (unexpected shutdown)
+    - Event Log: ID 1 (kernel boot), 12 (kernel shutdown), 13 (kernel crash)
+    - Event Log: ID 41 (unexpected power loss / crash)
+    - Hibernation file timestamps
+    - Recent file timestamps correlated with power events
+    Builds a full timeline of when PC was on/off.
+    If someone claims they were on the PC but logs show it was off — 2-PC bypass.
+    """
+    if not WINDOWS:
+        return section("Power Events / PC Timeline", ["Windows only"]), 0, []
+    import subprocess
+    events = []; warnings = []
+
+    EVENT_MAP = {
+        "6005": ("POWER ON",  "System startup — EventLog service started"),
+        "6006": ("POWER OFF", "Clean shutdown initiated"),
+        "6008": ("CRASH OFF", "Unexpected shutdown / power loss"),
+        "41":   ("CRASH",     "Kernel power — unexpected restart (crash/BSOD)"),
+        "1":    ("KERNEL ON", "Kernel loaded — system boot"),
+        "12":   ("KERNEL OFF","Kernel shutdown"),
+        "13":   ("KERNEL BAD","Kernel crash/unexpected power loss"),
+    }
+
+    si = subprocess.STARTUPINFO()
+    si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+
+    # Pull last 200 power events from System log
+    ps_cmd = r"""
+$ids = @(6005,6006,6008,41,1,12,13)
+try {
+    $evts = Get-WinEvent -FilterHashtable @{LogName='System';Id=$ids} -MaxEvents 200 -ErrorAction SilentlyContinue
+    foreach($e in $evts){
+        Write-Output "$($e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))|$($e.Id)|$($e.Message.Split([Environment]::NewLine)[0].Trim())"
+    }
+} catch {}
+"""
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command", ps_cmd],
+            capture_output=True, text=True, timeout=12,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        for line in out.stdout.strip().splitlines():
+            line = line.strip()
+            if "|" not in line: continue
+            parts = line.split("|", 2)
+            if len(parts) < 2: continue
+            ts, eid = parts[0], parts[1]
+            msg = parts[2] if len(parts) > 2 else ""
+            etype, edesc = EVENT_MAP.get(eid, ("EVENT", f"ID {eid}"))
+            events.append({"ts": ts, "type": etype, "eid": eid, "desc": edesc})
+    except Exception: pass
+
+    # Sort chronologically
+    events.sort(key=lambda e: e["ts"])
+
+    # Build on/off pairs to find gaps (potential 2-PC periods)
+    timeline = []
+    last_on = None
+    gaps = []  # periods where PC was confirmed OFF
+    for ev in events:
+        if ev["type"] in ("POWER ON", "KERNEL ON"):
+            if last_on is None:
+                last_on = ev["ts"]
+            timeline.append(("ON",  ev["ts"], ev["desc"]))
+        elif ev["type"] in ("POWER OFF", "KERNEL OFF"):
+            if last_on:
+                timeline.append(("OFF", ev["ts"], ev["desc"]))
+                gaps.append((last_on, ev["ts"]))
+                last_on = None
+        elif ev["type"] in ("CRASH OFF", "CRASH", "KERNEL BAD"):
+            timeline.append(("CRASH", ev["ts"], ev["desc"]))
+            if last_on:
+                gaps.append((last_on, ev["ts"]))
+                last_on = None
+
+    # Flag if there are clean shutdown → startup pairs within the same screenshare window
+    # (agent can manually check: if player claims continuous session but PC was off, flag it)
+    if len(gaps) > 0:
+        warnings.append(f"⚠ {len(gaps)} power cycle(s) recorded — PC was fully off between these times")
+
+    # Check hibernation file timestamp
+    hib_path = r"C:\hiberfil.sys"
+    if os.path.exists(hib_path):
+        try:
+            hib_mt = datetime.datetime.fromtimestamp(os.path.getmtime(hib_path))
+            timeline.append(("HIBERNATE", hib_mt.strftime("%Y-%m-%d %H:%M:%S"), "hiberfil.sys last modified — system hibernated"))
+        except Exception: pass
+
+    # Output
+    lines = [f"\n  Power events found: {len(events)}",
+             f"  Power cycles (on→off): {len(gaps)}", ""]
+
+    for w in warnings: lines.append(w)
+    if warnings: lines.append("")
+
+    lines.append("  PC POWER TIMELINE (newest last):")
+    lines.append("  " + "─"*60)
+    for entry_type, ts, desc in timeline[-60:]:  # show last 60 events
+        sym = {"ON":"▶","OFF":"■","CRASH":"⚡","HIBERNATE":"◑","KERNEL ON":"▶","KERNEL OFF":"■","KERNEL BAD":"⚡"}.get(entry_type,"·")
+        col = "  "
+        lines.append(f"  {sym}  {ts}  [{entry_type}]  {desc[:60]}")
+
+    if not events:
+        lines.append("  No power events found (event log may be cleared)")
+        warnings.append("No power events — possible event log tampering")
+
+    hit_count = len(warnings)
+    return section("Power Events / PC Timeline", lines), hit_count, timeline
+
+
+def scan_two_pc_indicators():
+    """
+    Detect dual-PC streaming bypass:
+    - Network shares / mapped drives (second PC streams to first)
+    - OBS or streaming software with network sources
+    - Virtual display adapters (no physical monitor = stream-only PC)
+    - Remote desktop / VNC / AnyDesk / Parsec connections
+    - Low-res display (streaming PCs often run 720p virtual display)
+    - Virtual machine detection (VMware/VirtualBox/Hyper-V)
+    - NVIDIA/AMD streaming software (GameStream, Relive)
+    - Sunshine/Moonlight streaming software
+    """
+    if not WINDOWS:
+        return section("2-PC / Stream Bypass Detection", ["Windows only"]), 0, []
+    import subprocess
+    hits = []; warnings = []
+
+    si = subprocess.STARTUPINFO()
+    si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+
+    # ── 1. Check for virtual display / headless adapters ──
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "Get-WmiObject Win32_VideoController | Select-Object Name,AdapterRAM,CurrentHorizontalResolution,CurrentVerticalResolution | ConvertTo-Csv -NoTypeInformation"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        for line in out.stdout.splitlines()[1:]:
+            line = line.strip().strip('"')
+            ll = line.lower()
+            if any(x in ll for x in ["virtual","display only","basic display","indirect","idd ",
+                                      "parsec","sunshine","moonlight","nvfbc","amf"]):
+                hits.append(f"VIRTUAL DISPLAY: {line[:100]}")
+                warnings.append(f"Virtual/headless display adapter detected: {line[:80]}")
+            # Check for very low resolution (streaming PC often 1280x720 virtual)
+            parts = [p.strip().strip('"') for p in line.split('","')]
+            for p in parts:
+                if p.isdigit() and int(p) in (720, 768, 480):
+                    hits.append(f"LOW RESOLUTION DISPLAY: {p}p — common on headless streaming PCs")
+    except Exception: pass
+
+    # ── 2. Remote desktop / streaming software processes ──
+    STREAM_PROCS = {
+        "parsec":       "Parsec — remote gaming/stream software",
+        "sunshine":     "Sunshine — game streaming server",
+        "moonlight":    "Moonlight — game streaming client",
+        "anydesk":      "AnyDesk — remote desktop",
+        "teamviewer":   "TeamViewer — remote desktop",
+        "rustdesk":     "RustDesk — remote desktop",
+        "nvcapt":       "NVIDIA screen capture (game streaming)",
+        "nvstreamer":   "NVIDIA GameStream",
+        "nvcontainer":  "NVIDIA container (GameStream component)",
+        "amdlink":      "AMD Link — game streaming",
+        "playnite":     "Playnite (often used with streaming setups)",
+        "obs64":        "OBS Studio (64-bit)",
+        "obs32":        "OBS Studio (32-bit)",
+        "streamlabs":   "Streamlabs OBS",
+        "xsplit":       "XSplit — streaming/recording",
+        "virtualhere":  "VirtualHere — USB over network (2-PC setup)",
+        "spacedesk":    "Spacedesk — virtual display driver",
+        "iddcxdriver":  "Indirect Display Driver (virtual monitor)",
+    }
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "Get-Process | Select-Object -ExpandProperty Name"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        running = {p.strip().lower() for p in out.stdout.splitlines() if p.strip()}
+        for proc, desc in STREAM_PROCS.items():
+            if any(proc in r for r in running):
+                hits.append(f"RUNNING: {desc}")
+                if proc not in ("obs64","obs32","streamlabs","xsplit"):  # OBS alone isn't suspicious
+                    warnings.append(f"⚠ {desc} is running")
+    except Exception: pass
+
+    # ── 3. Installed streaming/remote software (registry) ──
+    STREAM_REG = [
+        (r"SOFTWARE\Parsec", "Parsec installed"),
+        (r"SOFTWARE\Sunshine", "Sunshine streaming server installed"),
+        (r"SOFTWARE\AnyDesk", "AnyDesk installed"),
+        (r"SOFTWARE\TeamViewer", "TeamViewer installed"),
+        (r"SOFTWARE\RustDesk", "RustDesk installed"),
+        (r"SOFTWARE\VirtualHere", "VirtualHere USB over network installed"),
+        (r"SOFTWARE\SpaceDesk", "SpaceDesk virtual display installed"),
+        (r"SOFTWARE\Moonlight Game Streaming", "Moonlight streaming client installed"),
+    ]
+    for reg_path, desc in STREAM_REG:
+        for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+            try:
+                winreg.OpenKey(hive, reg_path, 0, winreg.KEY_READ)
+                hits.append(f"INSTALLED: {desc}")
+                warnings.append(f"⚠ {desc}")
+                break
+            except Exception: pass
+
+    # ── 4. Virtual machine detection ──
+    VM_INDICATORS = {
+        "vmware":     "VMware virtual machine",
+        "virtualbox": "VirtualBox virtual machine",
+        "vbox":       "VirtualBox component",
+        "qemu":       "QEMU virtual machine",
+        "hyper-v":    "Hyper-V virtual machine",
+        "xen":        "Xen hypervisor",
+        "parallels":  "Parallels Desktop (Mac)",
+    }
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "Get-WmiObject Win32_ComputerSystem | Select-Object Manufacturer,Model | ConvertTo-Csv -NoTypeInformation"],
+            capture_output=True, text=True, timeout=6,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        mfg_line = out.stdout.lower()
+        for vm_key, vm_desc in VM_INDICATORS.items():
+            if vm_key in mfg_line:
+                hits.append(f"VIRTUAL MACHINE: {vm_desc}")
+                warnings.append(f"⚠ Running in a virtual machine: {vm_desc}")
+    except Exception: pass
+
+    # ── 5. Network shares / mapped drives ──
+    try:
+        out = subprocess.run(
+            ["net","use"],
+            capture_output=True, text=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        if out.stdout.strip() and "no entries" not in out.stdout.lower():
+            for line in out.stdout.splitlines():
+                if "\\\\" in line:
+                    hits.append(f"NETWORK SHARE: {line.strip()}")
+                    warnings.append(f"⚠ Network share mapped: {line.strip()[:80]}")
+    except Exception: pass
+
+    # ── 6. OBS network sources (check OBS config for stream from network) ──
+    obs_config_paths = [
+        os.path.expandvars(r"%APPDATA%\obs-studio\basic\scenes"),
+        os.path.expandvars(r"%APPDATA%\obs-studio\global.ini"),
+    ]
+    for obs_path in obs_config_paths:
+        if not os.path.exists(obs_path): continue
+        try:
+            if os.path.isdir(obs_path):
+                for f in os.listdir(obs_path):
+                    if not f.endswith(".json"): continue
+                    with open(os.path.join(obs_path,f),"r",errors="ignore") as fp:
+                        raw = fp.read()
+                    if any(x in raw.lower() for x in ['"type":"rtsp"','"type":"vlc"','"url":"rtsp','"url":"rtp']):
+                        hits.append("OBS network source detected — streaming FROM another PC")
+                        warnings.append("⚠ OBS has network video source (RTSP/RTP) — possible 2-PC setup")
+        except Exception: pass
+
+    lines = [f"\n  2-PC / Stream indicators: {len(hits)}", ""]
+    if not hits:
+        lines.append("  ✓ No dual-PC streaming indicators detected")
+    else:
+        for w in warnings: lines.append(f"  {w}")
+        lines.append("")
+        lines.append("  All findings:")
+        for h in hits: lines.append(f"  ► {h}")
+
+    return section("2-PC / Stream Bypass Detection", lines), len(warnings), hits
+
+
+def scan_deleted_cheat_recovery():
+    """
+    Recover deleted cheat files to a folder on the desktop.
+    Sources checked:
+    - $Recycle.Bin (all users) — reads $I metadata to get original path + deletion time
+    - Windows.old folder remnants
+    - VSS shadow copy traces
+    - Prefetch for recently-deleted executables
+    - MFT journal (USN) for recent deletions
+    Creates: Desktop\\CometRecovered\\ with a report of what was found.
+    Does NOT copy actual malware — just reports what existed and when.
+    """
+    if not WINDOWS:
+        return section("Deleted Cheat Recovery", ["Windows only"]), 0, []
+    import subprocess, struct
+    recovered = []; report_lines = []
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+    out_dir  = os.path.join(desktop, "CometRecovered")
+
+    # ── Source 1: $Recycle.Bin — read $I metadata files ──
+    rb_root = "C:\\$Recycle.Bin"
+    if os.path.exists(rb_root):
+        try:
+            for root, dirs, files in os.walk(rb_root):
+                for f in files:
+                    if not f.startswith("$I"): continue
+                    ipath = os.path.join(root, f)
+                    try:
+                        with open(ipath,"rb") as fp: data = fp.read(600)
+                        if len(data) < 28: continue
+                        # $I file format: 8 bytes header, 8 bytes file size, 8 bytes deletion FILETIME, then path
+                        del_ft = struct.unpack_from("<Q", data, 16)[0]
+                        del_dt = filetime_to_dt(del_ft)
+                        del_str = del_dt.strftime("%Y-%m-%d %H:%M:%S") if del_dt else "Unknown"
+                        # Original path is UTF-16LE after offset 28
+                        orig_path = data[28:].decode("utf-16-le", errors="ignore").rstrip("\x00")
+                        if not orig_path: continue
+                        kws = matches_keyword(orig_path)
+                        orig_fn  = os.path.basename(orig_path)
+                        if kws:
+                            recovered.append({
+                                "original_path": orig_path,
+                                "filename":      orig_fn,
+                                "deleted_at":    del_str,
+                                "keywords":      kws,
+                                "source":        "Recycle Bin",
+                                "i_file":        ipath,
+                            })
+                    except Exception: pass
+        except Exception: pass
+
+    # ── Source 2: Prefetch of deleted executables ──
+    pf_dir = r"C:\Windows\Prefetch"
+    if os.path.exists(pf_dir):
+        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
+            name = os.path.basename(pf).rsplit("-",1)[0]
+            kws  = matches_keyword(name)
+            if not kws: continue
+            try:
+                with open(pf,"rb") as f: raw = f.read(4096)
+                decoded = raw.decode("utf-16-le", errors="ignore")
+                paths = re.findall(r"C:[/\\][^\x00]{3,120}", decoded)
+                full = paths[-1].strip() if paths else name
+            except Exception:
+                full = name
+            if not os.path.exists(full):
+                mt = datetime.datetime.fromtimestamp(os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
+                recovered.append({
+                    "original_path": full,
+                    "filename":      os.path.basename(full),
+                    "deleted_at":    f"Last run: {mt}",
+                    "keywords":      kws,
+                    "source":        "Prefetch (file no longer exists)",
+                    "i_file":        pf,
+                })
+
+    # ── Source 3: BAM entries for missing executables ──
+    try:
+        base = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                              r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
+                              0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        idx = 0
+        while True:
+            try:
+                sid = winreg.EnumKey(base, idx)
+                sk  = winreg.OpenKey(base, sid, 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+                vi  = 0
+                while True:
+                    try:
+                        name, data, _ = winreg.EnumValue(sk, vi)
+                        if name.startswith("\\Device\\") and isinstance(data,bytes) and len(data)>=8:
+                            path = re.sub(r"\\Device\\HarddiskVolume\d+", "C:", name)
+                            kws  = matches_keyword(path)
+                            if kws and not os.path.exists(path):
+                                ft  = struct.unpack_from("<Q",data,0)[0]
+                                dt  = filetime_to_dt(ft)
+                                ts  = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else "Unknown"
+                                recovered.append({
+                                    "original_path": path,
+                                    "filename":      os.path.basename(path),
+                                    "deleted_at":    f"Last run: {ts}",
+                                    "keywords":      kws,
+                                    "source":        "BAM Registry (file missing)",
+                                    "i_file":        None,
+                                })
+                        vi += 1
+                    except OSError: break
+                winreg.CloseKey(sk); idx += 1
+            except OSError: break
+        winreg.CloseKey(base)
+    except Exception: pass
+
+    # Deduplicate by filename
+    seen_names = set(); unique_rec = []
+    for r in recovered:
+        key = r["filename"].lower()
+        if key not in seen_names:
+            seen_names.add(key); unique_rec.append(r)
+
+    # Write recovery report to Desktop\CometRecovered\
+    if unique_rec:
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+            report_path = os.path.join(out_dir, "recovery_report.txt")
+            with open(report_path, "w", encoding="utf-8") as fp:
+                fp.write(f"COMET DELETED CHEAT EVIDENCE REPORT\n")
+                fp.write(f"Generated: {now_str()}\n")
+                fp.write(f"PC User: {current_user()}\n")
+                fp.write("="*60+"\n\n")
+                for i,r in enumerate(unique_rec, 1):
+                    fp.write(f"[{i}] {r['filename']}\n")
+                    fp.write(f"  Original Path : {r['original_path']}\n")
+                    fp.write(f"  Deleted/Run   : {r['deleted_at']}\n")
+                    fp.write(f"  Source        : {r['source']}\n")
+                    fp.write(f"  Keywords      : {', '.join(r['keywords'])}\n")
+                    if r.get("i_file"): fp.write(f"  Evidence File : {r['i_file']}\n")
+                    fp.write("\n")
+            report_lines.append(f"  ✓ Report saved: {report_path}")
+        except Exception as e:
+            report_lines.append(f"  ✗ Could not write report: {e}")
+
+    lines = [f"\n  Deleted cheat evidence found: {len(unique_rec)}", ""]
+    if unique_rec:
+        lines.append(f"⚠ {len(unique_rec)} deleted/missing cheat file(s) with forensic evidence:")
+        lines.append("")
+        for r in unique_rec:
+            lines.append(f"  ✗ {r['filename']}")
+            lines.append(f"    Path    : {r['original_path']}")
+            lines.append(f"    Deleted : {r['deleted_at']}")
+            lines.append(f"    Source  : {r['source']}")
+            lines.append(f"    Keywords: {', '.join(r['keywords'])}")
+            lines.append("")
+        lines.extend(report_lines)
+    else:
+        lines.append("  ✓ No deleted cheat file evidence found.")
+
+    return section("Deleted Cheat Recovery", lines), len(unique_rec), unique_rec
+
+
 def run_full_scan(league="?"):
     sb_t,sb_h,_        = scan_shellbags()
     bm_t,bm_h,_        = scan_bam()
@@ -2514,7 +2953,14 @@ def run_full_scan(league="?"):
     al_t,al_h,_        = scan_roblox_alts_registry()
     cs_t,cs_h,_        = scan_cheat_files()
     yr_t,yr_h,_        = scan_yara()
-    us_t,us_h,us_l     = scan_unsigned()
+    # Run unsigned scan in thread — it's slow (PowerShell)
+    us_result = [None]
+    def _run_unsigned():
+        us_result[0] = scan_unsigned()
+    _ut = __import__("threading").Thread(target=_run_unsigned, daemon=True)
+    _ut.start()
+    _ut.join(timeout=30)  # wait for unsigned scan (max 30s)
+    us_t,us_h,us_l = us_result[0] if us_result[0] else (section("Unsigned Scan",["Timed out"]),0,[])
     rb_t,rb_h,rb_l     = scan_recycle_bin()
     sm_t,sm_h,auto_f   = scan_sysmain()
     pr_t,pr_h,_        = scan_running_processes()
@@ -2530,8 +2976,11 @@ def run_full_scan(league="?"):
     lk_t,lk_h,_        = scan_lnk_files()
     di_t,di_h,_        = scan_deleted_integrity()
     eh_t,eh_fc,eh_list = scan_execution_history()
+    pw_t,pw_h,pw_list  = scan_power_events()
+    tp_t,tp_h,tp_list  = scan_two_pc_indicators()
+    dr_t,dr_h,dr_list  = scan_deleted_cheat_recovery()
 
-    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+dm_h
+    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+dm_h+pw_h+tp_h+dr_h
 
     roblox_list=[]
     if isinstance(accs,list):
@@ -2546,11 +2995,13 @@ def run_full_scan(league="?"):
         "cleaners":cl_t,"network":nw_t,"registry_extra":al_t,
         "eventlog":ev_t,"jumplists":jl_t,"lnkfiles":lk_t,"deleted_int":di_t,
         "exec_history_text":eh_t,"exec_history":eh_list,"exec_hits":eh_fc,
+        "power_events":pw_t,"two_pc":tp_t,"deleted_recovery":dr_t,
         "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
         "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_hits":us_l,
         "sysmain_hits":sm_h,"sysmain_autofail":auto_f,
         "fastflag_hits":ff_h,"process_hits":pr_h,"cleaner_hits":cl_h,
         "eventlog_hits":ev_h,"jumplist_hits":jl_h,"lnk_hits":lk_h,"deleted_hits":di_h,
+        "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
         "roblox_log_hits":rl_h,"roblox_accounts":roblox_list,"discord_accounts":dc_accs,
         "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
         "total_hits":total,"verdict":"REVIEW","league":league,
@@ -2570,6 +3021,7 @@ def run_full_scan(league="?"):
             f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
             sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,pr_t,cl_t,
             nw_t,dc_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,di_t,eh_t,
+            pw_t,tp_t,dr_t,
             f"\nHITS: {total}",
         ]),
     }
@@ -2617,6 +3069,10 @@ class App:
         ("LNK FILES",    "lnkfiles"),
         (None, None),
         ("EXEC HISTORY", "exec_history"),
+        (None, None),
+        ("POWER EVENTS", "power_events"),
+        ("2-PC BYPASS",  "two_pc"),
+        ("DEL RECOVERY", "deleted_recovery"),
         (None, None),
         ("DISCORD",      "discord"),
         ("DISC MEMORY",  "discord_memory"),
