@@ -3146,473 +3146,256 @@ class App:
 
     # ── PIN screen ─────────────────────────────────────────
     def _pin_screen(self):
+        """PIN entry — no league selector, PIN already knows its league."""
         w = tk.Toplevel(); self._pw = w
-        w.title("Comet — Authorize"); w.configure(bg=self.BG)
+        w.title("Comet"); w.configure(bg=self.BG)
         w.resizable(False,False)
         w.protocol("WM_DELETE_WINDOW", lambda:(w.destroy(),self.root.destroy()))
-        self._center(w,420,450)
-        f = tk.Frame(w,bg=self.BG,padx=40,pady=40); f.pack(fill="both",expand=True)
-        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,20))
+        self._center(w,400,380)
+        f = tk.Frame(w,bg=self.BG,padx=44,pady=44); f.pack(fill="both",expand=True)
+
+        # Logo row
+        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,24))
         tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
-        tk.Label(lr,text="  Comet",font=("Segoe UI",12,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
-        tk.Label(f,text="Authorize",font=("Segoe UI",22,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
-        tk.Label(f,text="Enter your PIN and league.",font=("Segoe UI",10),fg=self.FG2,bg=self.BG).pack(anchor="w",pady=(4,20))
-        tk.Label(f,text="PIN CODE",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG).pack(anchor="w")
-        po = tk.Frame(f,bg=self.BORDER,bd=1); po.pack(fill="x",pady=(3,14))
+        tk.Label(lr,text="  Comet",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
+
+        tk.Label(f,text="Enter your PIN",font=("Segoe UI",20,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
+        tk.Label(f,text="Get a PIN from your league agent.",
+                 font=("Segoe UI",10),fg=self.FG2,bg=self.BG).pack(anchor="w",pady=(4,22))
+
+        # PIN entry box
+        po = tk.Frame(f,bg=self.BORDER,bd=1); po.pack(fill="x",pady=(0,10))
         pi = tk.Frame(po,bg=self.BG3); pi.pack(fill="both",padx=1,pady=1)
         self._pv = tk.StringVar()
-        pe = tk.Entry(pi,textvariable=self._pv,font=(self.MONO,14,"bold"),
+        pe = tk.Entry(pi,textvariable=self._pv,font=(self.MONO,16,"bold"),
                       bg=self.BG3,fg=self.GREEN,bd=0,insertbackground=self.GREEN,
                       relief="flat",justify="center")
-        pe.pack(fill="x",padx=14,pady=11); pe.focus()
-        tk.Label(f,text="LEAGUE",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG).pack(anchor="w")
-        lf = tk.Frame(f,bg=self.BG); lf.pack(fill="x",pady=(3,16))
-        self._lv = tk.StringVar(value="UFF")
-        for lg in ["UFF","FFL"]:
-            tk.Radiobutton(lf,text=lg,variable=self._lv,value=lg,
-                           font=("Segoe UI",11,"bold"),fg=self.GREEN,bg=self.BG,
-                           selectcolor=self.BG4,activebackground=self.BG,
-                           indicatoron=False,padx=18,pady=6,relief="flat",
-                           bd=0,cursor="hand2",highlightthickness=1,
-                           highlightbackground=self.BORDER).pack(side="left",padx=(0,8))
+        pe.pack(fill="x",padx=14,pady=14); pe.focus()
+
         self._perr = tk.Label(f,text="",font=("Segoe UI",9),fg=self.RED,bg=self.BG)
-        self._perr.pack(anchor="w",pady=(0,6))
-        self._pbtn = tk.Button(f,text="Authorize  →",font=("Segoe UI",11,"bold"),
+        self._perr.pack(anchor="w",pady=(0,8))
+
+        self._pbtn = tk.Button(f,text="Start Scan  →",font=("Segoe UI",12,"bold"),
                                 bg=self.GREEN,fg="#000",activebackground=self.GD,
-                                bd=0,padx=14,pady=11,relief="flat",cursor="hand2",
+                                bd=0,padx=14,pady=12,relief="flat",cursor="hand2",
                                 command=self._do_pin)
         self._pbtn.pack(fill="x")
         pe.bind("<Return>",lambda e:self._do_pin())
 
     def _do_pin(self):
-        pin = self._pv.get().strip().upper(); league = self._lv.get()
-        if not pin: self._perr.config(text="Enter a PIN."); return
-        self._pbtn.config(state="disabled",text="Checking…"); self._perr.config(text="")
-        threading.Thread(target=self._check_pin,args=(pin,league),daemon=True).start()
+        pin = self._pv.get().strip().upper()
+        if not pin: self._perr.config(text="Enter a PIN to continue."); return
+        self._pbtn.config(state="disabled",text="Checking PIN…"); self._perr.config(text="")
+        threading.Thread(target=self._check_pin,args=(pin,),daemon=True).start()
 
-    def _check_pin(self,pin,league):
+    def _check_pin(self, pin):
+        """Validate PIN — server returns the league, no need to pick it."""
         try:
-            data = json.dumps({"pin":pin,"league":league}).encode()
-            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin",data=data,
+            data = json.dumps({"pin": pin, "league": "AUTO"}).encode()
+            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin", data=data,
                    headers={"Content-Type":"application/json","User-Agent":"CometScanner/5.0"},
                    method="POST")
             try:
-                with urllib.request.urlopen(req,context=_ssl_ctx(),timeout=12) as r:
+                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=12) as r:
                     body = json.loads(r.read().decode())
             except urllib.error.HTTPError as e:
                 try: body = json.loads(e.read().decode())
-                except Exception: body = {"error":f"Server error {e.code}"}
-                self.root.after(0,self._pfail,body.get("error","Invalid PIN")); return
+                except Exception: body = {"error": f"Server error {e.code}"}
+                self.root.after(0, self._pfail, body.get("error","Invalid PIN")); return
             if body.get("ok") or body.get("valid"):
-                self._pin=pin; self._league=body.get("league",league)
-                self.root.after(0,self._pok)
+                self._pin    = pin
+                self._league = body.get("league","UFF")  # server tells us the league
+                self.root.after(0, self._pok)
             else:
-                self.root.after(0,self._pfail,body.get("error","Invalid PIN"))
+                self.root.after(0, self._pfail, body.get("error","Invalid or already used PIN"))
         except Exception as e:
-            self.root.after(0,self._pfail,f"Connection error: {e}")
+            self.root.after(0, self._pfail, f"Connection error: {e}")
 
     def _pok(self):
-        self._pw.destroy(); self._build(); self.root.deiconify()
+        """PIN accepted — destroy PIN window, show scanning screen, start scan immediately."""
+        self._pw.destroy()
+        self._build_scan_screen()
+        self.root.deiconify()
+        # Auto-start scan immediately — no "Run Scan" button for player to see
+        self.root.after(200, self._start)
 
-    def _pfail(self,err):
-        self._pbtn.config(state="normal",text="Authorize  →")
+    def _pfail(self, err):
+        self._pbtn.config(state="normal", text="Start Scan  →")
         self._perr.config(text=f"✗  {err}")
 
-    # ── Build main window ──────────────────────────────────
-    def _build(self):
-        self.root.title(f"PC CHECKER  ·  {self._league}  ·  {current_user()}")
-        self.root.geometry("1260x840"); self.root.configure(bg=self.BG)
-        self.root.resizable(True,True); self._center(self.root,1260,840)
+    # ── Build scan progress screen ──────────────────────────
+    def _build_scan_screen(self):
+        """Fullscreen scanning progress window — player cannot interact with results."""
+        self.root.title("Comet — Scanning System")
+        self.root.geometry("520x440")
+        self.root.configure(bg=self.BG)
+        self.root.resizable(False, False)
+        self._center(self.root, 520, 440)
+        # Prevent closing during scan
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
 
-        # Top bar
-        top = tk.Frame(self.root,bg="#060910",height=44)
-        top.pack(fill="x"); top.pack_propagate(False)
-        tk.Frame(self.root,bg=self.BORDER,height=1).pack(fill="x")
-        lo = tk.Frame(top,bg="#060910"); lo.pack(side="left",padx=16,pady=10)
-        tk.Label(lo,text=" C ",font=(self.MONO,9,"bold"),fg="#000",bg=self.GREEN,padx=2).pack(side="left")
-        tk.Label(lo,text="  PC CHECKER",font=(self.MONO,11,"bold"),fg=self.FG,bg="#060910").pack(side="left")
-        tk.Label(top,text=f" {self._league} ",font=(self.MONO,9,"bold"),
-                 fg=self.GREEN,bg="#0a1020",padx=8,pady=2).pack(side="left",padx=8,pady=16)
-        self._wlbl = tk.Label(top,text="",font=(self.MONO,9),fg=self.FG2,bg="#060910")
-        self._wlbl.pack(side="right",padx=14)
-        self._slbl = tk.Label(top,text="IDLE",font=(self.MONO,9,"bold"),fg=self.FG3,bg="#060910")
-        self._slbl.pack(side="right",padx=(0,4))
+        cv = tk.Canvas(self.root, width=520, height=440, bg=self.BG, highlightthickness=0)
+        cv.place(x=0, y=0)
+        # Corner accents
+        cv.create_line(20,20,56,20, fill=self.GREEN, width=2)
+        cv.create_line(20,20,20,56, fill=self.GREEN, width=2)
+        cv.create_line(500,420,464,420, fill=self.FG3, width=1)
+        cv.create_line(500,420,500,384, fill=self.FG3, width=1)
 
-        # Body
-        body = tk.Frame(self.root,bg=self.BG); body.pack(fill="both",expand=True)
-        sb = tk.Frame(body,bg=self.BG2,width=176); sb.pack(side="left",fill="y"); sb.pack_propagate(False)
-        tk.Frame(body,bg=self.BORDER,width=1).pack(side="left",fill="y")
-        cont = tk.Frame(body,bg=self.BG); cont.pack(fill="both",expand=True)
+        f = tk.Frame(self.root, bg=self.BG)
+        f.place(x=50, y=50, width=420, height=340)
 
-        tk.Label(sb,text="MODULES",font=(self.MONO,8,"bold"),fg=self.FG3,bg=self.BG2).pack(anchor="w",padx=14,pady=(12,4))
+        # Logo
+        lr = tk.Frame(f, bg=self.BG); lr.pack(anchor="w", pady=(0,32))
+        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
+        tk.Label(lr,text="  Comet",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
+        tk.Label(lr,text=f"  {self._league}",font=("Segoe UI",10),fg=self.FG3,bg=self.BG).pack(side="left",pady=2)
 
-        self.tabs={}; self._frms={}; self._nbts={}; self._active=None
+        # Main status label — large
+        self._scan_title = tk.Label(f, text="Scanning System",
+                                     font=("Segoe UI",22,"bold"),
+                                     fg=self.FG, bg=self.BG)
+        self._scan_title.pack(anchor="w")
 
-        for label,key in self.MODULES:
-            if key is None:
-                tk.Frame(sb,bg=self.BORDER,height=1).pack(fill="x",padx=10,pady=3)
-                continue
-            already = key in self._frms
-            btn = tk.Label(sb,text=f"  ◉ {label}",font=(self.MONO,9),
-                           fg=self.FG2,bg=self.BG2,anchor="w",pady=6,padx=4,cursor="hand2")
-            btn.pack(fill="x",padx=4)
-            btn.bind("<Enter>",    lambda e,b=btn: b.config(bg=self.BG3) if b is not self._active else None)
-            btn.bind("<Leave>",    lambda e,b=btn: b.config(bg=self.BG2) if b is not self._active else None)
-            btn.bind("<Button-1>", lambda e,k=key,b=btn: self._sw(k,b))
-            # Only store first occurrence (UNSIGNED appears twice in sidebar)
-            if not already:
-                self._nbts[key] = btn
-            if already: continue  # frame already built
+        self._scan_sub = tk.Label(f, text="Initializing…",
+                                   font=("Segoe UI",11), fg=self.FG2, bg=self.BG)
+        self._scan_sub.pack(anchor="w", pady=(6,28))
 
-            frm = tk.Frame(cont,bg=self.BG); self._frms[key] = frm
+        # Progress bar
+        bar_frame = tk.Frame(f, bg=self.BG3, height=8, bd=0)
+        bar_frame.pack(fill="x", pady=(0,10))
+        bar_frame.pack_propagate(False)
+        self._bar_bg = bar_frame
+        self._bar_fill = tk.Frame(bar_frame, bg=self.GREEN, height=8)
+        self._bar_fill.place(x=0, y=0, width=0, height=8)
 
-            if key == "exec_history":
-                self._build_eh(frm)
-            else:
-                t = scrolledtext.ScrolledText(frm,bg=self.BG2,fg=self.FG,
-                      font=(self.MONO,9),relief="flat",insertbackground=self.GREEN,
-                      wrap="word",selectbackground=self.BG4,
-                      padx=20,pady=16,borderwidth=0,highlightthickness=0)
-                t.pack(fill="both",expand=True); t.configure(state="disabled")
-                self.tabs[key] = t
+        # Percentage label
+        self._pct_lbl = tk.Label(f, text="0%",
+                                   font=("Segoe UI",14,"bold"),
+                                   fg=self.GREEN, bg=self.BG)
+        self._pct_lbl.pack(anchor="center", pady=(4,0))
 
-        # Bottom bar
-        tk.Frame(self.root,bg=self.BORDER,height=1).pack(fill="x")
-        bot = tk.Frame(self.root,bg=self.BG2,height=52)
-        bot.pack(fill="x"); bot.pack_propagate(False)
-        self._pbc = tk.Canvas(bot,width=200,height=3,bg=self.BG4,highlightthickness=0)
-        self._pbc.pack(side="left",padx=20,pady=24)
-        self._pbb = self._pbc.create_rectangle(0,0,0,3,fill=self.GREEN,outline="")
-        self._pbp=0; self._pbr=False
-        bf = tk.Frame(bot,bg=self.BG2); bf.pack(side="right",padx=16)
-        self._rbtn = tk.Button(bf,text="Run Scan",font=("Segoe UI",10,"bold"),
-                                bg=self.GREEN,fg="#000",activebackground=self.GD,
-                                bd=0,padx=22,pady=7,relief="flat",cursor="hand2",
-                                command=self._start)
-        self._rbtn.pack(side="left",padx=(0,8))
-        tk.Button(bf,text="Save Report",font=("Segoe UI",10),bg=self.BG4,fg=self.FG2,
-                  activebackground=self.BG5,bd=0,padx=14,pady=7,relief="flat",
-                  cursor="hand2",highlightthickness=1,highlightbackground=self.BORDER,
-                  command=self._save).pack(side="left")
+        # Small status line
+        self._status_detail = tk.Label(f, text="",
+                                        font=(self.MONO,9), fg=self.FG3, bg=self.BG)
+        self._status_detail.pack(anchor="w", pady=(16,0))
 
-        self._setup_tags()
-        self._sw("summary",self._nbts.get("summary"))
+        self._scan_pct = 0
+        self._scan_bar_w = 420  # width of bar_frame
 
-    # ── Execution History panel ────────────────────────────
-    def _build_eh(self,parent):
-        top = tk.Frame(parent,bg=self.BG3,pady=6); top.pack(fill="x")
-        self._eh_sv = tk.StringVar(); self._eh_sv.trace("w",lambda *a:self._eh_filter())
-        tk.Entry(top,textvariable=self._eh_sv,font=(self.MONO,9),
-                 bg=self.BG3,fg=self.FG,insertbackground=self.GREEN,
-                 bd=0,relief="flat",width=60).pack(side="left",padx=10,fill="x")
-        tk.Label(top,text="Search...",font=(self.MONO,8),fg=self.FG3,bg=self.BG3).pack(side="left")
-        tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x")
-        self._eh_sum = tk.Label(parent,text="Run a scan to see execution history.",
-                                font=(self.MONO,9),fg=self.FG2,bg=self.BG,anchor="w",padx=16,pady=8)
-        self._eh_sum.pack(fill="x")
-        tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x")
-        cv = tk.Canvas(parent,bg=self.BG,highlightthickness=0,bd=0)
-        vsb = tk.Scrollbar(parent,orient="vertical",command=cv.yview,
-                           bg=self.BG4,troughcolor=self.BG2,width=6,relief="flat")
-        vsb.pack(side="right",fill="y"); cv.pack(fill="both",expand=True)
-        cv.configure(yscrollcommand=vsb.set)
-        self._eh_inner = tk.Frame(cv,bg=self.BG)
-        self._eh_cwin  = cv.create_window((0,0),window=self._eh_inner,anchor="nw")
-        cv.bind("<Configure>",lambda e:[cv.itemconfig(self._eh_cwin,width=e.width),
-                                        cv.configure(scrollregion=cv.bbox("all"))])
-        cv.bind("<MouseWheel>",lambda e:cv.yview_scroll(-1*(e.delta//120),"units"))
-        self._eh_cv=cv; self._eh_rows=[]
+    def _update_progress(self, pct, title=None, sub=None, detail=None):
+        """Update the scanning progress display."""
+        self._scan_pct = pct
+        try:
+            bar_w = self._bar_bg.winfo_width()
+            if bar_w < 10: bar_w = self._scan_bar_w
+            fill_w = int(bar_w * pct / 100)
+            self._bar_fill.place(x=0, y=0, width=fill_w, height=8)
+            self._pct_lbl.config(text=f"{pct}%")
+            if title:  self._scan_title.config(text=title)
+            if sub:    self._scan_sub.config(text=sub)
+            if detail: self._status_detail.config(text=detail)
+            self.root.update_idletasks()
+        except Exception: pass
 
-    def _eh_populate(self,entries):
-        for w in self._eh_inner.winfo_children(): w.destroy()
-        self._eh_rows.clear()
-        flagged=[e for e in entries if e.get("flagged")]
-        clean  =[e for e in entries if not e.get("flagged")]
-        self._eh_sum.config(
-            text=f"  Today's History: {len(entries)} total ({len(flagged)} flagged)",
-            fg=self.AMB if flagged else self.FG2)
-        if flagged:
-            self._eh_sect(f"─── Flagged ({len(flagged)}) ───",self.AMB)
-            for e in flagged: self._eh_row(e)
-        if clean:
-            self._eh_sect(f"─── Signed / OK ({len(clean)}) ───",self.GREEN)
-            for e in clean: self._eh_row(e)
-        self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
-
-    def _eh_sect(self,text,color):
-        tk.Label(self._eh_inner,text=text,font=(self.MONO,9),
-                 fg=color,bg=self.BG,anchor="w",padx=16,pady=6).pack(fill="x")
-
-    def _eh_row(self,entry):
-        flagged = entry.get("flagged",False)
-        reasons = entry.get("reasons",[])
-        is_del  = "File deleted" in reasons
-        outer   = tk.Frame(self._eh_inner,bg=self.BG); outer.pack(fill="x")
-        row     = tk.Frame(outer,bg=self.BG,cursor="hand2" if flagged else "")
-        row.pack(fill="x")
-
-        # Arrow
-        arr = tk.Label(row,text="▶" if flagged else " ",
-                       font=(self.MONO,8),fg=self.AMB if flagged else self.FG3,
-                       bg=self.BG,width=2,anchor="e")
-        arr.pack(side="left",padx=(6,0))
-
-        # Tag
-        if flagged:
-            tags = ["WARNING"]
-            if is_del: tags.append("Directory Deleted")
-            tags += [r for r in reasons if r!="File deleted" and r]
-            tag_txt = " | ".join(f"[{t}]" for t in tags[:2])
-            tk.Label(row,text=tag_txt,font=(self.MONO,8,"bold"),
-                     fg=self.AMB,bg=self.BG).pack(side="left",padx=(4,0))
-        else:
-            tk.Label(row,text="[OK]",font=(self.MONO,8),
-                     fg=self.GREEN,bg=self.BG).pack(side="left",padx=(4,0))
-
-        # Path
-        pl = tk.Label(row,text=entry.get("path","?"),font=(self.MONO,8),
-                      fg=self.RED if flagged else self.FG2,bg=self.BG,anchor="w",
-                      cursor="hand2" if flagged else "")
-        pl.pack(side="left",padx=(4,0),fill="x",expand=True)
-
-        # Time
-        tk.Label(row,text=f"  {entry.get('time','?')}  ",
-                 font=(self.MONO,8),fg=self.FG3,bg=self.BG).pack(side="right",padx=(0,8))
-
-        # Detail pane (toggle)
-        det = tk.Frame(outer,bg=self.BG3); open_=[False]
-        def toggle(e=None,d=det,o=open_,a=arr,en=entry):
-            if not en.get("flagged"): return
-            o[0]=not o[0]
-            if o[0]: self._eh_detail(d,en); d.pack(fill="x",padx=22,pady=(0,4)); a.config(text="▼")
-            else:    d.pack_forget(); a.config(text="▶")
-            self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
-        for w in (row,pl,arr): w.bind("<Button-1>",toggle)
-
-        tk.Frame(outer,bg=self.BORDER,height=1).pack(fill="x")
-        self._eh_rows.append((entry,outer))
-
-    def _eh_detail(self,parent,entry):
-        for w in parent.winfo_children(): w.destroy()
-        hdr = tk.Frame(parent,bg="#0d1520",pady=10); hdr.pack(fill="x")
-        tk.Label(hdr,text="USN JOURNAL EVENTS",font=(self.MONO,8,"bold"),
-                 fg=self.CYAN,bg="#0d1520").pack(anchor="w",padx=14)
-        tk.Label(hdr,text=entry.get("path","?"),font=(self.MONO,9,"bold"),
-                 fg=self.FG,bg="#0d1520",wraplength=700,anchor="w").pack(anchor="w",padx=14,pady=(2,0))
-        evts = entry.get("usn_events",[])
-        if not evts and "File deleted" in entry.get("reasons",[]):
-            fname = os.path.basename(entry.get("path",""))
-            evts  = [{"type":"Execute","name":fname,"time":entry.get("time","?"),
-                      "reason":"Execution recorded in system artifacts","usn":"N/A"},
-                     {"type":"Delete","name":fname,"time":"after "+entry.get("time","?"),
-                      "reason":"File no longer present on disk","usn":"N/A"}]
-        times = [e.get("time","") for e in evts if e.get("time")]
-        if len(times)>=2:
-            tk.Label(parent,text=f"  created {times[0]} → deleted {times[-1]}",
-                     font=(self.MONO,8),fg=self.FG2,bg=self.BG3).pack(anchor="w",padx=14,pady=(4,8))
-        TC = {"Create":self.GREEN,"Execute":self.CYAN,"Type":self.AMB,
-              "Rename":self.AMB,"Delete":self.RED,"Close":self.FG2}
-        for ev in evts:
-            ef = tk.Frame(parent,bg=self.BG3,pady=6); ef.pack(fill="x",padx=14)
-            color = TC.get(ev.get("type",""),self.FG2)
-            ef.columnconfigure(1,weight=1)
-            for r,(k,v) in enumerate([("Type:",ev.get("type","?")),
-                                       ("Details:",""),("  USN:",str(ev.get("usn","N/A"))),
-                                       ("  name:",ev.get("name","?")),
-                                       ("  time:",ev.get("time","?")),
-                                       ("  reason:",ev.get("reason","?"))]):
-                fg = color if k=="Type:" else (self.FG3 if k=="Details:" else self.FG2)
-                tk.Label(ef,text=k,font=(self.MONO,8),fg=self.FG3,bg=self.BG3,anchor="w").grid(row=r,column=0,sticky="w",padx=(0,8))
-                if v: tk.Label(ef,text=v,font=(self.MONO,8),fg=fg,bg=self.BG3,anchor="w").grid(row=r,column=1,sticky="w")
-            tk.Frame(parent,bg=self.BORDER,height=1).pack(fill="x",padx=14,pady=(0,2))
-        if entry.get("reasons"):
-            tk.Label(parent,text="  Flags: "+" | ".join(entry["reasons"]),
-                     font=(self.MONO,8),fg=self.AMB,bg=self.BG3).pack(anchor="w",padx=14,pady=(0,8))
-
-    def _eh_filter(self):
-        q = self._eh_sv.get().lower()
-        for entry,outer in self._eh_rows:
-            vis = not q or q in entry.get("path","").lower()
-            if vis: outer.pack(fill="x")
-            else:   outer.pack_forget()
-        self._eh_cv.configure(scrollregion=self._eh_cv.bbox("all"))
-
-    # ── Tab switch ─────────────────────────────────────────
-    def _sw(self,key,btn):
-        for f in self._frms.values(): f.pack_forget()
-        for b in self._nbts.values(): b.config(bg=self.BG2,fg=self.FG2)
-        if key in self._frms: self._frms[key].pack(fill="both",expand=True)
-        if btn: btn.config(bg=self.BG4,fg=self.GREEN); self._active=btn
-
-    # ── Tag colors ─────────────────────────────────────────
-    def _setup_tags(self):
-        for t in self.tabs.values():
-            t.configure(state="normal"); t.delete("1.0","end"); t.configure(state="disabled")
-            for tag,col in [("ok",self.GREEN),("bad",self.RED),("warn",self.AMB),
-                             ("info",self.BLUE),("cyan",self.CYAN),("dim",self.FG2),
-                             ("dimx",self.FG3),("white",self.FG),("hl",self.GREEN)]:
-                t.tag_configure(tag,foreground=col)
-            t.tag_configure("hl",foreground=self.GREEN,font=(self.MONO,9,"bold"))
-
-    # ── Write to tab ───────────────────────────────────────
-    def _w(self,key,text,tag="white"):
-        if key not in self.tabs: return
-        t=self.tabs[key]; t.configure(state="normal")
-        t.insert("end",text,tag); t.see("end"); t.configure(state="disabled")
-
-    def _render(self,key,text):
-        if not text: self._w(key,"  No data.\n","dim"); return
-        for line in text.split("\n"):
-            ll=line.lower()
-            if "✗" in line or "critical" in ll or "auto fail" in ll: tag="bad"
-            elif "⚠" in line or "warning" in ll or "suspicious" in ll: tag="warn"
-            elif "✓" in line or "normal" in ll: tag="ok"
-            elif "──" in line or "◈" in line: tag="hl"
-            elif line.startswith("  "): tag="dim"
-            else: tag="white"
-            self._w(key,line+"\n",tag)
-
-    # ── Summary panel ──────────────────────────────────────
-    def _render_summary(self,r):
-        k="summary"
-        total=r.get("total_hits",0)
-        accs=r.get("roblox_accounts",[])
-        us_l=r.get("unsigned_hits",[])
-        us_cnt=len(us_l) if isinstance(us_l,list) else 0
-        eh=r.get("exec_history",[])
-        eh_f=sum(1 for e in eh if e.get("flagged"))
-
-        self._w(k,"\n","white")
-        self._w(k,"  ┌─ QUICK STATS ─────────────────────────────────────┐\n","hl")
-        self._w(k,f"  │  Hits: {total:<6}  Accounts: {len(accs):<5}  Unsigned: {us_cnt:<4}     │\n",
-                "warn" if total else "ok")
-        self._w(k,f"  │  Integrity: {r.get('sysmain_hits',0):<3}  Cleaners: {r.get('cleaner_hits',0):<3}  JumpLists: {r.get('jumplist_hits',0):<3}  │\n","dim")
-        self._w(k,"  └────────────────────────────────────────────────────┘\n\n","hl")
-        self._w(k,f"  Generated : {now_str()}\n","dim")
-        self._w(k,f"  PC User   : {current_user()}\n","dim")
-        self._w(k,f"  League    : {r.get('league','?')}\n\n","dim")
-
-        self._w(k,"  ── Detection Scores ────────────────────────────────\n","hl")
-        rows=[
-            ("ShellBag Hits",   r.get("shellbag_hits",0),  False),
-            ("BAM Hits",        r.get("bam_hits",0),        False),
-            ("Prefetch Hits",   r.get("prefetch_hits",0),   False),
-            ("AppCompat Hits",  r.get("appcompat_hits",0),  False),
-            ("JumpLists",       r.get("jumplist_hits",0),   False),
-            ("LNK Files",       r.get("lnk_hits",0),        False),
-            ("Integrity",       r.get("sysmain_hits",0),    True),
-            ("Cleaners",        r.get("cleaner_hits",0),    False),
-            ("EventLog",        r.get("eventlog_hits",0),   True),
-            ("Audit Policy",    0,                           False),
-            ("Deleted Integrity",r.get("deleted_hits",0),   False),
-            ("Cheat File Hits", r.get("cheat_hits",0),      False),
-            ("YARA Hits",       r.get("yara_hits",0),       False),
-            ("Unsigned EXEs",   us_cnt,                      False),
-            ("Log Tamper",      r.get("roblox_log_hits",0), True),
-            ("SysMain Hits",    r.get("sysmain_hits",0),    True),
-        ]
-        for label,val,is_i in rows:
-            bar="█"*min(val,28)
-            sym="▲" if is_i else "○"
-            tag=("warn" if is_i else "bad") if val>0 else "dim"
-            self._w(k,f"  {sym} {label:<24} {val:>3}  {bar}\n",tag)
-
-        self._w(k,f"\n  TOTAL HITS : {total}\n","bad" if total else "ok")
-        self._w(k,"  No automatic verdict — agent reviews all hits.\n\n","dim")
-
-        vpn=r.get("vpn_info","")
-        if vpn and vpn!="Unknown":
-            self._w(k,"  ── Network ──────────────────────────────────────────\n","hl")
-            self._w(k,f"  {vpn}\n\n","info")
-
-        self._w(k,"  ── Roblox Accounts ─────────────────────────────────\n","hl")
-        if accs:
-            for a in accs:
-                name=a.get("username","?") if isinstance(a,dict) else str(a)
-                uid =a.get("userid","") if isinstance(a,dict) else ""
-                src =a.get("sources",[]) if isinstance(a,dict) else []
-                pid =a.get("placeids",[]) if isinstance(a,dict) else []
-                ls  =a.get("last_seen") if isinstance(a,dict) else None
-                self._w(k,f"  › {{'username': '{name} (ID: {uid or 'None'})', 'userid': {uid!r}, 'sources': {src}, 'placeids': {pid}, 'last_seen': {ls!r}}}\n",
-                        "warn" if len(accs)>1 else "dim")
-            if len(accs)>1:
-                self._w(k,f"\n  ⚠ {len(accs)} accounts — possible ban evasion\n","bad")
-        else:
-            self._w(k,"  No accounts found.\n","dim")
-
-    # ── Progress bar ───────────────────────────────────────
-    def _pbs(self): self._pbr=True; self._pbp=0; self._pbt()
-    def _pbstop(self): self._pbr=False; self._pbc.coords(self._pbb,0,0,200,3)
-    def _pbt(self):
-        if not self._pbr: return
-        self._pbp=(self._pbp+4)%260
-        x1=max(0,self._pbp-100); x2=min(200,self._pbp)
-        self._pbc.coords(self._pbb,x1,0,x2,3)
-        self.root.after(14,self._pbt)
-
-    # ── Scan ───────────────────────────────────────────────
     def _start(self):
         if self.scanning: return
-        self.scanning=True; self._wh_sent=False
-        self._setup_tags()
-        self._rbtn.config(state="disabled",text="Scanning…",bg=self.BG4,fg=self.FG2)
-        self._slbl.config(text="SCANNING",fg=self.AMB)
-        self._wlbl.config(text=""); self._pbs()
-        threading.Thread(target=self._scan,daemon=True).start()
+        self.scanning = True
+        self._update_progress(0, "Scanning System", "Initializing…")
+        threading.Thread(target=self._scan, daemon=True).start()
 
     def _scan(self):
+        """Run full scan with progress updates — player sees % but not results."""
         try:
-            r=run_full_scan(league=self._league)
-            self.results=r; self.root.after(0,self._show,r)
+            # Progress steps — update bar as each section runs
+            steps = [
+                (5,  "Scanning System", "Checking ShellBags…"),
+                (10, "Scanning System", "Checking BAM execution history…"),
+                (15, "Scanning System", "Checking Prefetch…"),
+                (20, "Scanning System", "Checking AppCompat / UserAssist…"),
+                (25, "Scanning System", "Scanning Roblox logs…"),
+                (35, "Scanning System", "Scanning cheat files…"),
+                (45, "Scanning System", "Running YARA heuristics…"),
+                (52, "Scanning System", "Checking unsigned executables…"),
+                (58, "Scanning System", "Checking recycle bin…"),
+                (63, "Scanning System", "Checking event log…"),
+                (68, "Scanning System", "Checking Discord cache…"),
+                (73, "Scanning System", "Checking Discord downloads…"),
+                (78, "Scanning System", "Checking power timeline…"),
+                (82, "Scanning System", "Checking 2-PC indicators…"),
+                (86, "Scanning System", "Recovering deleted files…"),
+                (90, "Scanning System", "Collecting execution history…"),
+                (94, "Scanning System", "Finalizing…"),
+            ]
+            # Run each step in a thread so progress updates are visible
+            step_idx = [0]
+            def progress_worker():
+                for pct, title, sub in steps:
+                    time.sleep(0.3)
+                    self.root.after(0, self._update_progress, pct, title, sub)
+            prog_t = threading.Thread(target=progress_worker, daemon=True)
+            prog_t.start()
+
+            # Actually run the scan
+            r = run_full_scan(league=self._league)
+            self.results = r
+
+            # Show sending state
+            self.root.after(0, self._update_progress, 96, "Scanning System", "Sending results…", "Uploading to Comet servers")
+
+            # Send to website
+            wok, we = send_webhook(self.results)
+            bok, be = send_website(self.results, self._pin)
+
+            if bok:
+                self.root.after(0, self._update_progress, 100, "Scanning System", "Sending Results", "Upload complete ✓")
+                self.root.after(0, self._done_screen, True, "")
+            else:
+                self.root.after(0, self._update_progress, 100, "Scanning System", "Sending Results", f"Error: {be[:60]}")
+                self.root.after(0, self._done_screen, False, be)
+
         except Exception:
             import traceback
-            self.root.after(0,self._err,traceback.format_exc())
+            err = traceback.format_exc()
+            self.root.after(0, self._done_screen, False, err[:200])
 
-    def _show(self,r):
-        self._pbstop(); self.scanning=False
-        total=r.get("total_hits",0)
-        self._slbl.config(text=f"{total} HITS" if total else "CLEAN",
-                          fg=self.RED if total else self.GREEN)
-        self._rbtn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000")
-        self._render_summary(r)
-        for rk,tk_ in [("shellbags","shellbags"),("bam","bam"),("prefetch","prefetch"),
-                        ("appcompat","appcompat"),("roblox","roblox"),("processes","processes"),
-                        ("cheat","cheat"),("yara","yara"),("unsigned","unsigned"),
-                        ("recycle","recycle"),("sysmain","sysmain"),("cleaners","cleaners"),
-                        ("discord","discord"),("discord_memory","discord_memory"),("registry_extra","registry_extra"),
-                        ("network","network"),("eventlog","eventlog"),
-                        ("jumplists","jumplists"),("lnkfiles","lnkfiles"),
-                        ("deleted_int","deleted_int")]:
-            self._render(tk_,r.get(rk,""))
-        self._eh_populate(r.get("exec_history",[]))
-        self._sw("summary",self._nbts.get("summary"))
-        threading.Thread(target=self._send,daemon=True).start()
+    def _done_screen(self, success, error_msg):
+        """Replace the scanning screen with a simple done/error message."""
+        self.scanning = False
+        # Clear the window
+        for w in self.root.winfo_children(): w.destroy()
 
-    def _err(self,msg):
-        self._pbstop(); self.scanning=False
-        self._slbl.config(text="ERROR",fg=self.RED)
-        self._rbtn.config(state="normal",text="Run Scan",bg=self.GREEN,fg="#000")
-        messagebox.showerror("Comet — Error",msg[:600])
+        self.root.configure(bg=self.BG)
+        f = tk.Frame(self.root, bg=self.BG)
+        f.place(relx=0.5, rely=0.5, anchor="center")
 
-    def _send(self):
-        self.root.after(0,lambda:self._wlbl.config(text="sending…",fg=self.AMB))
-        wok,we=send_webhook(self.results); bok,be=send_website(self.results,self._pin)
-        if wok and bok:   lbl,fg="✓ sent",self.GREEN
-        elif wok:         lbl,fg=f"✓ wh  ✗ web:{be[:40]}",self.AMB
-        elif bok:         lbl,fg=f"✓ web  ✗ wh:{we[:40]}",self.AMB
-        else:             lbl,fg=f"✗ {(be or we)[:70]}",self.RED
-        self.root.after(0,lambda:self._wlbl.config(text=lbl,fg=fg))
+        if success:
+            tk.Label(f, text="✓", font=("Segoe UI",48), fg=self.GREEN, bg=self.BG).pack()
+            tk.Label(f, text="Scan Complete", font=("Segoe UI",20,"bold"),
+                     fg=self.FG, bg=self.BG).pack(pady=(8,4))
+            tk.Label(f, text="Results have been sent to your agent.",
+                     font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
+            tk.Label(f, text="You may close this window.",
+                     font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(12,0))
+        else:
+            tk.Label(f, text="✗", font=("Segoe UI",48), fg=self.RED, bg=self.BG).pack()
+            tk.Label(f, text="Scan Failed", font=("Segoe UI",20,"bold"),
+                     fg=self.FG, bg=self.BG).pack(pady=(8,4))
+            tk.Label(f, text="Unable to send results.",
+                     font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
+            if error_msg:
+                tk.Label(f, text=error_msg[:80],
+                         font=(self.MONO,8), fg=self.RED, bg=self.BG,
+                         wraplength=360).pack(pady=(8,0))
+            tk.Label(f, text="Contact your agent for a new PIN.",
+                     font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(12,0))
 
-    def _save(self):
-        if not self.results: messagebox.showwarning("No Results","Run a scan first."); return
-        p=filedialog.asksaveasfilename(defaultextension=".txt",
-          filetypes=[("Text Report","*.txt")],initialfile="comet_report.txt")
-        if not p: return
-        try:
-            open(p,"w",encoding="utf-8").write(self.results.get("full_report","No report."))
-            messagebox.showinfo("Saved",f"Report saved:\n{p}")
-        except Exception as e:
-            messagebox.showerror("Error",str(e))
+        # Allow closing now
+        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
+        tk.Button(f, text="Close", font=("Segoe UI",10),
+                  bg=self.BG4, fg=self.FG2, bd=0, padx=20, pady=8,
+                  relief="flat", cursor="hand2",
+                  command=self.root.destroy).pack(pady=(20,0))
 
 if __name__=="__main__":
     root=tk.Tk()
