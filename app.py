@@ -698,14 +698,15 @@ def debug_pin(pin_code):
 @login_required
 def api_delete_scan(scan_id):
     user = get_user()
+    # Only admins and owners can delete scans — agents cannot
+    if user["role"] not in ("admin", "owner"):
+        return jsonify({"error": "Only admins and owners can delete scans"}), 403
     conn = get_db(); cur = conn.cursor()
     cur.execute("SELECT * FROM scans WHERE id=%s", (scan_id,))
     row = row_to_dict(cur.fetchone(), cur)
     if not row: cur.close(); conn.close(); return jsonify({"error":"Not found"}), 404
     if not can_access_league(user, row["league"]): cur.close(); conn.close(); abort(403)
-    # Delete the scan
     cur.execute("DELETE FROM scans WHERE id=%s", (scan_id,))
-    # Also unlink the pin (set scan_id=NULL, mark as unused so it shows no results)
     cur.execute("UPDATE pins SET scan_id=NULL WHERE scan_id=%s", (scan_id,))
     conn.commit(); cur.close(); conn.close()
     return jsonify({"ok": True})
