@@ -1,34 +1,63 @@
 """
-Comet Scanner v4 — Forensic Scanner
-Rebranded from Lite to Comet
-Build: pyinstaller --onefile --noconsole --name=CometScanner comet_scanner.py
+Comet Scanner v5 — Forensic Scanner
+Build: pyinstaller --onefile --noconsole --icon=comet.ico --name=Comet --manifest=comet.manifest comet_scanner.py
 """
-# ============================================================
-#  AUTO-ELEVATION — request admin if not already elevated
-# ============================================================
 import sys as _sys, os as _os
+
+# ── Crash logger — writes errors to Desktop so nothing is silent ──────────
+def _setup_crash_log():
+    try:
+        import traceback, datetime
+        desktop = _os.path.join(_os.path.expanduser("~"), "Desktop")
+        log_path = _os.path.join(desktop, "comet_error.txt")
+        def _excepthook(exc_type, exc_value, exc_tb):
+            try:
+                with open(log_path, "w", encoding="utf-8") as f:
+                    f.write(f"Comet Scanner Error\n{datetime.datetime.now()}\n\n")
+                    f.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+            except Exception:
+                pass
+            try:
+                import tkinter as _tk, tkinter.messagebox as _mb
+                _r = _tk.Tk(); _r.withdraw()
+                _mb.showerror("Comet — Error",
+                    f"{exc_type.__name__}: {exc_value}\n\nFull error saved to Desktop\\comet_error.txt")
+                _r.destroy()
+            except Exception:
+                pass
+        _sys.excepthook = _excepthook
+    except Exception:
+        pass
+_setup_crash_log()
+
+# ── Auto-elevation via manifest (preferred) — this is a Python fallback ──
 def _is_admin():
     try:
         import ctypes
-        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
     except Exception:
         return False
 
 if _os.name == "nt" and not _is_admin():
-    # Re-launch self with admin rights — UAC prompt appears automatically
     import ctypes
     try:
-        script = _sys.executable if getattr(_sys, "frozen", False) else _os.path.abspath(__file__)
-        params = " ".join(f'"{a}"' for a in _sys.argv[1:])
-        ret = ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", _sys.executable,
-            f'"{script}" {params}'.strip(),
-            None, 1  # SW_SHOWNORMAL
-        )
+        # For frozen EXE: executable IS the script
+        # For .py: need to pass script path as argument to python
+        if getattr(_sys, "frozen", False):
+            exe  = _sys.executable          # the .exe itself
+            args = " ".join(f'"{a}"' for a in _sys.argv[1:])
+            ret  = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", exe, args if args else None, None, 1)
+        else:
+            exe    = _sys.executable        # python.exe
+            script = _os.path.abspath(__file__)
+            args   = f'"{script}"' + (" " + " ".join(f'"{a}"' for a in _sys.argv[1:]) if _sys.argv[1:] else "")
+            ret    = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", exe, args, None, 1)
         if int(ret) > 32:
-            _sys.exit(0)   # old process exits, elevated one takes over
+            _sys.exit(0)
     except Exception:
-        pass  # if UAC is cancelled or fails, continue without admin
+        pass  # UAC cancelled — continue without admin
 
 # ============================================================
 #  CONFIG
@@ -1271,9 +1300,22 @@ def scan_recycle_bin():
     rb = "C:\\$Recycle.Bin"; hits=[]; total=0
     last_mod = "Unknown"; mod_ts = None
     try:
-        stat = os.stat(rb)
-        mod_ts = datetime.datetime.fromtimestamp(stat.st_mtime)
-        last_mod = mod_ts.strftime("%Y-%m-%d %H:%M:%S")
+        import subprocess as _sp
+        _si = subprocess.STARTUPINFO()
+        _si.dwFlags = subprocess.STARTF_USESHOWWINDOW; _si.wShowWindow = 0
+        _out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command",
+             "(Get-Item 'C:\\$Recycle.Bin' -Force).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')"],
+            capture_output=True, text=True, timeout=6,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=_si)
+        if _out.stdout.strip():
+            last_mod = _out.stdout.strip()
+            try: mod_ts = datetime.datetime.strptime(last_mod, "%Y-%m-%d %H:%M:%S")
+            except Exception: mod_ts = None
+        else:
+            stat = os.stat(rb)
+            mod_ts = datetime.datetime.fromtimestamp(stat.st_mtime)
+            last_mod = mod_ts.strftime("%Y-%m-%d %H:%M:%S")
         for root,dirs,files in os.walk(rb):
             for f in files:
                 total += 1
@@ -1406,71 +1448,230 @@ def scan_running_processes():
 
 
 def scan_cleaners():
-    """Detect PC cleaning / evidence wiping tools."""
+    """
+    Comprehensive cleaner/bypass tool detection.
+    Based on research of open-source screenshare bypass tools:
+    - Roblox-Clean-Sweep (Zectxr) — deletes prefetch, logs, registry, firewall rules
+    - ByGoneSpoofer — MAC spoof, Roblox reinstall, system cleaning
+    - StringCleaner (FuryMan) — memory string cleaner
+    - FN Cleaner / generic .bat cleaners — delete temp/prefetch/logs
+    - Generic HWID spoofers
+    Detection methods: registry traces, prefetch of cleaner tools,
+    hosts file tampering, MAC address spoofing, scheduled task remnants,
+    firewall rule deletion traces, event log manipulation.
+    """
     if not WINDOWS:
-        return section("Cleaner Detection",["Windows only"]),0,"None"
-    found=[]; hit_count=0
+        return section("Cleaner / Bypass Detection", ["Windows only"]), 0, "None"
+    import subprocess
+    found = []; hit_count = 0
 
-    # Check registry for cleaner installations
-    for reg_path in CLEANER_SIGNATURES["registry_keys"]:
+    si = subprocess.STARTUPINFO()
+    si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+
+    # ── 1. Known cleaner/spoofer executable names in Prefetch ──
+    CLEANER_NAMES = [
+        # Evidence wipers
+        "ccleaner","privazer","bleachbit","eraser","moo0","wisecleaner",
+        "auslogics","iobit","glary","fileshredder","diskwipe","dban",
+        # Screenshare-specific bypass tools (researched)
+        "clean-sweep","cleansweep","robloxcleaner","roblox-clean",
+        "bygonespoofer","bygone","stringcleaner","string-cleaner",
+        "fnclean","fn-clean","sscleaner","ss-cleaner",
+        "hwid-spoofer","hwid_spoofer","hwidspoofer","spoofer",
+        "banbypass","ban-bypass","banbypass","bypasscleaner",
+        "prefetchcleaner","logcleaner","log-cleaner","logwiper",
+        "tracecleaner","trace-cleaner","evtxcleaner","eventcleaner",
+        "bamcleaner","bam-cleaner","shellbagcleaner","regcleaner",
+        "discordcleaner","discord-cleaner",
+        # Generic bypass .bat tools commonly distributed
+        "bypass","cleaner","wiper","antiforensic","anti-forensic",
+        "covertrack","cover-track","trackhider","track-hider",
+    ]
+    pf_dir = r"C:\Windows\Prefetch"
+    if os.path.exists(pf_dir):
+        try:
+            for pf in glob.glob(os.path.join(pf_dir, "*.pf")):
+                name_lower = os.path.basename(pf).lower()
+                for sig in CLEANER_NAMES:
+                    if sig in name_lower:
+                        mt = datetime.datetime.fromtimestamp(
+                            os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
+                        found.append(f"Prefetch: {os.path.basename(pf)} (last run: {mt})")
+                        hit_count += 2
+                        break
+        except Exception:
+            pass
+
+    # ── 2. Registry traces ──
+    CLEANER_REG = [
+        (r"SOFTWARE\Piriform\CCleaner",             "CCleaner"),
+        (r"SOFTWARE\PrivaZer",                       "PrivaZer"),
+        (r"SOFTWARE\BleachBit",                      "BleachBit"),
+        (r"SOFTWARE\IObit\IObit Uninstaller",         "IObit"),
+        (r"SOFTWARE\Auslogics\BoostSpeed",            "Auslogics BoostSpeed"),
+        (r"SOFTWARE\Eraser",                          "Eraser"),
+        (r"SOFTWARE\Wise\Wise Care 365",              "Wise Care 365"),
+    ]
+    for reg_path, label in CLEANER_REG:
         for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
             try:
-                key = winreg.OpenKey(hive, reg_path, 0, winreg.KEY_READ)
-                winreg.CloseKey(key)
-                found.append(f"Registry: {reg_path}")
-                hit_count+=2
-            except Exception: pass
+                winreg.OpenKey(hive, reg_path, 0, winreg.KEY_READ)
+                found.append(f"Registry: {label} installed")
+                hit_count += 2
+                break
+            except Exception:
+                pass
 
-    # Check running processes
-    try:
-        si=subprocess.STARTUPINFO(); si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-        out=subprocess.run(["powershell","-NoProfile","-NonInteractive","-Command",
-                            "Get-Process | Select-Object -ExpandProperty Name"],
-                           capture_output=True,text=True,timeout=10,
-                           creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        for proc in out.stdout.lower().splitlines():
-            proc=proc.strip()
-            if any(sig in proc for sig in CLEANER_SIGNATURES["processes"]):
-                found.append(f"Running: {proc}")
-                hit_count+=3
-    except Exception: pass
-
-    # Check common install paths
-    cleaner_paths=[
-        os.path.expandvars(r"%PROGRAMFILES%\CCleaner"),
-        os.path.expandvars(r"%PROGRAMFILES%\PrivaZer"),
-        os.path.expandvars(r"%PROGRAMFILES%\BleachBit"),
-        os.path.expandvars(r"%APPDATA%\BleachBit"),
-        os.path.expandvars(r"%LOCALAPPDATA%\PrivaZer"),
-        os.path.expandvars(r"%PROGRAMFILES%\Eraser"),
-        os.path.expandvars(r"%PROGRAMFILES(X86)%\CCleaner"),
+    # ── 3. Installed paths ──
+    CLEANER_PATHS = [
+        os.path.expandvars(r"%PROGRAMFILES%\CCleaner\CCleaner.exe"),
+        os.path.expandvars(r"%PROGRAMFILES(X86)%\CCleaner\CCleaner.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\PrivaZer\privazer.exe"),
+        os.path.expandvars(r"%PROGRAMFILES%\BleachBitleachbit.exe"),
+        os.path.expandvars(r"%PROGRAMFILES%\Eraser\Eraser.exe"),
+        os.path.expandvars(r"%PROGRAMFILES%\Wise\Wise Care 365\WiseCare365.exe"),
     ]
-    for cp in cleaner_paths:
-        if os.path.exists(cp):
-            found.append(f"Installed: {cp}")
-            hit_count+=2
+    for p in CLEANER_PATHS:
+        if os.path.exists(p):
+            found.append(f"Installed: {p}")
+            hit_count += 2
 
-    # Prefetch for cleaners (even if uninstalled)
-    pf_dir=r"C:\Windows\Prefetch"
+    # ── 4. Hosts file tampering (Roblox-Clean-Sweep deletes roblox hosts entries) ──
+    hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
     try:
-        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
-            pfname=os.path.basename(pf).lower()
-            for sig in CLEANER_SIGNATURES["file_patterns"]:
-                if sig.lower() in pfname:
-                    mt=datetime.datetime.fromtimestamp(os.stat(pf).st_mtime).strftime("%Y-%m-%d %H:%M")
-                    found.append(f"Prefetch trace: {os.path.basename(pf)} (last run: {mt})")
-                    hit_count+=1
-    except Exception: pass
+        with open(hosts_path, "r", encoding="utf-8", errors="ignore") as f:
+            hosts = f.read()
+        # Check for roblox entries being blocked (some bypasses do this)
+        roblox_blocks = [l.strip() for l in hosts.splitlines()
+                         if "roblox" in l.lower() and not l.strip().startswith("#")
+                         and not l.strip().startswith("127.0.0.1 localhost")]
+        if roblox_blocks:
+            for rb in roblox_blocks[:5]:
+                found.append(f"HOSTS FILE: Roblox entry: {rb}")
+                hit_count += 3
+    except Exception:
+        pass
 
-    lines=[]
+    # ── 5. MAC address spoofing (ByGoneSpoofer, Roblox-Clean-Sweep) ──
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             r"Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\*' -ErrorAction SilentlyContinue | "
+             r"Where-Object {$_.NetworkAddress} | Select-Object NetworkAddress,DriverDesc | ConvertTo-Csv -NoTypeInformation"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        for line in out.stdout.splitlines()[1:]:
+            line = line.strip().strip('"')
+            if line and "," in line:
+                mac_val = line.split('","')[0].strip('"')
+                adapter = line.split('","')[1].strip('"') if '","' in line else ""
+                if mac_val and len(mac_val) == 12:
+                    found.append(f"MAC SPOOFED: {adapter} → {mac_val[:2]}:{mac_val[2:4]}:...(custom)")
+                    hit_count += 4
+    except Exception:
+        pass
+
+    # ── 6. Firewall rule deletion (Roblox-Clean-Sweep removes Roblox firewall rules) ──
+    # Detect if Roblox is installed but has no firewall rules (they were deleted)
+    roblox_installed = os.path.exists(os.path.expanduser(r"~\AppData\Local\Roblox"))
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-NetFirewallRule | Where-Object {$_.DisplayName -like '*roblox*'} | Measure-Object | Select-Object -ExpandProperty Count"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        fw_count = int(out.stdout.strip()) if out.stdout.strip().isdigit() else -1
+        if roblox_installed and fw_count == 0:
+            found.append("FIREWALL: Roblox is installed but has 0 firewall rules — rules may have been deleted by cleaner")
+            hit_count += 2
+    except Exception:
+        pass
+
+    # ── 7. Scheduled task remnants from cleaner tools ──
+    try:
+        out = subprocess.run(
+            ["schtasks", "/query", "/fo", "csv"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        for line in out.stdout.splitlines():
+            ll = line.lower()
+            for sig in ["cleaner","wiper","spoofer","bypass","privazer","ccleaner","bleachbit"]:
+                if sig in ll and "microsoft" not in ll:
+                    found.append(f"Scheduled task: {line.split(',')[0].strip()}")
+                    hit_count += 1
+                    break
+    except Exception:
+        pass
+
+    # ── 8. .bat/.ps1 cleaner scripts in common locations ──
+    SCAN_DIRS = [
+        os.path.expanduser("~\Desktop"),
+        os.path.expanduser("~\Downloads"),
+        os.path.expanduser("~\Documents"),
+    ]
+    BAT_SIGS = [
+        "clean","wipe","bypass","spoof","purge","erase","sweep",
+        "fnclean","traceclean","logclean","bamclean",
+    ]
+    for sdir in SCAN_DIRS:
+        if not os.path.exists(sdir): continue
+        try:
+            for fname in os.listdir(sdir):
+                fl = fname.lower()
+                if not (fl.endswith(".bat") or fl.endswith(".ps1") or fl.endswith(".cmd")):
+                    continue
+                for sig in BAT_SIGS:
+                    if sig in fl:
+                        fpath = os.path.join(sdir, fname)
+                        mt = datetime.datetime.fromtimestamp(
+                            os.path.getmtime(fpath)).strftime("%Y-%m-%d %H:%M:%S")
+                        found.append(f"Script: {fpath}  (modified: {mt})")
+                        hit_count += 3
+                        break
+        except Exception:
+            pass
+
+    # ── 9. StringCleaner / memory cleaner indicators ──
+    # StringCleaner writes to temp or AppData
+    string_cleaner_paths = [
+        os.path.expandvars(r"%TEMP%\stringcleaner"),
+        os.path.expandvars(r"%APPDATA%\StringCleaner"),
+        os.path.expandvars(r"%LOCALAPPDATA%\StringCleaner"),
+    ]
+    for p in string_cleaner_paths:
+        if os.path.exists(p):
+            found.append(f"StringCleaner directory found: {p}")
+            hit_count += 3
+
+    # ── 10. Running cleaner processes ──
+    CLEANER_PROCS = [
+        "ccleaner","privazer","bleachbit","eraser","wisecleaner",
+        "spoofer","hwidspoofer","bygone","stringcleaner",
+    ]
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-Process | Select-Object -ExpandProperty Name"],
+            capture_output=True, text=True, timeout=6,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        running = {p.strip().lower() for p in out.stdout.splitlines() if p.strip()}
+        for proc in CLEANER_PROCS:
+            if any(proc in r for r in running):
+                found.append(f"RUNNING: {proc}")
+                hit_count += 4
+    except Exception:
+        pass
+
+    lines = []
     if found:
-        lines.append(f"⚠ {len(found)} cleaner indicator(s) found:")
-        for f in found: lines.append(f"  ✗ {f}")
+        lines.append(f"\n  ⚠ {len(found)} cleaner/bypass indicator(s) found:\n")
+        for f in found:
+            lines.append(f"  ✗ {f}")
     else:
-        lines.append("  ✓ No cleaning tools detected")
+        lines.append("  ✓ No cleaning/bypass tools detected")
 
     summary = ", ".join(found[:3]) if found else "None detected"
-    return section("Cleaner Detection",lines),hit_count,summary
+    return section("Cleaner / Bypass Detection", lines), hit_count, summary
 
 
 def scan_network_vpn():
@@ -1969,16 +2170,14 @@ def scan_factory_reset():
         if out.stdout.strip(): user_created=out.stdout.strip()
     except Exception: pass
 
-    # ── Source 5: System age via %SystemRoot% creation date ──
+    # ── Source 5: System age — use install_dt from registry (most accurate) ──
     sys_age_days=None
-    try:
-        sys_root=os.environ.get("SystemRoot","C:\\Windows")
-        ctime=os.path.getctime(sys_root)
-        sys_install=datetime.datetime.fromtimestamp(ctime)
-        sys_age_days=(datetime.datetime.now()-sys_install).days
-        if sys_age_days < 30:
-            warnings.append(f"⚠ Windows folder only {sys_age_days} days old — very recent install")
-    except Exception: pass
+    if install_dt:
+        try:
+            sys_age_days = (datetime.datetime.now() - install_dt).days
+            if sys_age_days < 30:
+                warnings.append(f"⚠ Windows installed only {sys_age_days} days ago — very recent install")
+        except Exception: pass
 
     # ── Source 6: Event log 6005/6009 for oldest system boot ──
     oldest_boot="Unknown"
@@ -1995,11 +2194,12 @@ def scan_factory_reset():
                 oldest_boot=line.strip(); break
     except Exception: pass
 
-    lines=[f"\n  Current OS  : {current}",
-           f"  BIOS Date   : {bios_date}",
-           f"  Windows Age : {sys_age_days} days" if sys_age_days else "  Windows Age : Unknown",
-           f"  User PW Set : {user_created}",
-           f"  Oldest Boot : {oldest_boot}",""]
+    age_str = f"{sys_age_days} days ({sys_age_days//365}y {(sys_age_days%365)//30}m)" if sys_age_days else "Unknown"
+    lines=[f"\n  Current OS       : {current}",
+           f"  BIOS Date        : {bios_date}",
+           f"  OS Age           : {age_str}",
+           f"  User Account     : {user_created}",
+           f"  Oldest Boot Evt  : {oldest_boot}",""]
     if warnings:
         for w in warnings: lines.append(f"  {w}")
         lines.append("")
@@ -2018,38 +2218,144 @@ def scan_factory_reset():
 
 
 def scan_fastflags():
-    SUSPICIOUS_FLAGS={
-        "FFlagDebugGraphicsDisableDirect3D11":"Disables D3D11 (anti-cheat bypass)",
-        "FFlagDisableNewIGMinDUA":"Disables input guard",
-        "DFStringTaskSchedulerTargetFps":"Uncapped FPS exploit",
-        "FFlagDebugRenderingSetDeterministic":"Rendering manipulation",
-        "FFlagDisablePostFx":"Visual exploit flag",
-        "FFlagEnableHyperscaleImpostors":"Known cheat flag",
-        "FFlagFixGraphicsQuality":"Graphics bypass flag",
-        "FFlagDebugDisableTelemetry":"Telemetry bypass",
-        "FFlagEnableNewAnimationSystem":"Known exploit flag",
+    """
+    FastFlag detection — shows all active flags with notes on suspicious ones.
+    Sources: ClientAppSettings.json, Bloxstrap/Froststrap/Fishstrap configs, Roblox logs.
+    Format: FlagName = Value  [reason if suspicious]
+    """
+    SUSPICIOUS = {
+        "FFlagDebugGraphicsDisableDirect3D11":  "Disables D3D11 renderer (anti-cheat bypass)",
+        "FFlagDisableNewIGMinDUA":              "Disables input guard",
+        "FFlagDebugDisableTelemetry":           "Disables telemetry (hides activity)",
+        "FFlagDebugDisableNewCSN":              "Disables new content security",
+        "FFlagDisableAbuseReportButton":        "Disables abuse reporting",
+        "DFStringTaskSchedulerTargetFps":       "Uncapped FPS (speed advantage)",
+        "DFIntTaskSchedulerTargetFps":          "Uncapped FPS (speed advantage)",
+        "FFlagTaskSchedulerLimitTargetFps":     "FPS limit bypass",
+        "FIntRenderTargetFPS":                  "Render FPS manipulation",
+        "FFlagDebugRenderingSetDeterministic":  "Rendering manipulation",
+        "FFlagDisablePostFx":                   "PostFX disabled (visual exploit)",
+        "FFlagDebugGraphicsPreferD3D11":        "Force D3D11 (used by some exploits)",
+        "DFFlagTextureQualityOverrideEnabled":  "Texture quality override",
+        "FFlagDebugForceFutureIsBrightPhase3":  "Lighting manipulation",
+        "FFlagEnableNewAnimationSystem":        "Known exploit flag",
+        "FFlagDebugRenderForceTechnologyVoxel": "Voxel rendering exploit",
+        "FIntFullscreenTitleBarTriggerDelayMillis": "Fullscreen trigger delay (bypass)",
+        "FIntRenderShadowIntensity":            "Shadow manipulation",
+        "DFIntTextureQualityOverride":          "Texture quality cheat",
+        "FLogNetwork":                          "Network logging (info gathering)",
+        "DFIntCanHideGuiGroupId":               "GUI hiding by group ID",
+        "FIntFontSizePadding":                  "Font size manipulation",
+        "DFFlagDisableDPIScale":                "DPI scaling disabled",
     }
-    ff_paths=[
+
+    all_flags   = {}   # merged from all sources
+    sources_hit = []   # which files were found
+
+    # ── ClientAppSettings.json from all known paths ──
+    json_paths = [
         os.path.expanduser(r"~\AppData\Local\Roblox\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Froststrap\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Fishstrap\ClientSettings\ClientAppSettings.json"),
     ]
-    hits=[]; all_flags={}
-    for path in ff_paths:
-        if not os.path.exists(path): continue
+    for jp in json_paths:
+        if not os.path.exists(jp): continue
         try:
-            with open(path,"r",encoding="utf-8",errors="ignore") as f:
-                flags=json.loads(f.read())
-            for k,v in flags.items():
-                all_flags[k]=v
-                if k in SUSPICIOUS_FLAGS:
-                    hits.append(f"{k} = {v}  [{SUSPICIOUS_FLAGS[k]}]")
-        except Exception: pass
-    lines=[f"\n  Total FastFlags found: {len(all_flags)}",f"  Suspicious flags: {len(hits)}",""]
-    if hits:
-        for h in hits: lines.append(f"  ⚠ {h}")
+            with open(jp, "r", encoding="utf-8", errors="ignore") as f:
+                data = json.loads(f.read())
+            if isinstance(data, dict) and data:
+                all_flags.update(data)
+                sources_hit.append(os.path.basename(os.path.dirname(jp)))
+        except Exception:
+            pass
+
+    # ── Roblox log files — extract LoadClientSettings block ──
+    log_dirs = [
+        os.path.expanduser(r"~\AppData\Local\Roblox\logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Logs"),
+    ]
+    log_username = "Unknown"
+    log_placeid  = ""
+    for log_dir in log_dirs:
+        if not os.path.exists(log_dir): continue
+        try:
+            log_files = sorted(
+                glob.glob(os.path.join(log_dir, "*.log")) +
+                glob.glob(os.path.join(log_dir, "*.txt")),
+                key=lambda f: os.path.getmtime(f), reverse=True)[:10]
+        except Exception:
+            continue
+        for fpath in log_files:
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    raw = f.read(500000)
+            except Exception:
+                continue
+            # Get username
+            um = re.search(r'"UserName"%3a"([A-Za-z0-9_]{3,20})"', raw)
+            if um and log_username == "Unknown":
+                log_username = um.group(1)
+            # Get place ID
+            pm = re.search(r'placeId=(\d{6,15})', raw)
+            if pm and not log_placeid:
+                log_placeid = pm.group(1)
+            # Extract LoadClientSettings JSON block
+            lcs_idx = raw.find("LoadClientSettings")
+            if lcs_idx == -1: continue
+            brace = raw.find("{", lcs_idx)
+            if brace == -1: continue
+            chunk = raw[brace:brace+60000]
+            depth = 0; end = 0
+            for i, ch in enumerate(chunk):
+                if ch == "{": depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0: end = i+1; break
+            if end < 10: continue
+            try:
+                flags_from_log = json.loads(chunk[:end])
+                if isinstance(flags_from_log, dict) and flags_from_log:
+                    all_flags.update(flags_from_log)
+                    sources_hit.append(f"log:{os.path.basename(fpath)[:40]}")
+                    break  # one log is enough for flags
+            except Exception:
+                # fallback: line-by-line
+                for line in chunk[:end].splitlines():
+                    m = re.match(r'\s*"([^"]+)"\s*:\s*"?([^",}\n]+)"?', line)
+                    if m:
+                        all_flags[m.group(1)] = m.group(2).strip().strip('"')
+
+    # ── Build output ──
+    sus_flags    = {k: v for k, v in all_flags.items() if k in SUSPICIOUS}
+    normal_flags = {k: v for k, v in all_flags.items() if k not in SUSPICIOUS}
+
+    lines = [
+        f"\n  Username  : {log_username}",
+        f"  Place ID  : {'https://www.roblox.com/games/'+log_placeid if log_placeid else 'Unknown'}",
+        f"  Sources   : {', '.join(sources_hit) if sources_hit else 'None found'}",
+        f"  Total flags: {len(all_flags)}  |  Suspicious: {len(sus_flags)}",
+        "",
+    ]
+
+    if sus_flags:
+        lines.append("  ⚠ SUSPICIOUS FLAGS:")
+        for k, v in sus_flags.items():
+            lines.append(f"  ✗ {k} = {v}  [{SUSPICIOUS[k]}]")
+        lines.append("")
+
+    if all_flags:
+        lines.append("  All Active FastFlags:")
+        lines.append("  " + "─"*50)
+        for k, v in sorted(all_flags.items()):
+            note = f"  [{SUSPICIOUS[k]}]" if k in SUSPICIOUS else ""
+            lines.append(f"  {k} = {v}{note}")
     else:
-        lines.append("  ✓ No suspicious FastFlags detected.")
-    return section("FastFlag Detection",lines),len(hits),hits
+        lines.append("  ✓ No FastFlags configured.")
+
+    all_sus = [f"{k} = {v}  [{SUSPICIOUS[k]}]" for k,v in sus_flags.items()]
+    return section("FastFlag Detection", lines), len(sus_flags), all_sus
 
 
 def scan_drives():
@@ -2511,116 +2817,179 @@ $r=@(); Get-Content '{tf_path}' | ForEach-Object {{
 
 def scan_power_events():
     """
-    PC Power On/Off timeline — catches 2-PC bypass attempts.
-    Sources:
-    - Event Log: ID 6005 (system start), 6006 (clean shutdown), 6008 (unexpected shutdown)
-    - Event Log: ID 1 (kernel boot), 12 (kernel shutdown), 13 (kernel crash)
-    - Event Log: ID 41 (unexpected power loss / crash)
-    - Hibernation file timestamps
-    - Recent file timestamps correlated with power events
-    Builds a full timeline of when PC was on/off.
-    If someone claims they were on the PC but logs show it was off — 2-PC bypass.
+    Logon/Logoff Session History — Trinity format.
+    Reads event IDs 4624 (logon) and 4647/4634 (logoff) from Security log.
+    Falls back to System log 6005/6006 if Security log is empty.
+    Shows past 15 days grouped by date.
     """
     if not WINDOWS:
-        return section("Power Events / PC Timeline", ["Windows only"]), 0, []
+        return section("Logon/Logoff Sessions", ["Windows only"]), 0, []
     import subprocess
-    events = []; warnings = []
-
-    EVENT_MAP = {
-        "6005": ("POWER ON",  "System startup — EventLog service started"),
-        "6006": ("POWER OFF", "Clean shutdown initiated"),
-        "6008": ("CRASH OFF", "Unexpected shutdown / power loss"),
-        "41":   ("CRASH",     "Kernel power — unexpected restart (crash/BSOD)"),
-        "1":    ("KERNEL ON", "Kernel loaded — system boot"),
-        "12":   ("KERNEL OFF","Kernel shutdown"),
-        "13":   ("KERNEL BAD","Kernel crash/unexpected power loss"),
-    }
 
     si = subprocess.STARTUPINFO()
     si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+    DAYS = 15
 
-    # Pull last 200 power events from System log
-    ps_cmd = r"""
-$ids = @(6005,6006,6008,41,1,12,13)
-try {
-    $evts = Get-WinEvent -FilterHashtable @{LogName='System';Id=$ids} -MaxEvents 200 -ErrorAction SilentlyContinue
-    foreach($e in $evts){
-        Write-Output "$($e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))|$($e.Id)|$($e.Message.Split([Environment]::NewLine)[0].Trim())"
-    }
-} catch {}
+    # ── Strategy: pull ALL logon and logoff events separately,
+    #    then pair them up by finding the nearest logoff after each logon ──
+    ps_cmd = f"""
+$days = {DAYS}
+$cutoff = (Get-Date).AddDays(-$days)
+
+# Collect logons (type 2=interactive, 7=unlock, 10=remote, 11=cached)
+$logons  = @()
+$logoffs = @()
+
+try {{
+    $evts = Get-WinEvent -FilterHashtable @{{LogName='Security';Id=@(4624,4634,4647);StartTime=$cutoff}} -MaxEvents 2000 -ErrorAction SilentlyContinue
+    foreach($e in $evts) {{
+        if($e.Id -eq 4624) {{
+            $lt = $e.Properties[8].Value
+            if($lt -in @(2,7,10,11)) {{
+                $logons += $e.TimeCreated
+            }}
+        }} elseif($e.Id -in @(4634,4647)) {{
+            $logoffs += $e.TimeCreated
+        }}
+    }}
+}} catch {{}}
+
+# Sort both lists
+$logons  = $logons  | Sort-Object
+$logoffs = $logoffs | Sort-Object
+
+# Pair each logon with next logoff after it
+$used_offs = @{{}}
+foreach($on in $logons) {{
+    $matched = $null
+    foreach($off in $logoffs) {{
+        if($off -gt $on -and -not $used_offs.ContainsKey($off.Ticks)) {{
+            $matched = $off
+            $used_offs[$off.Ticks] = 1
+            break
+        }}
+    }}
+    if($matched) {{
+        $dur = [int]($matched - $on).TotalMinutes
+        Write-Output "$($on.ToString('yyyy-MM-dd HH:mm:ss'))|$($matched.ToString('yyyy-MM-dd HH:mm:ss'))|$dur"
+    }} else {{
+        Write-Output "$($on.ToString('yyyy-MM-dd HH:mm:ss'))||ACTIVE"
+    }}
+}}
 """
+
+    raw_sessions = []
     try:
         out = subprocess.run(
             ["powershell","-NoProfile","-NonInteractive","-Command", ps_cmd],
-            capture_output=True, text=True, timeout=12,
+            capture_output=True, text=True, timeout=25,
             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
         for line in out.stdout.strip().splitlines():
             line = line.strip()
-            if "|" not in line: continue
+            if not line or "|" not in line: continue
             parts = line.split("|", 2)
-            if len(parts) < 2: continue
-            ts, eid = parts[0], parts[1]
-            msg = parts[2] if len(parts) > 2 else ""
-            etype, edesc = EVENT_MAP.get(eid, ("EVENT", f"ID {eid}"))
-            events.append({"ts": ts, "type": etype, "eid": eid, "desc": edesc})
-    except Exception: pass
+            if len(parts) < 3: continue
+            on_str, off_str, dur_str = parts
+            try:
+                on_dt = datetime.datetime.strptime(on_str, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                continue
+            off_dt = None
+            if off_str.strip():
+                try: off_dt = datetime.datetime.strptime(off_str.strip(), "%Y-%m-%d %H:%M:%S")
+                except Exception: pass
+            dur_min = -1
+            try: dur_min = int(dur_str.strip())
+            except Exception: pass
+            raw_sessions.append({"on": on_dt, "off": off_dt, "dur_min": dur_min})
+    except Exception:
+        pass
 
-    # Sort chronologically
-    events.sort(key=lambda e: e["ts"])
-
-    # Build on/off pairs to find gaps (potential 2-PC periods)
-    timeline = []
-    last_on = None
-    gaps = []  # periods where PC was confirmed OFF
-    for ev in events:
-        if ev["type"] in ("POWER ON", "KERNEL ON"):
-            if last_on is None:
-                last_on = ev["ts"]
-            timeline.append(("ON",  ev["ts"], ev["desc"]))
-        elif ev["type"] in ("POWER OFF", "KERNEL OFF"):
-            if last_on:
-                timeline.append(("OFF", ev["ts"], ev["desc"]))
-                gaps.append((last_on, ev["ts"]))
-                last_on = None
-        elif ev["type"] in ("CRASH OFF", "CRASH", "KERNEL BAD"):
-            timeline.append(("CRASH", ev["ts"], ev["desc"]))
-            if last_on:
-                gaps.append((last_on, ev["ts"]))
-                last_on = None
-
-    # Flag if there are clean shutdown → startup pairs within the same screenshare window
-    # (agent can manually check: if player claims continuous session but PC was off, flag it)
-    if len(gaps) > 0:
-        warnings.append(f"⚠ {len(gaps)} power cycle(s) recorded — PC was fully off between these times")
-
-    # Check hibernation file timestamp
-    hib_path = r"C:\hiberfil.sys"
-    if os.path.exists(hib_path):
+    # ── Fallback: System log 6005=start, 6006=stop if Security gave nothing ──
+    if not raw_sessions:
+        ps2 = f"""
+$cutoff=(Get-Date).AddDays(-{DAYS})
+try {{
+    $evts=Get-WinEvent -FilterHashtable @{{LogName='System';Id=@(6005,6006,6008);StartTime=$cutoff}} -EA SilentlyContinue | Sort-Object TimeCreated
+    $last_on=$null
+    foreach($e in $evts){{
+        if($e.Id -eq 6005){{ $last_on=$e.TimeCreated }}
+        elseif($e.Id -in @(6006,6008) -and $last_on){{
+            $dur=[int]($e.TimeCreated-$last_on).TotalMinutes
+            Write-Output "$($last_on.ToString('yyyy-MM-dd HH:mm:ss'))|$($e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))|$dur"
+            $last_on=$null
+        }}
+    }}
+    if($last_on){{ Write-Output "$($last_on.ToString('yyyy-MM-dd HH:mm:ss'))||ACTIVE" }}
+}} catch {{}}
+"""
         try:
-            hib_mt = datetime.datetime.fromtimestamp(os.path.getmtime(hib_path))
-            timeline.append(("HIBERNATE", hib_mt.strftime("%Y-%m-%d %H:%M:%S"), "hiberfil.sys last modified — system hibernated"))
-        except Exception: pass
+            out2 = subprocess.run(
+                ["powershell","-NoProfile","-NonInteractive","-Command", ps2],
+                capture_output=True, text=True, timeout=15,
+                creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+            for line in out2.stdout.strip().splitlines():
+                parts = line.strip().split("|",2)
+                if len(parts)<3: continue
+                on_str,off_str,dur_str=parts
+                try: on_dt=datetime.datetime.strptime(on_str,"%Y-%m-%d %H:%M:%S")
+                except Exception: continue
+                off_dt=None
+                if off_str.strip():
+                    try: off_dt=datetime.datetime.strptime(off_str.strip(),"%Y-%m-%d %H:%M:%S")
+                    except Exception: pass
+                dur_min=-1
+                try: dur_min=int(dur_str.strip())
+                except Exception: pass
+                raw_sessions.append({"on":on_dt,"off":off_dt,"dur_min":dur_min})
+        except Exception:
+            pass
 
-    # Output
-    lines = [f"\n  Power events found: {len(events)}",
-             f"  Power cycles (on→off): {len(gaps)}", ""]
+    def fmt_dur(m):
+        if m < 0: return ""
+        if m < 60: return f"({m}m)"
+        h,mm = m//60, m%60
+        return f"({h}h {mm}m)" if mm else f"({h}h)"
 
-    for w in warnings: lines.append(w)
-    if warnings: lines.append("")
+    # Group by date
+    from collections import defaultdict
+    by_date = defaultdict(list)
+    for s in raw_sessions:
+        by_date[s["on"].strftime("%B %-d, %Y")].append(s)
 
-    lines.append("  PC POWER TIMELINE (newest last):")
-    lines.append("  " + "─"*60)
-    for entry_type, ts, desc in timeline[-60:]:  # show last 60 events
-        sym = {"ON":"▶","OFF":"■","CRASH":"⚡","HIBERNATE":"◑","KERNEL ON":"▶","KERNEL OFF":"■","KERNEL BAD":"⚡"}.get(entry_type,"·")
-        col = "  "
-        lines.append(f"  {sym}  {ts}  [{entry_type}]  {desc[:60]}")
+    # Sort dates newest first
+    def parse_date(d):
+        try: return datetime.datetime.strptime(d, "%B %d, %Y")
+        except Exception:
+            try: return datetime.datetime.strptime(d, "%B %-d, %Y")
+            except Exception: return datetime.datetime.min
+    sorted_dates = sorted(by_date.keys(), key=parse_date, reverse=True)
 
-    if not events:
-        lines.append("  No power events found (event log may be cleared)")
-        warnings.append("No power events — possible event log tampering")
+    total = len(raw_sessions)
+    lines = [
+        f"\n  Logon/Logoff History: {total} session(s) (past {DAYS} days)",
+        "  " + "="*50,
+    ]
 
-    hit_count = len(warnings)
-    return section("Power Events / PC Timeline", lines), hit_count, timeline
+    if not raw_sessions:
+        lines.append("  ⚠ No session data — Security log may be cleared or auditing disabled.")
+        lines.append("  ⚠ This itself may indicate tampering.")
+    else:
+        for date_str in sorted_dates:
+            lines.append(f"\n  --- {date_str} ---")
+            sessions_for_day = sorted(by_date[date_str], key=lambda x:x["on"], reverse=True)
+            for s in sessions_for_day:
+                on_t = s["on"].strftime("%H:%M:%S")
+                if s["off"] is None or s["dur_min"] < 0:
+                    lines.append(f"  Logon {on_t} -> Active now")
+                else:
+                    off_t = s["off"].strftime("%H:%M:%S")
+                    lines.append(f"  Logon {on_t} -> Logoff {off_t}  {fmt_dur(s['dur_min'])}")
+
+    lines.append("\n  " + "="*50)
+
+    warnings = 1 if not raw_sessions else 0
+    return section("Logon/Logoff Sessions", lines), warnings, raw_sessions
 
 
 def scan_two_pc_indicators():
@@ -2787,148 +3156,225 @@ def scan_two_pc_indicators():
 
 def scan_deleted_cheat_recovery():
     """
-    Recover deleted cheat files to a folder on the desktop.
-    Sources checked:
-    - $Recycle.Bin (all users) — reads $I metadata to get original path + deletion time
-    - Windows.old folder remnants
-    - VSS shadow copy traces
-    - Prefetch for recently-deleted executables
-    - MFT journal (USN) for recent deletions
-    Creates: Desktop\\CometRecovered\\ with a report of what was found.
-    Does NOT copy actual malware — just reports what existed and when.
+    Deleted cheat file evidence recovery.
+    Sources:
+    1. $Recycle.Bin $I metadata — original path + exact deletion time
+    2. Prefetch — files that ran but no longer exist on disk
+    3. BAM registry — execution records for missing files
+    4. ShellBag paths that no longer exist
+    5. AppCompat/UserAssist for missing executables
+    Writes Desktop\CometRecovered\recovery_report.txt
     """
     if not WINDOWS:
         return section("Deleted Cheat Recovery", ["Windows only"]), 0, []
-    import subprocess, struct
-    recovered = []; report_lines = []
+    import subprocess
+    recovered = []
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
     out_dir  = os.path.join(desktop, "CometRecovered")
 
-    # ── Source 1: $Recycle.Bin — read $I metadata files ──
+    # ── Source 1: $Recycle.Bin — try both offset formats ──
+    # Windows 10+ format: header(8) + filesize(8) + FILETIME(8) + path_length(4) + path(UTF-16LE)
+    # Older format:       header(8) + filesize(8) + FILETIME(8) + path(UTF-16LE, fixed 520 bytes)
     rb_root = "C:\\$Recycle.Bin"
     if os.path.exists(rb_root):
         try:
             for root, dirs, files in os.walk(rb_root):
                 for f in files:
-                    if not f.startswith("$I"): continue
+                    if not f.upper().startswith("$I"): continue
                     ipath = os.path.join(root, f)
                     try:
-                        with open(ipath,"rb") as fp: data = fp.read(600)
+                        with open(ipath, "rb") as fp:
+                            data = fp.read(1100)
                         if len(data) < 28: continue
-                        # $I file format: 8 bytes header, 8 bytes file size, 8 bytes deletion FILETIME, then path
-                        del_ft = struct.unpack_from("<Q", data, 16)[0]
-                        del_dt = filetime_to_dt(del_ft)
-                        del_str = del_dt.strftime("%Y-%m-%d %H:%M:%S") if del_dt else "Unknown"
-                        # Original path is UTF-16LE after offset 28
-                        orig_path = data[28:].decode("utf-16-le", errors="ignore").rstrip("\x00")
+
+                        # Read deletion FILETIME at offset 16
+                        del_ft  = struct.unpack_from("<Q", data, 16)[0]
+                        del_dt  = filetime_to_dt(del_ft)
+                        del_str = del_dt.strftime("%Y-%m-%d %H:%M:%S") if del_dt and del_dt.year > 2000 else "Unknown"
+
+                        # Try to decode the original path
+                        orig_path = ""
+
+                        # Format 1: Windows 10 v2 — has path length at offset 28 (4 bytes LE)
+                        if len(data) >= 32:
+                            try:
+                                path_len = struct.unpack_from("<I", data, 28)[0]
+                                if 2 <= path_len <= 520:
+                                    path_bytes = data[32:32 + path_len * 2]
+                                    candidate  = path_bytes.decode("utf-16-le", errors="ignore").rstrip("\x00")
+                                    if candidate.startswith(("C:\\","D:\\","E:\\")):
+                                        orig_path = candidate
+                            except Exception:
+                                pass
+
+                        # Format 2: Older — fixed 520-byte path at offset 28
+                        if not orig_path and len(data) >= 548:
+                            try:
+                                candidate = data[28:548].decode("utf-16-le", errors="ignore").rstrip("\x00").split("\x00")[0]
+                                if candidate.startswith(("C:\\","D:\\","E:\\")):
+                                    orig_path = candidate
+                            except Exception:
+                                pass
+
+                        # Format 3: Try offset 24 (some versions)
+                        if not orig_path and len(data) >= 28:
+                            try:
+                                candidate = data[24:].decode("utf-16-le", errors="ignore").rstrip("\x00").split("\x00")[0]
+                                if candidate.startswith(("C:\\","D:\\","E:\\")):
+                                    orig_path = candidate
+                            except Exception:
+                                pass
+
                         if not orig_path: continue
+
                         kws = matches_keyword(orig_path)
-                        orig_fn  = os.path.basename(orig_path)
                         if kws:
                             recovered.append({
+                                "filename":      os.path.basename(orig_path),
                                 "original_path": orig_path,
-                                "filename":      orig_fn,
                                 "deleted_at":    del_str,
                                 "keywords":      kws,
-                                "source":        "Recycle Bin",
-                                "i_file":        ipath,
+                                "source":        "Recycle Bin ($I metadata)",
                             })
-                    except Exception: pass
-        except Exception: pass
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
-    # ── Source 2: Prefetch of deleted executables ──
+    # ── Source 2: Prefetch — files that ran but are now missing ──
     pf_dir = r"C:\Windows\Prefetch"
     if os.path.exists(pf_dir):
-        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
-            name = os.path.basename(pf).rsplit("-",1)[0]
+        for pf in glob.glob(os.path.join(pf_dir, "*.pf")):
+            name = os.path.basename(pf).rsplit("-", 1)[0]
             kws  = matches_keyword(name)
             if not kws: continue
             try:
-                with open(pf,"rb") as f: raw = f.read(4096)
+                with open(pf, "rb") as f:
+                    raw = f.read(4096)
                 decoded = raw.decode("utf-16-le", errors="ignore")
                 paths = re.findall(r"C:[/\\][^\x00]{3,120}", decoded)
-                full = paths[-1].strip() if paths else name
+                full  = paths[-1].strip() if paths else f"C:\\...\\{name}"
             except Exception:
-                full = name
+                full = f"C:\\...\\{name}"
             if not os.path.exists(full):
-                mt = datetime.datetime.fromtimestamp(os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
+                mt = datetime.datetime.fromtimestamp(
+                    os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
                 recovered.append({
-                    "original_path": full,
                     "filename":      os.path.basename(full),
-                    "deleted_at":    f"Last run: {mt}",
+                    "original_path": full,
+                    "deleted_at":    f"Last executed: {mt}",
                     "keywords":      kws,
-                    "source":        "Prefetch (file no longer exists)",
-                    "i_file":        pf,
+                    "source":        "Prefetch (no longer on disk)",
                 })
 
-    # ── Source 3: BAM entries for missing executables ──
+    # ── Source 3: BAM registry — execution records for missing files ──
     try:
-        base = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                              r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
-                              0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        base = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
+            0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
         idx = 0
         while True:
             try:
                 sid = winreg.EnumKey(base, idx)
-                sk  = winreg.OpenKey(base, sid, 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+                sk  = winreg.OpenKey(base, sid, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
                 vi  = 0
                 while True:
                     try:
                         name, data, _ = winreg.EnumValue(sk, vi)
-                        if name.startswith("\\Device\\") and isinstance(data,bytes) and len(data)>=8:
+                        if name.startswith("\\Device\\") and isinstance(data, bytes) and len(data) >= 8:
                             path = re.sub(r"\\Device\\HarddiskVolume\d+", "C:", name)
                             kws  = matches_keyword(path)
                             if kws and not os.path.exists(path):
-                                ft  = struct.unpack_from("<Q",data,0)[0]
-                                dt  = filetime_to_dt(ft)
-                                ts  = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else "Unknown"
+                                ft = struct.unpack_from("<Q", data, 0)[0]
+                                dt = filetime_to_dt(ft)
+                                ts = dt.strftime("%Y-%m-%d %H:%M:%S") if dt and dt.year > 2000 else "Unknown"
                                 recovered.append({
-                                    "original_path": path,
                                     "filename":      os.path.basename(path),
+                                    "original_path": path,
                                     "deleted_at":    f"Last run: {ts}",
                                     "keywords":      kws,
-                                    "source":        "BAM Registry (file missing)",
-                                    "i_file":        None,
+                                    "source":        "BAM Registry (file missing from disk)",
                                 })
                         vi += 1
-                    except OSError: break
-                winreg.CloseKey(sk); idx += 1
-            except OSError: break
+                    except OSError:
+                        break
+                winreg.CloseKey(sk)
+                idx += 1
+            except OSError:
+                break
         winreg.CloseKey(base)
-    except Exception: pass
+    except Exception:
+        pass
 
-    # Deduplicate by filename
-    seen_names = set(); unique_rec = []
+    # ── Source 4: AppCompat shimcache — missing files ──
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache",
+            0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+        raw_ac, _ = winreg.QueryValueEx(key, "AppCompatCache")
+        winreg.CloseKey(key)
+        offset = 128 if raw_ac[:4] == b"\x30\x00\x00\x00" else 0
+        while offset < len(raw_ac) - 12:
+            try:
+                if raw_ac[offset:offset+4] != b"10ts": offset += 4; continue
+                data_len  = struct.unpack_from("<I", raw_ac, offset + 8)[0]
+                path_len  = struct.unpack_from("<H", raw_ac, offset + 12)[0]
+                path_off  = offset + 14
+                if path_off + path_len > len(raw_ac): break
+                path = raw_ac[path_off:path_off+path_len].decode("utf-16-le", errors="ignore")
+                kws  = matches_keyword(path)
+                if kws and not os.path.exists(path):
+                    recovered.append({
+                        "filename":      os.path.basename(path),
+                        "original_path": path,
+                        "deleted_at":    "Unknown (AppCompat record)",
+                        "keywords":      kws,
+                        "source":        "AppCompat (shimcache, file missing)",
+                    })
+                offset += 14 + path_len + data_len
+            except Exception:
+                offset += 4
+    except Exception:
+        pass
+
+    # Deduplicate by lowercase filename
+    seen = set(); unique_rec = []
     for r in recovered:
-        key = r["filename"].lower()
-        if key not in seen_names:
-            seen_names.add(key); unique_rec.append(r)
+        k = r["filename"].lower()
+        if k not in seen:
+            seen.add(k)
+            unique_rec.append(r)
 
-    # Write recovery report to Desktop\CometRecovered\
+    # Sort: Recycle Bin first (most concrete evidence), then Prefetch, then BAM, then AppCompat
+    SOURCE_ORDER = {"Recycle Bin ($I metadata)": 0, "Prefetch (no longer on disk)": 1,
+                    "BAM Registry (file missing from disk)": 2, "AppCompat (shimcache, file missing)": 3}
+    unique_rec.sort(key=lambda r: SOURCE_ORDER.get(r["source"], 9))
+
+    # Write report to Desktop\CometRecovered\
     if unique_rec:
         try:
             os.makedirs(out_dir, exist_ok=True)
-            report_path = os.path.join(out_dir, "recovery_report.txt")
-            with open(report_path, "w", encoding="utf-8") as fp:
-                fp.write(f"COMET DELETED CHEAT EVIDENCE REPORT\n")
-                fp.write(f"Generated: {now_str()}\n")
-                fp.write(f"PC User: {current_user()}\n")
-                fp.write("="*60+"\n\n")
-                for i,r in enumerate(unique_rec, 1):
+            rpt = os.path.join(out_dir, "recovery_report.txt")
+            with open(rpt, "w", encoding="utf-8") as fp:
+                fp.write("COMET — DELETED CHEAT EVIDENCE\n")
+                fp.write(f"Generated : {now_str()}\n")
+                fp.write(f"PC User   : {current_user()}\n")
+                fp.write("=" * 60 + "\n\n")
+                for i, r in enumerate(unique_rec, 1):
                     fp.write(f"[{i}] {r['filename']}\n")
-                    fp.write(f"  Original Path : {r['original_path']}\n")
-                    fp.write(f"  Deleted/Run   : {r['deleted_at']}\n")
-                    fp.write(f"  Source        : {r['source']}\n")
-                    fp.write(f"  Keywords      : {', '.join(r['keywords'])}\n")
-                    if r.get("i_file"): fp.write(f"  Evidence File : {r['i_file']}\n")
-                    fp.write("\n")
-            report_lines.append(f"  ✓ Report saved: {report_path}")
-        except Exception as e:
-            report_lines.append(f"  ✗ Could not write report: {e}")
+                    fp.write(f"  Path     : {r['original_path']}\n")
+                    fp.write(f"  Deleted  : {r['deleted_at']}\n")
+                    fp.write(f"  Source   : {r['source']}\n")
+                    fp.write(f"  Keywords : {', '.join(r['keywords'])}\n\n")
+        except Exception:
+            pass
 
+    # Build output lines
     lines = [f"\n  Deleted cheat evidence found: {len(unique_rec)}", ""]
     if unique_rec:
-        lines.append(f"⚠ {len(unique_rec)} deleted/missing cheat file(s) with forensic evidence:")
+        lines.append(f"  ⚠ Report saved to: {out_dir}\\recovery_report.txt")
         lines.append("")
         for r in unique_rec:
             lines.append(f"  ✗ {r['filename']}")
@@ -2937,467 +3383,8 @@ def scan_deleted_cheat_recovery():
             lines.append(f"    Source  : {r['source']}")
             lines.append(f"    Keywords: {', '.join(r['keywords'])}")
             lines.append("")
-        lines.extend(report_lines)
     else:
-        lines.append("  ✓ No deleted cheat file evidence found.")
+        lines.append("  ✓ No deleted cheat evidence found.")
+        lines.append("  (Checked: Recycle Bin, Prefetch, BAM, AppCompat)")
 
     return section("Deleted Cheat Recovery", lines), len(unique_rec), unique_rec
-
-
-def run_full_scan(league="?"):
-    sb_t,sb_h,_        = scan_shellbags()
-    bm_t,bm_h,_        = scan_bam()
-    pf_t,pf_h,_        = scan_prefetch()
-    ac_t,ac_h,_        = scan_appcompat()
-    rl_t,rl_h,accs     = scan_roblox_logs()
-    al_t,al_h,_        = scan_roblox_alts_registry()
-    cs_t,cs_h,_        = scan_cheat_files()
-    yr_t,yr_h,_        = scan_yara()
-    # Run unsigned scan in thread — it's slow (PowerShell)
-    us_result = [None]
-    def _run_unsigned():
-        us_result[0] = scan_unsigned()
-    _ut = __import__("threading").Thread(target=_run_unsigned, daemon=True)
-    _ut.start()
-    _ut.join(timeout=30)  # wait for unsigned scan (max 30s)
-    us_t,us_h,us_l = us_result[0] if us_result[0] else (section("Unsigned Scan",["Timed out"]),0,[])
-    rb_t,rb_h,rb_l     = scan_recycle_bin()
-    sm_t,sm_h,auto_f   = scan_sysmain()
-    pr_t,pr_h,_        = scan_running_processes()
-    cl_t,cl_h,cl_info  = scan_cleaners()
-    nw_t,nw_h,vpn_info = scan_network_vpn()
-    dc_t,dc_h,dc_accs  = scan_discord_cache()
-    dm_t,dm_h,dm_list  = scan_discord_memory()
-    fr_t,_,fr_text     = scan_factory_reset()
-    ff_t,ff_h,ff_hits  = scan_fastflags()
-    dv_t,dv_w,dv_inf   = scan_drives()
-    ev_t,ev_h,ev_hits  = scan_event_log()
-    jl_t,jl_h,_        = scan_jumplists()
-    lk_t,lk_h,_        = scan_lnk_files()
-    di_t,di_h,_        = scan_deleted_integrity()
-    eh_t,eh_fc,eh_list = scan_execution_history()
-    pw_t,pw_h,pw_list  = scan_power_events()
-    tp_t,tp_h,tp_list  = scan_two_pc_indicators()
-    dr_t,dr_h,dr_list  = scan_deleted_cheat_recovery()
-
-    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+dm_h+pw_h+tp_h+dr_h
-
-    roblox_list=[]
-    if isinstance(accs,list):
-        for a in accs:
-            if isinstance(a,dict): roblox_list.append(a)
-            else: roblox_list.append({"username":str(a),"userid":None,"sources":[],"placeids":[],"last_seen":None})
-
-    return {
-        "shellbags":sb_t,"bam":bm_t,"prefetch":pf_t,"appcompat":ac_t,
-        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,
-        "recycle":rb_t,"sysmain":sm_t,"discord":dc_t,"processes":pr_t,
-        "cleaners":cl_t,"network":nw_t,"registry_extra":al_t,
-        "eventlog":ev_t,"jumplists":jl_t,"lnkfiles":lk_t,"deleted_int":di_t,
-        "exec_history_text":eh_t,"exec_history":eh_list,"exec_hits":eh_fc,
-        "power_events":pw_t,"two_pc":tp_t,"deleted_recovery":dr_t,
-        "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
-        "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_hits":us_l,
-        "sysmain_hits":sm_h,"sysmain_autofail":auto_f,
-        "fastflag_hits":ff_h,"process_hits":pr_h,"cleaner_hits":cl_h,
-        "eventlog_hits":ev_h,"jumplist_hits":jl_h,"lnk_hits":lk_h,"deleted_hits":di_h,
-        "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
-        "roblox_log_hits":rl_h,"roblox_accounts":roblox_list,"discord_accounts":dc_accs,
-        "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
-        "total_hits":total,"verdict":"REVIEW","league":league,
-        "vpn_info":vpn_info,"cleaner_info":cl_info,
-        "report":{
-            "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
-            "cheat_hits":cs_h,"yara_hits":yr_h,
-            "unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
-            "sysmain_hits":sm_h,"sysmain_autofail":auto_f,
-            "roblox_hits":rl_h,"fastflags":ff_hits,"discord_accounts":dc_accs,
-            "factory_resets":fr_text,"drive_info":dv_inf,"drive_warn":dv_w,
-            "vpn_info":vpn_info,"cleaner_info":cl_info,"process_hits":pr_h,
-            "cleaner_hits":cl_h,"eventlog_hits":ev_h,"jumplist_hits":jl_h,
-            "lnk_hits":lk_h,"deleted_hits":di_h,"discord_memory_hits":dm_h,"exec_history":eh_list,
-        },
-        "full_report":"\n".join([
-            f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
-            sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,pr_t,cl_t,
-            nw_t,dc_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,di_t,eh_t,
-            pw_t,tp_t,dr_t,
-            f"\nHITS: {total}",
-        ]),
-    }
-
-
-# ============================================================
-#  GUI — Comet v5
-#  Redesigned to match reference screenshots:
-#  • Sidebar module list (terminal style)
-#  • Monospace output panels
-#  • Interactive execution history with clickable USN drill-down
-#  • No Discord — PIN only
-# ============================================================
-class App:
-    BG   = "#0a0d12"; BG2  = "#0d1018"; BG3  = "#111620"
-    BG4  = "#161e2e"; BG5  = "#1a2438"; BORDER = "#1e2d42"
-    FG   = "#c8d4e8"; FG2  = "#5a6a80"; FG3  = "#2e3d52"
-    GREEN= "#00f5a0"; GD   = "#00c97a"; RED  = "#ff4d6d"
-    AMB  = "#ffb830"; BLUE = "#4d9fff"; CYAN = "#00e5ff"
-
-    MONO = "Consolas"  # overridden in __init__ after Tk root exists
-
-    MODULES = [
-        ("SUMMARY",      "summary"),
-        (None, None),
-        ("SHELLBAGS",    "shellbags"),
-        ("BAM",          "bam"),
-        ("PREFETCH",     "prefetch"),
-        ("APPCOMPAT",    "appcompat"),
-        (None, None),
-        ("ROBLOX LOGS",  "roblox"),
-        ("ROBLOX LIVE",  "processes"),
-        (None, None),
-        ("CHEAT FILES",  "cheat"),
-        ("YARA",         "yara"),
-        ("PE HEADERS",   "unsigned"),
-        ("UNSIGNED",     "unsigned"),
-        (None, None),
-        ("RECYCLE BIN",  "recycle"),
-        ("DELETED INT",  "deleted_int"),
-        (None, None),
-        ("EVENT LOG",    "eventlog"),
-        ("SYSMAIN",      "sysmain"),
-        ("JUMPLISTS",    "jumplists"),
-        ("LNK FILES",    "lnkfiles"),
-        (None, None),
-        ("EXEC HISTORY", "exec_history"),
-        (None, None),
-        ("POWER EVENTS", "power_events"),
-        ("2-PC BYPASS",  "two_pc"),
-        ("DEL RECOVERY", "deleted_recovery"),
-        (None, None),
-        ("DISCORD",      "discord"),
-        ("DISC MEMORY",  "discord_memory"),
-        ("CLEANERS",     "cleaners"),
-        ("NETWORK/VPN",  "network"),
-    ]
-
-    def __init__(self, root):
-        self.root = root; self.root.withdraw()
-        # Resolve best monospace font now that Tk root exists
-        try:
-            import tkinter.font as _tkf
-            families = _tkf.families()
-            App.MONO = next((f for f in ["Cascadia Code","Consolas","Courier New"] if f in families), "Courier New")
-        except Exception:
-            App.MONO = "Courier New"
-        self.results = {}; self.scanning = False
-        self._pin = ""; self._league = "UFF"; self._wh_sent = False
-        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
-        self._tos()
-
-    # ── center helper ──────────────────────────────────────
-    @staticmethod
-    def _center(w,W,H):
-        w.update_idletasks()
-        sw,sh = w.winfo_screenwidth(), w.winfo_screenheight()
-        w.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
-
-    # ── ToS ────────────────────────────────────────────────
-    def _tos(self):
-        w = tk.Toplevel(); self._tw = w
-        w.title("Comet — Terms of Service"); w.configure(bg=self.BG)
-        w.resizable(False,False)
-        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
-        self._center(w,520,560)
-        f = tk.Frame(w,bg=self.BG,padx=44,pady=38); f.pack(fill="both",expand=True)
-        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,18))
-        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
-        tk.Label(lr,text="  Comet  Scanner",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
-        tk.Label(f,text="Terms of Service",font=("Segoe UI",22,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
-        tk.Label(f,text="Read before continuing.",font=("Segoe UI",9),fg=self.FG3,bg=self.BG).pack(anchor="w",pady=(2,16))
-        outer = tk.Frame(f,bg=self.BORDER,bd=1); outer.pack(fill="x",pady=(0,16))
-        inner = tk.Frame(outer,bg=self.BG3); inner.pack(fill="both",padx=1,pady=1)
-        txt = tk.Text(inner,width=54,height=10,font=("Segoe UI",9),bg=self.BG3,fg=self.FG2,
-                      bd=0,padx=12,pady=10,relief="flat",wrap="word",cursor="arrow")
-        scr = tk.Scrollbar(inner,orient="vertical",command=txt.yview,
-                           bg=self.BG3,troughcolor=self.BG2,width=6,relief="flat")
-        scr.pack(side="right",fill="y"); txt.configure(yscrollcommand=scr.set)
-        txt.pack(side="left",fill="both",expand=True)
-        txt.insert("1.0",
-            "By using this software, you acknowledge and agree that the creator "
-            "of this software is NOT responsible for how the information obtained "
-            "is used by third party leagues and members.\n\n"
-            "This tool is provided to aid in the screensharing process and no "
-            "information will be distributed by the owner of the software.\n\n"
-            "If the league or individual using the software on you is NOT listed "
-            "or has received proper authorization, please report it immediately "
-            "by DMing Discord user: converts_19942 or by joining the Comet server "
-            "and making a ticket.\n\nUnauthorized usage will be revoked.")
-        txt.configure(state="disabled")
-        tk.Label(f,text="You must agree before continuing.",font=("Segoe UI",9),fg=self.FG3,bg=self.BG).pack(anchor="w",pady=(0,8))
-        tk.Button(f,text="I Agree — Continue",font=("Segoe UI",11,"bold"),
-                  bg=self.GREEN,fg="#000",activebackground=self.GD,
-                  bd=0,padx=14,pady=10,relief="flat",cursor="hand2",
-                  command=lambda:(w.destroy(),self._pin_screen())).pack(fill="x")
-        dr = tk.Frame(f,bg=self.BG); dr.pack(fill="x",pady=(8,0))
-        tk.Label(dr,text="Declining closes the app.",font=("Segoe UI",8),fg=self.FG3,bg=self.BG).pack(side="left")
-        tk.Button(dr,text="Decline",font=("Segoe UI",9),bg=self.BG,fg=self.FG3,
-                  bd=0,relief="flat",cursor="hand2",
-                  command=lambda:(w.destroy(),self.root.destroy())).pack(side="right")
-
-    # ── PIN screen ─────────────────────────────────────────
-    def _pin_screen(self):
-        """PIN entry — no league selector, PIN already knows its league."""
-        w = tk.Toplevel(); self._pw = w
-        w.title("Comet"); w.configure(bg=self.BG)
-        w.resizable(False,False)
-        w.protocol("WM_DELETE_WINDOW", lambda:(w.destroy(),self.root.destroy()))
-        self._center(w,400,380)
-        f = tk.Frame(w,bg=self.BG,padx=44,pady=44); f.pack(fill="both",expand=True)
-
-        # Logo row
-        lr = tk.Frame(f,bg=self.BG); lr.pack(anchor="w",pady=(0,24))
-        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
-        tk.Label(lr,text="  Comet",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
-
-        tk.Label(f,text="Enter your PIN",font=("Segoe UI",20,"bold"),fg=self.FG,bg=self.BG).pack(anchor="w")
-        tk.Label(f,text="Get a PIN from your league agent.",
-                 font=("Segoe UI",10),fg=self.FG2,bg=self.BG).pack(anchor="w",pady=(4,22))
-
-        # PIN entry box
-        po = tk.Frame(f,bg=self.BORDER,bd=1); po.pack(fill="x",pady=(0,10))
-        pi = tk.Frame(po,bg=self.BG3); pi.pack(fill="both",padx=1,pady=1)
-        self._pv = tk.StringVar()
-        pe = tk.Entry(pi,textvariable=self._pv,font=(self.MONO,16,"bold"),
-                      bg=self.BG3,fg=self.GREEN,bd=0,insertbackground=self.GREEN,
-                      relief="flat",justify="center")
-        pe.pack(fill="x",padx=14,pady=14); pe.focus()
-
-        self._perr = tk.Label(f,text="",font=("Segoe UI",9),fg=self.RED,bg=self.BG)
-        self._perr.pack(anchor="w",pady=(0,8))
-
-        self._pbtn = tk.Button(f,text="Start Scan  →",font=("Segoe UI",12,"bold"),
-                                bg=self.GREEN,fg="#000",activebackground=self.GD,
-                                bd=0,padx=14,pady=12,relief="flat",cursor="hand2",
-                                command=self._do_pin)
-        self._pbtn.pack(fill="x")
-        pe.bind("<Return>",lambda e:self._do_pin())
-
-    def _do_pin(self):
-        pin = self._pv.get().strip().upper()
-        if not pin: self._perr.config(text="Enter a PIN to continue."); return
-        self._pbtn.config(state="disabled",text="Checking PIN…"); self._perr.config(text="")
-        threading.Thread(target=self._check_pin,args=(pin,),daemon=True).start()
-
-    def _check_pin(self, pin):
-        """Validate PIN — server returns the league, no need to pick it."""
-        try:
-            data = json.dumps({"pin": pin, "league": "AUTO"}).encode()
-            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin", data=data,
-                   headers={"Content-Type":"application/json","User-Agent":"CometScanner/5.0"},
-                   method="POST")
-            try:
-                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=12) as r:
-                    body = json.loads(r.read().decode())
-            except urllib.error.HTTPError as e:
-                try: body = json.loads(e.read().decode())
-                except Exception: body = {"error": f"Server error {e.code}"}
-                self.root.after(0, self._pfail, body.get("error","Invalid PIN")); return
-            if body.get("ok") or body.get("valid"):
-                self._pin    = pin
-                self._league = body.get("league","UFF")  # server tells us the league
-                self.root.after(0, self._pok)
-            else:
-                self.root.after(0, self._pfail, body.get("error","Invalid or already used PIN"))
-        except Exception as e:
-            self.root.after(0, self._pfail, f"Connection error: {e}")
-
-    def _pok(self):
-        """PIN accepted — destroy PIN window, show scanning screen, start scan immediately."""
-        self._pw.destroy()
-        self._build_scan_screen()
-        self.root.deiconify()
-        # Auto-start scan immediately — no "Run Scan" button for player to see
-        self.root.after(200, self._start)
-
-    def _pfail(self, err):
-        self._pbtn.config(state="normal", text="Start Scan  →")
-        self._perr.config(text=f"✗  {err}")
-
-    # ── Build scan progress screen ──────────────────────────
-    def _build_scan_screen(self):
-        """Fullscreen scanning progress window — player cannot interact with results."""
-        self.root.title("Comet — Scanning System")
-        self.root.geometry("520x440")
-        self.root.configure(bg=self.BG)
-        self.root.resizable(False, False)
-        self._center(self.root, 520, 440)
-        # Prevent closing during scan
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
-
-        cv = tk.Canvas(self.root, width=520, height=440, bg=self.BG, highlightthickness=0)
-        cv.place(x=0, y=0)
-        # Corner accents
-        cv.create_line(20,20,56,20, fill=self.GREEN, width=2)
-        cv.create_line(20,20,20,56, fill=self.GREEN, width=2)
-        cv.create_line(500,420,464,420, fill=self.FG3, width=1)
-        cv.create_line(500,420,500,384, fill=self.FG3, width=1)
-
-        f = tk.Frame(self.root, bg=self.BG)
-        f.place(x=50, y=50, width=420, height=340)
-
-        # Logo
-        lr = tk.Frame(f, bg=self.BG); lr.pack(anchor="w", pady=(0,32))
-        tk.Label(lr,text=" C ",font=(self.MONO,10,"bold"),fg="#000",bg=self.GREEN,padx=3,pady=3).pack(side="left")
-        tk.Label(lr,text="  Comet",font=("Segoe UI",13,"bold"),fg=self.FG,bg=self.BG).pack(side="left")
-        tk.Label(lr,text=f"  {self._league}",font=("Segoe UI",10),fg=self.FG3,bg=self.BG).pack(side="left",pady=2)
-
-        # Main status label — large
-        self._scan_title = tk.Label(f, text="Scanning System",
-                                     font=("Segoe UI",22,"bold"),
-                                     fg=self.FG, bg=self.BG)
-        self._scan_title.pack(anchor="w")
-
-        self._scan_sub = tk.Label(f, text="Initializing…",
-                                   font=("Segoe UI",11), fg=self.FG2, bg=self.BG)
-        self._scan_sub.pack(anchor="w", pady=(6,28))
-
-        # Progress bar
-        bar_frame = tk.Frame(f, bg=self.BG3, height=8, bd=0)
-        bar_frame.pack(fill="x", pady=(0,10))
-        bar_frame.pack_propagate(False)
-        self._bar_bg = bar_frame
-        self._bar_fill = tk.Frame(bar_frame, bg=self.GREEN, height=8)
-        self._bar_fill.place(x=0, y=0, width=0, height=8)
-
-        # Percentage label
-        self._pct_lbl = tk.Label(f, text="0%",
-                                   font=("Segoe UI",14,"bold"),
-                                   fg=self.GREEN, bg=self.BG)
-        self._pct_lbl.pack(anchor="center", pady=(4,0))
-
-        # Small status line
-        self._status_detail = tk.Label(f, text="",
-                                        font=(self.MONO,9), fg=self.FG3, bg=self.BG)
-        self._status_detail.pack(anchor="w", pady=(16,0))
-
-        self._scan_pct = 0
-        self._scan_bar_w = 420  # width of bar_frame
-
-    def _update_progress(self, pct, title=None, sub=None, detail=None):
-        """Update the scanning progress display."""
-        self._scan_pct = pct
-        try:
-            bar_w = self._bar_bg.winfo_width()
-            if bar_w < 10: bar_w = self._scan_bar_w
-            fill_w = int(bar_w * pct / 100)
-            self._bar_fill.place(x=0, y=0, width=fill_w, height=8)
-            self._pct_lbl.config(text=f"{pct}%")
-            if title:  self._scan_title.config(text=title)
-            if sub:    self._scan_sub.config(text=sub)
-            if detail: self._status_detail.config(text=detail)
-            self.root.update_idletasks()
-        except Exception: pass
-
-    def _start(self):
-        if self.scanning: return
-        self.scanning = True
-        self._update_progress(0, "Scanning System", "Initializing…")
-        threading.Thread(target=self._scan, daemon=True).start()
-
-    def _scan(self):
-        """Run full scan with progress updates — player sees % but not results."""
-        try:
-            # Progress steps — update bar as each section runs
-            steps = [
-                (5,  "Scanning System", "Checking ShellBags…"),
-                (10, "Scanning System", "Checking BAM execution history…"),
-                (15, "Scanning System", "Checking Prefetch…"),
-                (20, "Scanning System", "Checking AppCompat / UserAssist…"),
-                (25, "Scanning System", "Scanning Roblox logs…"),
-                (35, "Scanning System", "Scanning cheat files…"),
-                (45, "Scanning System", "Running YARA heuristics…"),
-                (52, "Scanning System", "Checking unsigned executables…"),
-                (58, "Scanning System", "Checking recycle bin…"),
-                (63, "Scanning System", "Checking event log…"),
-                (68, "Scanning System", "Checking Discord cache…"),
-                (73, "Scanning System", "Checking Discord downloads…"),
-                (78, "Scanning System", "Checking power timeline…"),
-                (82, "Scanning System", "Checking 2-PC indicators…"),
-                (86, "Scanning System", "Recovering deleted files…"),
-                (90, "Scanning System", "Collecting execution history…"),
-                (94, "Scanning System", "Finalizing…"),
-            ]
-            # Run each step in a thread so progress updates are visible
-            step_idx = [0]
-            def progress_worker():
-                for pct, title, sub in steps:
-                    time.sleep(0.3)
-                    self.root.after(0, self._update_progress, pct, title, sub)
-            prog_t = threading.Thread(target=progress_worker, daemon=True)
-            prog_t.start()
-
-            # Actually run the scan
-            r = run_full_scan(league=self._league)
-            self.results = r
-
-            # Show sending state
-            self.root.after(0, self._update_progress, 96, "Scanning System", "Sending results…", "Uploading to Comet servers")
-
-            # Send to website
-            wok, we = send_webhook(self.results)
-            bok, be = send_website(self.results, self._pin)
-
-            if bok:
-                self.root.after(0, self._update_progress, 100, "Scanning System", "Sending Results", "Upload complete ✓")
-                self.root.after(0, self._done_screen, True, "")
-            else:
-                self.root.after(0, self._update_progress, 100, "Scanning System", "Sending Results", f"Error: {be[:60]}")
-                self.root.after(0, self._done_screen, False, be)
-
-        except Exception:
-            import traceback
-            err = traceback.format_exc()
-            self.root.after(0, self._done_screen, False, err[:200])
-
-    def _done_screen(self, success, error_msg):
-        """Replace the scanning screen with a simple done/error message."""
-        self.scanning = False
-        # Clear the window
-        for w in self.root.winfo_children(): w.destroy()
-
-        self.root.configure(bg=self.BG)
-        f = tk.Frame(self.root, bg=self.BG)
-        f.place(relx=0.5, rely=0.5, anchor="center")
-
-        if success:
-            tk.Label(f, text="✓", font=("Segoe UI",48), fg=self.GREEN, bg=self.BG).pack()
-            tk.Label(f, text="Scan Complete", font=("Segoe UI",20,"bold"),
-                     fg=self.FG, bg=self.BG).pack(pady=(8,4))
-            tk.Label(f, text="Results have been sent to your agent.",
-                     font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
-            tk.Label(f, text="You may close this window.",
-                     font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(12,0))
-        else:
-            tk.Label(f, text="✗", font=("Segoe UI",48), fg=self.RED, bg=self.BG).pack()
-            tk.Label(f, text="Scan Failed", font=("Segoe UI",20,"bold"),
-                     fg=self.FG, bg=self.BG).pack(pady=(8,4))
-            tk.Label(f, text="Unable to send results.",
-                     font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
-            if error_msg:
-                tk.Label(f, text=error_msg[:80],
-                         font=(self.MONO,8), fg=self.RED, bg=self.BG,
-                         wraplength=360).pack(pady=(8,0))
-            tk.Label(f, text="Contact your agent for a new PIN.",
-                     font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(12,0))
-
-        # Allow closing now
-        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
-        tk.Button(f, text="Close", font=("Segoe UI",10),
-                  bg=self.BG4, fg=self.FG2, bd=0, padx=20, pady=8,
-                  relief="flat", cursor="hand2",
-                  command=self.root.destroy).pack(pady=(20,0))
-
-if __name__=="__main__":
-    root=tk.Tk()
-    App(root)
-    root.mainloop()
