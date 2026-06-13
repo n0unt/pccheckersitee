@@ -532,13 +532,14 @@ def api_submit_scan():
         ALL_TABS = ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
                     "unsigned","recycle","sysmain","processes","cleaners","network",
                     "registry_extra","discord","discord_memory","eventlog","jumplists","lnkfiles",
-                    "deleted_int","exec_history_text"]
+                    "deleted_int","exec_history_text","power_events","two_pc","deleted_recovery"]
         for tab_key in ALL_TABS:
             if tab_key in data:
                 report[tab_key+"_raw"] = data[tab_key]
         for field in ["cleaner_info","process_hits","cleaner_hits",
                       "eventlog_hits","jumplist_hits","lnk_hits","deleted_hits",
-                      "exec_history","roblox_log_hits","vpn_detected"]:
+                      "exec_history","roblox_log_hits","vpn_detected",
+                      "power_hits","two_pc_hits","recovery_hits","discord_memory_hits"]:
             if field in data: report[field] = data[field]
         # Never store raw IP/VPN info - only store the flag
         report.pop("vpn_info", None)
@@ -552,7 +553,12 @@ def api_submit_scan():
             "appcompat_raw","shellbags_raw","prefetch_raw","bam_raw",
             "roblox_raw","registry_extra_raw","discord_raw","sysmain_raw",
             "recycle_raw","cleaners_raw","network_raw","eventlog_raw",
+            "power_events_raw","two_pc_raw","deleted_recovery_raw",
+            "discord_memory_raw","exec_history_text_raw",
         ]
+        # Pre-trim cheat_raw aggressively — can have 400+ files
+        if "cheat_raw" in report and isinstance(report["cheat_raw"], str):
+            report["cheat_raw"] = report["cheat_raw"][:20000]
         for tab in TAB_TRIM_ORDER:
             if tab in report and isinstance(report[tab], str):
                 report[tab] = report[tab][:30000]
@@ -561,13 +567,13 @@ def api_submit_scan():
             report["exec_history"] = report["exec_history"][:50]
         report_str = json.dumps(report, default=str)
         # If still too big after trimming, do a second aggressive trim
-        if len(report_str) > 900000:
+        if len(report_str) > 1800000:
             for tab in TAB_TRIM_ORDER:
                 if tab in report:
                     report[tab] = report.get(tab,"")[:8000]
             report_str = json.dumps(report, default=str)
         # Last resort - only if truly enormous
-        if len(report_str) > 1400000:
+        if len(report_str) > 2800000:
             report["_truncated"] = True
             for tab in TAB_TRIM_ORDER:
                 if tab in report: report[tab] = "[truncated — too large]"
