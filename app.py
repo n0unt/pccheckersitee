@@ -941,6 +941,30 @@ def download_report(pin):
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+
+@app.route("/api/test-submit")
+@login_required
+@owner_required  
+def api_test_submit():
+    """Quick test to verify submit pipeline works end to end."""
+    try:
+        conn=get_db(); cur=conn.cursor()
+        # Check DB connection
+        cur.execute("SELECT COUNT(*) FROM scans")
+        scan_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM pins WHERE used=0")
+        active_pins = cur.fetchone()[0]
+        cur.close(); conn.close()
+        return jsonify({
+            "ok": True,
+            "db": "connected",
+            "scan_count": scan_count,
+            "active_pins": active_pins,
+            "message": "Submit pipeline working"
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 # ── Public pages ─────────────────────────────────────────────
 @app.route("/download")
 def download_page():
