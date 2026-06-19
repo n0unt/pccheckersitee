@@ -205,7 +205,6 @@ def do_login():
     row=row_to_dict(cur.fetchone(),cur); cur.close(); conn.close()
     if not row:
         return redirect(url_for("login_page")+"?error=no_access")
-    import hashlib
     pw_hash=hashlib.sha256(password.encode()).hexdigest()
     stored=row.get("password_hash","")
     # Owner with no password set = allow and save hash
@@ -272,7 +271,7 @@ def auth_debug():
         "state": state,
     })
     oauth_url = f"https://discord.com/api/oauth2/authorize?{params}"
-    
+
     # Check if bot token works — use verbose version that shows errors
     bot_self = {}
     guild_info = {}
@@ -316,7 +315,7 @@ BOT ID               : {bot_self.get("id","?")}
 GUILD NAME           : {guild_info.get("name") or f"<span class='bad'>FAILED: {guild_raw_error or 'no response'}</span>"}
 GUILD ID             : {guild_info.get("id","?")}
 
-ROLE_COMET           : {ROLE_LITE}
+ROLE_COMET           : {ROLE_COMET}
 ROLE_UFF             : {ROLE_UFF}
 ROLE_FFL             : {ROLE_FFL}
 </pre>
@@ -334,8 +333,8 @@ def login_page():
     error = request.args.get("error")
     errors = {
         "no_access": "Account not found. Contact an admin.",
-                "db_error": "Database error during login.",
-                        "bad_password": "Incorrect password.",
+        "db_error": "Database error during login.",
+        "bad_password": "Incorrect password.",
         "empty": "Please enter username and password.",
     }
     return render_template("login.html", error=errors.get(error, error if error else None))
@@ -345,9 +344,44 @@ def login_page():
 @login_required
 def dashboard():
     user = get_user()
+    conn = get_db(); cur = conn.cursor()
+
+    # ── Scans — filtered by league access unless owner/admin ──
+    if user["role"] in ("owner", "admin"):
+        cur.execute("SELECT * FROM scans ORDER BY submitted DESC LIMIT 200")
+    else:
+        allowed = get_user_leagues(user)
+        if allowed:
+            ph = ",".join(["%s"] * len(allowed))
+            cur.execute(f"SELECT * FROM scans WHERE league IN ({ph}) ORDER BY submitted DESC LIMIT 200", allowed)
+        else:
+            cur.execute("SELECT * FROM scans WHERE 1=0")
+    scans = rows_to_dicts(cur.fetchall(), cur)
+
+    # ── Pins — template expects p.pin_code and p.created_at, DB has pin/created ──
+    if user["role"] in ("owner", "admin"):
+        cur.execute("""SELECT *, pin AS pin_code, created AS created_at
+                       FROM pins ORDER BY created DESC LIMIT 50""")
+    else:
+        cur.execute("""SELECT *, pin AS pin_code, created AS created_at
+                       FROM pins WHERE agent_id=%s ORDER BY created DESC LIMIT 50""",
+                    (user["id"],))
+    pins = rows_to_dicts(cur.fetchall(), cur)
+
+    # ── All users — template expects u.league (singular); DB column is "leagues" ──
+    all_users = []
+    if user["role"] in ("owner", "admin"):
+        cur.execute("SELECT id, username, role, leagues FROM users ORDER BY created DESC")
+        all_users = rows_to_dicts(cur.fetchall(), cur)
+        for u in all_users:
+            u["league"] = u.get("leagues")
+
+    cur.close(); conn.close()
+
     return render_template("dashboard.html", user=user,
                            role=user["role"],
-                           leagues=get_user_leagues(user))
+                           leagues=get_user_leagues(user),
+                           scans=scans, pins=pins, all_users=all_users)
 
 @app.route("/results/<pin>")
 @login_required
@@ -394,7 +428,10 @@ def api_stats():
         cur.execute("SELECT COUNT(*) FROM scans WHERE league='UFF'"); uff_c = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM scans WHERE league='FFL'"); ffl_c = cur.fetchone()[0]
     else:
-        allowed = get_user_leagues(user)
+        allowed = get_user_leagues(user) if user else []
+        if not allowed:
+            cur.close(); conn.close()
+            return jsonify({"total":0,"cheater":0,"suspicious":0,"clean":0,"uff":0,"ffl":0})
         ph = ",".join(["%s"]*len(allowed))
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE league IN ({ph})", allowed); total = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM scans WHERE verdict IN ('CHEATER','AUTO FAIL','AUTO_FAIL','AUTO-FAIL') AND league IN ({ph})", allowed); cheater = cur.fetchone()[0]
@@ -481,6 +518,12 @@ def api_gen_pin():
     cur.close(); conn.close()
     return jsonify({"pin":pin,"league":league,"expires":expires,
                     "results_url": f"/results/{pin}"})
+
+# Alias — dashboard.html JS calls /api/generate_pin (singular path used by frontend)
+@app.route("/api/generate_pin", methods=["POST"])
+@login_required
+def api_generate_pin_alias():
+    return api_gen_pin()
 
 @app.route("/api/validate_pin", methods=["POST"])
 @app.route("/api/pins/validate", methods=["POST"])
@@ -644,7 +687,10 @@ def api_admin_create_user():
     username = data.get("username","").strip()
     password = data.get("password","").strip()
     role     = data.get("role","agent")
-    leagues  = data.get("leagues","")
+    # Frontend dashboard sends "league" (singular) — accept either key
+    leagues  = data.get("leagues", data.get("league",""))
+    if leagues == "ALL":
+        leagues = "UFF,FFL"
     if not username or not password:
         return jsonify({"error":"Username and password required"}),400
     conn=get_db(); cur=conn.cursor()
