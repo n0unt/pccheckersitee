@@ -8,392 +8,208 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#080b10;--surface:#0f1420;--surface2:#131925;--surface3:#1a2235;
-  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);
-  --fg:#f0f4ff;--fg2:#8892a4;--fg3:#3d4a5c;
-  --green:#00f5a0;--green-glow:rgba(0,245,160,0.18);--green-dim:rgba(0,245,160,0.08);
-  --red:#ff4d6d;--blue:#4d9fff;--amber:#ffb830;
+  --bg:#030508;--s1:#060a12;--s2:#0a1020;--s3:#0e1830;--s4:#121e38;
+  --border:rgba(59,130,246,0.12);--border2:rgba(59,130,246,0.25);
+  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
+  --blue:#3b82f6;--blue2:#2563eb;--blue3:#1d4ed8;
+  --blueg:rgba(59,130,246,0.15);--blueg2:rgba(59,130,246,0.08);
+  --red:#ef4444;--amb:#f59e0b;
 }
-html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;min-height:100%;scroll-behavior:smooth;}
-
-/* Ambient bg */
+html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;min-height:100%;}
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;
   background:
-    radial-gradient(ellipse 90% 60% at 15% 10%, rgba(0,245,160,0.05) 0%,transparent 55%),
-    radial-gradient(ellipse 70% 70% at 85% 90%, rgba(77,159,255,0.04) 0%,transparent 55%),
-    radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0,245,160,0.02) 0%,transparent 60%);
+    radial-gradient(ellipse 80% 60% at 15% 0%, rgba(59,130,246,0.07) 0%,transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 100%, rgba(37,99,235,0.05) 0%,transparent 55%);
 }
-/* Grid */
 body::after{
   content:'';position:fixed;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
-  background-size:56px 56px;
+  background-image:linear-gradient(rgba(59,130,246,0.025) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(59,130,246,0.025) 1px,transparent 1px);
+  background-size:60px 60px;
 }
-
-/* ── Nav ── */
 nav{
   position:sticky;top:0;z-index:100;
-  background:rgba(8,11,16,0.85);backdrop-filter:blur(16px);
+  background:rgba(3,5,8,0.9);backdrop-filter:blur(20px);
   border-bottom:1px solid var(--border);
-  height:58px;display:flex;align-items:center;padding:0 40px;gap:0;
+  height:60px;display:flex;align-items:center;padding:0 40px;
 }
-.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:32px;}
-.nav-mark{
-  width:32px;height:32px;border-radius:10px;
-  background:linear-gradient(135deg,var(--green),#00c97a);
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:36px;}
+.mark{
+  width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--blue3));
   display:flex;align-items:center;justify-content:center;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#000;
-  box-shadow:0 0 18px var(--green-glow);
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;
+  box-shadow:0 0 20px rgba(59,130,246,0.4);
 }
-.nav-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--fg);}
-.nav-links{display:flex;align-items:center;gap:6px;}
-.nav-links a{
-  color:var(--fg2);text-decoration:none;font-size:13px;
-  padding:5px 12px;border-radius:8px;transition:all 0.15s;
-}
-.nav-links a:hover{color:var(--fg);background:rgba(255,255,255,0.04);}
-.nav-links a.active{color:var(--green);}
-.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.nav-btn-ghost{
-  color:var(--fg2);text-decoration:none;font-size:13px;
-  padding:6px 14px;border:1px solid var(--border2);border-radius:9px;
-  transition:all 0.15s;
-}
-.nav-btn-ghost:hover{color:var(--fg);border-color:rgba(255,255,255,0.15);}
-.nav-btn{
-  background:var(--green);color:#000;text-decoration:none;
-  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
-  padding:7px 16px;border-radius:9px;
-  box-shadow:0 0 16px var(--green-glow);
-  transition:all 0.15s;
-}
-.nav-btn:hover{opacity:0.9;transform:translateY(-1px);}
+.bname{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--fg);}
+.nav-links{display:flex;gap:4px;}
+.nav-links a{color:var(--fg2);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:8px;transition:all .15s;}
+.nav-links a:hover{color:var(--fg);background:var(--blueg2);}
+.nav-links a.active{color:var(--blue);background:var(--blueg2);}
+.nav-r{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.btn-ghost{color:var(--fg2);text-decoration:none;font-size:13px;padding:6px 14px;border:1px solid var(--border2);border-radius:9px;transition:all .15s;}
+.btn-ghost:hover{color:var(--fg);border-color:var(--blue);background:var(--blueg2);}
+.btn-blue{background:var(--blue);color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:7px 16px;border-radius:9px;transition:all .15s;border:none;cursor:pointer;}
+.btn-blue:hover{background:var(--blue2);}
 
-/* ── Hero ── */
-.hero{
-  position:relative;z-index:1;
-  max-width:900px;margin:0 auto;
-  padding:100px 24px 80px;text-align:center;
-}
-.hero-eyebrow{
+/* Hero */
+.hero{min-height:90vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:80px 20px;position:relative;}
+.hero-inner{max-width:780px;position:relative;z-index:1;}
+.hero-badge{
   display:inline-flex;align-items:center;gap:8px;
-  font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;
-  color:var(--green);background:var(--green-dim);border:1px solid rgba(0,245,160,0.2);
-  padding:5px 14px;border-radius:20px;margin-bottom:24px;
+  background:var(--blueg);border:1px solid var(--border2);
+  border-radius:20px;padding:5px 14px 5px 10px;
+  font-size:12px;font-weight:600;color:var(--blue);
+  letter-spacing:.04em;text-transform:uppercase;margin-bottom:24px;
 }
-.hero-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
-h1{
-  font-family:'Syne',sans-serif;font-size:clamp(40px,7vw,72px);
-  font-weight:800;line-height:1.06;letter-spacing:-0.03em;
-  margin-bottom:20px;
+.hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1{font-family:'Syne',sans-serif;font-size:clamp(2.6rem,6vw,4.4rem);font-weight:800;line-height:1.1;margin-bottom:20px;letter-spacing:-.02em;}
+h1 span{
+  background:linear-gradient(135deg,#60a5fa,#3b82f6,#1d4ed8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-h1 .accent{
-  background:linear-gradient(135deg,var(--green) 0%,#00c9ff 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  background-clip:text;
-}
-.hero-sub{
-  font-size:clamp(15px,2.5vw,18px);color:var(--fg2);
-  max-width:560px;margin:0 auto 40px;line-height:1.7;
-}
-.hero-actions{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;}
+.hero-sub{font-size:1.15rem;color:var(--fg2);max-width:560px;margin:0 auto 40px;line-height:1.7;}
+.hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
 .btn-primary{
   display:inline-flex;align-items:center;gap:8px;
-  background:var(--green);color:#000;text-decoration:none;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
-  padding:13px 28px;border-radius:12px;
-  box-shadow:0 0 30px var(--green-glow);
-  transition:all 0.2s;
+  background:var(--blue);color:#fff;text-decoration:none;
+  font-size:15px;font-weight:700;padding:14px 28px;border-radius:12px;
+  border:none;cursor:pointer;transition:all .2s;
+  box-shadow:0 0 32px rgba(59,130,246,0.35);
 }
-.btn-primary:hover{opacity:0.9;transform:translateY(-2px);box-shadow:0 4px 40px var(--green-glow);}
+.btn-primary:hover{background:var(--blue2);box-shadow:0 0 40px rgba(59,130,246,0.5);transform:translateY(-1px);}
 .btn-secondary{
   display:inline-flex;align-items:center;gap:8px;
   background:transparent;color:var(--fg);text-decoration:none;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:600;
-  padding:13px 28px;border-radius:12px;border:1px solid var(--border2);
-  transition:all 0.2s;
+  font-size:15px;font-weight:600;padding:14px 28px;border-radius:12px;
+  border:1px solid var(--border2);cursor:pointer;transition:all .2s;
 }
-.btn-secondary:hover{background:rgba(255,255,255,0.04);transform:translateY(-2px);}
+.btn-secondary:hover{background:var(--blueg2);border-color:var(--blue);}
+.arrow-icon{width:18px;height:18px;display:inline-block;}
 
-/* ── Stats bar ── */
-.stats-bar{
-  position:relative;z-index:1;
-  display:grid;grid-template-columns:repeat(3,1fr);
-  max-width:700px;margin:60px auto 0;
-  border:1px solid var(--border);background:var(--surface);border-radius:20px;
-  overflow:hidden;
-}
-.stats-bar-item{padding:24px 20px;text-align:center;}
-.stats-bar-item+.stats-bar-item{border-left:1px solid var(--border);}
-.sb-num{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--green);line-height:1;}
-.sb-label{font-size:11px;color:var(--fg2);margin-top:4px;}
+/* Stats bar */
+.stats{display:flex;justify-content:center;gap:48px;padding:32px 40px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--s1);flex-wrap:wrap;}
+.stat-n{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--blue);}
+.stat-l{font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
 
-/* ── Features ── */
-.features{position:relative;z-index:1;max-width:1000px;margin:80px auto;padding:0 24px;}
-.section-tag{font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--green);text-align:center;margin-bottom:12px;}
-.section-title{font-family:'Syne',sans-serif;font-size:clamp(28px,4vw,40px);font-weight:800;text-align:center;margin-bottom:10px;letter-spacing:-0.02em;}
-.section-sub{font-size:15px;color:var(--fg2);text-align:center;max-width:500px;margin:0 auto 48px;line-height:1.7;}
-.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.feat-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:18px;
-  padding:24px;transition:all 0.2s;position:relative;overflow:hidden;
+/* Features */
+.section{padding:80px 40px;max-width:1100px;margin:0 auto;}
+.section-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:12px;}
+.section-title{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;margin-bottom:14px;}
+.section-sub{color:var(--fg2);font-size:1rem;margin-bottom:48px;max-width:500px;line-height:1.7;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+.card{
+  background:var(--s1);border:1px solid var(--border);border-radius:16px;
+  padding:24px;transition:all .2s;position:relative;overflow:hidden;
 }
-.feat-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,245,160,0.3),transparent);
-  opacity:0;transition:opacity 0.2s;
-}
-.feat-card:hover{border-color:rgba(0,245,160,0.15);transform:translateY(-2px);}
-.feat-card:hover::before{opacity:1;}
-.feat-icon{
-  width:40px;height:40px;border-radius:12px;
-  background:var(--green-dim);border:1px solid rgba(0,245,160,0.2);
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;margin-bottom:16px;
-}
-.feat-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
-.feat-desc{font-size:13px;color:var(--fg2);line-height:1.6;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--blue),transparent);opacity:0;transition:.2s;}
+.card:hover{border-color:var(--border2);transform:translateY(-2px);background:var(--s2);}
+.card:hover::before{opacity:1;}
+.card-icon{width:44px;height:44px;border-radius:12px;background:var(--blueg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;}
+.card h3{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;margin-bottom:8px;}
+.card p{font-size:13px;color:var(--fg2);line-height:1.6;}
 
-/* ── How it works ── */
-.hiw{position:relative;z-index:1;max-width:860px;margin:0 auto 80px;padding:0 24px;}
-.hiw-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:48px;position:relative;}
-.hiw-steps::before{
-  content:'';position:absolute;top:20px;left:10%;right:10%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,245,160,0.2) 20%,rgba(0,245,160,0.2) 80%,transparent);
-}
-.hiw-step{text-align:center;padding:0 12px;}
-.hiw-num{
-  width:40px;height:40px;border-radius:50%;
-  background:var(--surface);border:1px solid rgba(0,245,160,0.3);
-  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green);
-  position:relative;z-index:1;
-}
-.hiw-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;margin-bottom:6px;}
-.hiw-desc{font-size:12px;color:var(--fg2);line-height:1.6;}
+/* Download section */
+.dl-section{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:48px;margin:0 auto 80px;max-width:800px;text-align:center;position:relative;overflow:hidden;}
+.dl-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(59,130,246,0.08),transparent);pointer-events:none;}
+.dl-title{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;margin-bottom:10px;}
+.dl-sub{color:var(--fg2);font-size:14px;margin-bottom:28px;line-height:1.6;}
+.dl-info{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:20px;}
+.dl-tag{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg3);}
+.dl-tag span{color:var(--blue);}
 
-/* ── CTA ── */
-.cta{
-  position:relative;z-index:1;
-  margin:0 24px 80px;
-  background:var(--surface);border:1px solid rgba(0,245,160,0.15);
-  border-radius:24px;padding:60px 40px;text-align:center;
-  overflow:hidden;
-}
-.cta::before{
-  content:'';position:absolute;
-  width:400px;height:400px;border-radius:50%;
-  background:radial-gradient(circle,rgba(0,245,160,0.06) 0%,transparent 70%);
-  top:50%;left:50%;transform:translate(-50%,-50%);
-  pointer-events:none;
-}
-.cta-title{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,38px);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em;}
-.cta-sub{font-size:15px;color:var(--fg2);margin-bottom:28px;line-height:1.6;}
-
-/* ── Footer ── */
-footer{
-  position:relative;z-index:1;
-  border-top:1px solid var(--border);
-  padding:24px 40px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.foot-brand{display:flex;align-items:center;gap:8px;}
-.foot-mark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--green),#00c97a);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:9px;font-weight:800;color:#000;}
-.foot-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;}
-.foot-links{display:flex;align-items:center;gap:20px;}
-.foot-links a{color:var(--fg3);text-decoration:none;font-size:12px;transition:color 0.15s;}
+/* Footer */
+footer{border-top:1px solid var(--border);padding:24px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.foot-brand{display:flex;align-items:center;gap:8px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--fg2);}
+.foot-links{display:flex;gap:20px;}
+.foot-links a{color:var(--fg3);text-decoration:none;font-size:12px;transition:.15s;}
 .foot-links a:hover{color:var(--fg2);}
-.foot-copy{font-size:11px;color:var(--fg3);}
-
-@media(max-width:700px){
-  .feat-grid{grid-template-columns:1fr;}
-  .hiw-steps{grid-template-columns:1fr 1fr;}
-  .hiw-steps::before{display:none;}
-  nav{padding:0 16px;}
-  .nav-links{display:none;}
-  footer{flex-direction:column;gap:16px;text-align:center;}
-  .stats-bar{grid-template-columns:1fr;}
-  .stats-bar-item+.stats-bar-item{border-left:none;border-top:1px solid var(--border);}
-}
+.copy{font-size:11px;color:var(--fg3);}
 </style>
 </head>
 <body>
 
 <nav>
-  <a href="/" class="nav-brand">
-    <div class="nav-mark">L</div>
-    <div class="nav-name">Comet</div>
-  </a>
+  <a href="/" class="brand"><div class="mark">C</div><span class="bname">Comet</span></a>
   <div class="nav-links">
     <a href="/" class="active">Home</a>
     <a href="/download">Download</a>
+    <a href="/dashboard">Dashboard</a>
     <a href="/terms">Terms</a>
     <a href="/privacy">Privacy</a>
   </div>
-  <div class="nav-right">
+  <div class="nav-r">
     {% if user %}
-    <a href="/dashboard" class="nav-btn-ghost">Dashboard</a>
-    <a href="/logout" class="nav-btn-ghost">Sign out</a>
+    <a href="/dashboard" class="btn-ghost">Dashboard</a>
+    <a href="/auth/logout" class="btn-blue">Sign out</a>
     {% else %}
-    <a href="/login" class="nav-btn-ghost">Sign in</a>
-    <a href="/auth/discord" class="nav-btn">Get Access</a>
+    <a href="/login" class="btn-blue">Sign in</a>
     {% endif %}
   </div>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-eyebrow">
-    <span class="hero-eyebrow-dot"></span>
-    Forensic Screenshare Tool
-  </div>
-  <h1>
-    Catch cheaters.<br>
-    <span class="accent">Keep it clean.</span>
-  </h1>
-  <p class="hero-sub">
-    Comet is a forensic scanner built for Roblox league screensharing.
-    Advanced forensic analysis for competitive Roblox leagues.
-  </p>
-  <div class="hero-actions">
-    {% if user %}
-    <a href="/dashboard" class="btn-primary">Open Dashboard</a>
-    <a href="/download" class="btn-secondary">↓ Download Scanner</a>
-    {% else %}
-    <a href="/auth/discord" class="btn-primary">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-      Sign in with Discord
-    </a>
-    <a href="/download" class="btn-secondary">↓ Download Scanner</a>
-    {% endif %}
-  </div>
-
-  <div class="stats-bar">
-    <div class="stats-bar-item">
-      <div class="sb-num" id="stat-total">—</div>
-      <div class="sb-label">Total Scans</div>
-    </div>
-    <div class="stats-bar-item">
-      <div class="sb-num" id="stat-caught">—</div>
-      <div class="sb-label">Cheaters Caught</div>
-    </div>
-    <div class="stats-bar-item">
-      <div class="sb-num">2</div>
-      <div class="sb-label">Leagues Supported</div>
+  <div class="hero-inner">
+    <div class="hero-badge"><span></span>Forensic PC Scanner</div>
+    <h1>Roblox screenshare<br>&<br><span>Forensic scanner</span></h1>
+    <p class="hero-sub">Generate a PIN and provide it to the individual being checked.</p>
+    <div class="hero-btns">
+      <a href="/download" class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Scanner
+      </a>
+      <a href="/dashboard" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        View Dashboard
+      </a>
     </div>
   </div>
 </section>
+
 
 <!-- Features -->
-<section class="features">
-  <div class="section-tag">Capabilities</div>
-  <div class="section-title">Built to find everything</div>
-  <p class="section-sub">Comet performs deep forensic analysis across multiple system layers — even after cleanup attempts.</p>
-  <div class="feat-grid">
-    <div class="feat-card">
-      <div class="feat-icon">🔍</div>
-      <div class="feat-name">Deep System Forensics</div>
-      <div class="feat-desc">Comprehensive analysis of Windows system artifacts that persist regardless of user-level cleanup.</div>
-    </div>
-    <div class="feat-card">
-      <div class="feat-icon">⚡</div>
-      <div class="feat-name">Execution History Analysis</div>
-      <div class="feat-desc">Recovers evidence of programs that have been run on the machine, even if they've been removed.</div>
-    </div>
-    <div class="feat-card">
-      <div class="feat-icon">🎮</div>
-      <div class="feat-name">Roblox Account Detection</div>
-      <div class="feat-desc">Surfaces all accounts associated with the machine across multiple detection vectors.</div>
-    </div>
-    <div class="feat-card">
-      <div class="feat-icon">🛡</div>
-      <div class="feat-name">Cheat Detection</div>
-      <div class="feat-desc">Multi-layer detection that catches both active and previously-used cheat software.</div>
-    </div>
-    <div class="feat-card">
-      <div class="feat-icon">🗑</div>
-      <div class="feat-name">Tamper & Cleanup Detection</div>
-      <div class="feat-desc">Identifies signs of deliberate evidence removal — flagged automatically as high severity.</div>
-    </div>
-    <div class="feat-card">
-      <div class="feat-icon">💬</div>
-      <div class="feat-name">Identity Analysis</div>
-      <div class="feat-desc">Cross-references multiple identity sources to surface alt accounts and ban evasion patterns.</div>
-    </div>
+<div class="section">
+  <div class="section-label">Detection Scope</div>
+  <div class="grid">
+    <div class="card"><div class="card-icon">🔍</div><h3>Cheat File Detection</h3><p>400+ executor signatures.</p></div>
+    <div class="card"><div class="card-icon">🗑️</div><h3>Deleted Evidence Recovery</h3><p>Recovers deleted cheat evidence.</p></div>
+    <div class="card"><div class="card-icon">⏱️</div><h3>Logon Session Timeline</h3><p>Full 15-day logon/logoff history.</p></div>
+    <div class="card"><div class="card-icon">🚩</div><h3>FastFlag Detection</h3><p>Reads active FastFlags from logs and ClientAppSettings.json.</p></div>
+    <div class="card"><div class="card-icon">🧹</div><h3>Cleaner Detection</h3><p>Detects Cleaners .</p></div>
+    <div class="card"><div class="card-icon">📅</div><h3>Factory Reset Detection</h3><p>Checks install date, BIOS date, OS age, previous installs, and new profile creation.</p></div>
   </div>
-</section>
+</div>
 
-<!-- How it works -->
-<section class="hiw">
-  <div class="section-tag">Process</div>
-  <div class="section-title">How it works</div>
-  <p class="section-sub">Simple four-step process from PIN generation to results.</p>
-  <div class="hiw-steps">
-    <div class="hiw-step">
-      <div class="hiw-num">1</div>
-      <div class="hiw-label">Agent generates PIN</div>
-      <div class="hiw-desc">Agent logs in and creates a one-time PIN tied to their league.</div>
-    </div>
-    <div class="hiw-step">
-      <div class="hiw-num">2</div>
-      <div class="hiw-label">Player runs scanner</div>
-      <div class="hiw-desc">Player downloads the .exe, agrees to terms, and enters the PIN.</div>
-    </div>
-    <div class="hiw-step">
-      <div class="hiw-num">3</div>
-      <div class="hiw-label">Scan runs locally</div>
-      <div class="hiw-desc">Scanner checks system artifacts, registry, files, and Discord cache.</div>
-    </div>
-    <div class="hiw-step">
-      <div class="hiw-num">4</div>
-      <div class="hiw-label">Results appear live</div>
-      <div class="hiw-desc">Results post to the dashboard instantly with full breakdown and verdict.</div>
-    </div>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta" style="max-width:960px;margin:0 auto 80px;">
-  {% if user %}
-  <div class="cta-title">Welcome back, {{ user.username }}</div>
-  <p class="cta-sub">Head to your dashboard to view recent scans and generate new PINs.</p>
-  <a href="/dashboard" class="btn-primary">Open Dashboard →</a>
-  {% else %}
-  <div class="cta-title">Ready to start scanning?</div>
-  <p class="cta-sub">Sign in with Discord to access your dashboard. You need the Comet, UFF Access, or FFL Access role.</p>
-  <a href="/auth/discord" class="btn-primary">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-    Sign in with Discord
+<!-- Download section -->
+<div style="padding:0 40px">
+<div class="dl-section" id="download">
+  <div class="dl-title">Download Comet Scanner</div>
+  <p class="dl-sub">Get a PIN from your league agent, run the scanner, and results are automatically sent. No interaction needed from the player.</p>
+  <a href="/download" class="btn-primary" style="font-size:16px;padding:16px 36px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download Comet.exe
   </a>
-  {% endif %}
-</section>
+  <div class="dl-info">
+    <div class="dl-tag"><span>✓</span> Windows 10/11</div>
+    <div class="dl-tag"><span>✓</span> Requires Admin (auto-prompted)</div>
+    <div class="dl-tag"><span>✓</span> PIN Required to Run</div>
+    <div class="dl-tag"><span>✓</span> Results auto-sent to agent</div>
+  </div>
+</div>
+</div>
 
 <footer>
-  <div class="foot-brand">
-    <div class="foot-mark">L</div>
-    <div class="foot-name">Comet</div>
-  </div>
+  <div class="foot-brand"><div class="mark" style="width:26px;height:26px;font-size:11px">C</div> Comet</div>
   <div class="foot-links">
-    <a href="/">Home</a>
-    <a href="/download">Download</a>
     <a href="/terms">Terms</a>
     <a href="/privacy">Privacy</a>
+    <a href="/dashboard">Dashboard</a>
   </div>
-  <div class="foot-copy">© 2026 Comet. All rights reserved.</div>
+  <div class="copy">© 2026 Comet Forensic Scanner</div>
 </footer>
 
-<script>
-// Load public stats (no auth needed)
-fetch('/api/stats').then(r=>r.json()).then(d=>{
-  if(d.total !== undefined){
-    document.getElementById('stat-total').textContent = d.total;
-    document.getElementById('stat-caught').textContent = d.cheater;
-  }
-}).catch(()=>{
-  document.getElementById('stat-total').textContent = '—';
-  document.getElementById('stat-caught').textContent = '—';
-});
-</script>
 </body>
 </html>
