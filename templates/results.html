@@ -2,769 +2,537 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Comet — Results {{ pin.pin }}</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#080b10;--surface:#0f1420;--s2:#131925;--s3:#1a2235;--s4:#1f2840;
-  --border:rgba(255,255,255,0.06);--b2:rgba(255,255,255,0.1);--b3:rgba(255,255,255,0.04);
-  --fg:#f0f4ff;--fg2:#8892a4;--fg3:#3d4a5c;
-  --green:#00f5a0;--gd:rgba(0,245,160,0.08);--gd2:rgba(0,245,160,0.12);
-  --red:#ff4d6d;--rd:rgba(255,77,109,0.08);
-  --amber:#ffb830;--ad:rgba(255,184,48,0.08);
-  --blue:#4d9fff;--bld:rgba(77,159,255,0.08);
-  --cyan:#00e5ff;
+  --bg:#030508;--s1:#060a12;--s2:#0a1020;--s3:#0d1528;
+  --border:rgba(59,130,246,0.1);--border2:rgba(59,130,246,0.22);
+  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
+  --blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.12);--blueg2:rgba(59,130,246,0.06);
+  --red:#ef4444;--redg:rgba(239,68,68,0.08);--redg2:rgba(239,68,68,0.15);
+  --amb:#f59e0b;--ambg:rgba(245,158,11,0.08);
+  --green:#22c55e;--greeng:rgba(34,197,94,0.08);
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(59,130,246,0.05),transparent);}
+
 /* Nav */
-.snav{height:44px;background:rgba(8,11,16,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;position:relative;z-index:200;}
-.snav a{color:var(--fg2);text-decoration:none;font-size:12px;}
-.snav a:hover{color:var(--fg);}
-.brand{display:flex;align-items:center;gap:8px;color:var(--fg);}
-.bmark{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--green),#00c97a);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;}
-.nav-links{display:flex;gap:20px;margin-left:16px;}
-.nav-right{margin-left:auto;display:flex;gap:12px;align-items:center;}
-/* Shell */
-.shell{display:flex;height:calc(100vh - 44px);}
-/* Sidebar */
-.sb{width:224px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
-.sb-top{padding:16px 14px;border-bottom:1px solid var(--border);}
-.back{display:flex;align-items:center;gap:6px;color:var(--fg2);text-decoration:none;font-size:12px;margin-bottom:12px;}
-.back:hover{color:var(--fg);}
-.pin-code{font-family:'DM Mono',monospace;font-size:17px;font-weight:500;letter-spacing:.14em;color:var(--green);}
-.pin-meta{font-size:10px;color:var(--fg2);margin-top:3px;}
-.pin-actions{display:flex;gap:6px;margin-top:10px;}
-.pin-btn{font-size:10px;font-weight:600;padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--s3);color:var(--fg2);cursor:pointer;text-decoration:none;transition:all .15s;}
-.pin-btn:hover{color:var(--fg);background:var(--s4);}
-.pin-btn.del{border-color:rgba(255,77,109,.25);color:rgba(255,77,109,.7);}
-.pin-btn.del:hover{background:var(--rd);color:var(--red);}
-.tab-list{flex:1;padding:8px 6px;overflow-y:auto;}
-.tsect{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);padding:10px 8px 4px;}
-.ti{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:9px;font-size:12px;color:var(--fg2);cursor:pointer;transition:all .15s;margin-bottom:1px;}
-.ti:hover{color:var(--fg);background:var(--s3);}
-.ti.active{color:var(--green);background:var(--gd);}
-.tlab{display:flex;align-items:center;gap:7px;}
-.hc{font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;}
-.hc.red{background:var(--rd);color:var(--red);border:1px solid rgba(255,77,109,.2);}
-.hc.amb{background:var(--ad);color:var(--amber);border:1px solid rgba(255,184,48,.2);}
-.hc.dim{color:var(--fg3);}
-/* Content */
-.cnt{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-.tbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0;}
-.ptitle{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
-.vbadge{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 12px;border-radius:20px;}
-.vbadge.REVIEW{color:var(--amber);background:var(--ad);border:1px solid rgba(255,184,48,.25);}
-.vbadge.CHEATER,.vbadge.AUTO_FAIL,.vbadge.AUTO-FAIL{color:var(--red);background:var(--rd);border:1px solid rgba(255,77,109,.25);}
-.vbadge.CLEAN{color:var(--green);background:var(--gd);border:1px solid rgba(0,245,160,.25);}
-.vbadge.PENDING{color:var(--fg3);background:var(--s3);border:1px solid var(--border);}
-.tbar-right{margin-left:auto;font-size:11px;color:var(--fg2);}
-.main{flex:1;overflow-y:auto;padding:24px;}
-/* Panels */
-.panel{display:none;}
-.panel.active{display:block;animation:rise .2s cubic-bezier(.16,1,.3,1);}
-@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-/* Info grid */
-.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
-.icard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
-.ilabel{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);margin-bottom:4px;}
-.ival{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;}
-.ival.red{color:var(--red)}.ival.green{color:var(--green)}.ival.amb{color:var(--amber)}
-/* Mini stats */
-.mrow{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
-.mcard{flex:1;min-width:100px;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
-.mlabel{font-size:10px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;}
-.mval{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-top:2px;}
-.mval.red{color:var(--red)}.mval.green{color:var(--green)}.mval.amb{color:var(--amber)}
-/* Det bars */
-.det-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:16px;}
-.drow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--b3);}
-.drow:last-child{border-bottom:none;}
-.dname{font-size:12px;color:var(--fg2);width:140px;flex-shrink:0;}
-.dbar-w{flex:1;height:4px;background:var(--s3);border-radius:4px;overflow:hidden;}
-.dbar{height:100%;background:var(--s4);border-radius:4px;}
-.drow.hit .dbar{background:var(--red);}
-.drow.amb .dbar{background:var(--amber);}
-.dcnt{font-family:'DM Mono',monospace;font-size:12px;color:var(--fg3);width:28px;text-align:right;flex-shrink:0;}
-.drow.hit .dcnt{color:var(--red)}.drow.amb .dcnt{color:var(--amber)}
-/* Account cards */
-.acard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;}
-.ahead{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
-.aico{width:36px;height:36px;border-radius:50%;background:var(--s3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green);flex-shrink:0;}
-.aname{font-size:14px;font-weight:600;}
-.aid{font-family:'DM Mono',monospace;font-size:11px;color:var(--fg2);margin-top:2px;}
-.aid a{color:var(--blue);text-decoration:none;}
-.agrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.af{background:var(--s2);border-radius:9px;padding:9px 12px;}
-.afl{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--fg3);margin-bottom:3px;}
-.afv{font-size:12px;font-family:'DM Mono',monospace;color:var(--fg2);}
-/* Warn boxes */
-.wbox{border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;}
-.wbox.red{background:var(--rd);border:1px solid rgba(255,77,109,.2);color:rgba(255,77,109,.9);}
-.wbox.amb{background:var(--ad);border:1px solid rgba(255,184,48,.2);color:rgba(255,184,48,.9);}
-.wbox.green{background:var(--gd);border:1px solid rgba(0,245,160,.2);color:var(--green);}
-/* Coloured raw pre — lines get class via JS */
-.rpre{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;font-family:'DM Mono',monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:600px;overflow-y:auto;line-height:1.75;}
-.rpre .L-red{color:var(--red);}
-.rpre .L-amb{color:var(--amber);}
-.rpre .L-grn{color:var(--green);}
-.rpre .L-dim{color:var(--fg3);}
-.rpre .L-def{color:var(--fg2);}
-.slabel{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-bottom:10px;margin-top:18px;}
-.slabel:first-child{margin-top:0;}
-/* Pending */
-.pend{display:flex;flex-direction:column;align-items:center;justify-content:center;height:340px;}
-.pring{width:64px;height:64px;border-radius:50%;border:2px solid var(--b2);border-top-color:var(--green);animation:spin 1.2s linear infinite;margin-bottom:20px;}
-@keyframes spin{to{transform:rotate(360deg)}}
-::-webkit-scrollbar{width:4px;}
-::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px;}
-/* USN Journal popup */
-.usn-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;}
-.usn-overlay.open{display:flex;}
-.usn-box{background:#0d1520;border:1px solid rgba(0,229,255,.2);border-radius:14px;width:700px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;}
-.usn-head{padding:16px 20px;border-bottom:1px solid var(--border);}
-.usn-head-title{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase;}
-.usn-head-path{font-family:'DM Mono',monospace;font-size:13px;color:var(--fg);margin-top:4px;word-break:break-all;}
-.usn-head-meta{font-size:11px;color:var(--fg2);margin-top:4px;}
-.usn-body{overflow-y:auto;padding:16px 20px;flex:1;}
-.usn-close{margin-left:auto;background:none;border:none;color:var(--fg2);font-size:13px;cursor:pointer;padding:4px 10px;border-radius:6px;}
-.usn-close:hover{color:var(--fg);}
-.usn-evt{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
-.usn-evt:last-child{border-bottom:none;margin-bottom:0;}
-.usn-type-Create{color:var(--green);}
-.usn-type-Delete{color:var(--red);}
-.usn-type-Type,.usn-type-Rename{color:var(--amber);}
-.usn-type-Close,.usn-type-Execute{color:var(--fg2);}
-.usn-detail{font-family:'DM Mono',monospace;font-size:12px;color:var(--fg2);margin-top:6px;line-height:1.8;}
-.usn-detail span{color:var(--fg3);margin-right:8px;}
+.nav{height:52px;background:rgba(3,5,8,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;position:relative;z-index:200;flex-shrink:0;}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:11px;font-weight:800;color:#fff;}
+.bname{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--fg);}
+.nav-pin{font-family:'DM Mono',monospace;font-size:13px;color:var(--blue);background:var(--blueg);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;}
+.nav-r{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.nav-r a{font-size:12px;color:var(--fg3);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:7px;transition:.15s;}
+.nav-r a:hover{color:var(--fg2);border-color:var(--border2);}
+.btn-dl{font-size:12px;color:#fff;background:var(--blue);text-decoration:none;padding:5px 12px;border-radius:7px;}
+.btn-dl:hover{background:var(--blue2);}
+
+/* Layout */
+.shell{display:flex;height:calc(100vh - 52px);}
+
+/* Sidebar tabs — big round style like Trinity */
+.side{width:200px;background:var(--s1);border-right:1px solid var(--border);padding:12px 10px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:3px;}
+.side-sect{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);padding:10px 8px 4px;}
+.tab{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 12px;border-radius:10px;cursor:pointer;
+  font-size:12px;color:var(--fg2);transition:.15s;
+  border:1px solid transparent;
+}
+.tab:hover{background:var(--blueg2);color:var(--fg);}
+.tab.active{background:var(--blueg);border-color:var(--border2);color:var(--blue);}
+.tab-label{display:flex;align-items:center;gap:8px;}
+.tab-icon{font-size:13px;line-height:1;}
+.hc{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;min-width:18px;text-align:center;}
+.hc.red{background:var(--redg2);color:var(--red);}
+.hc.amb{background:var(--ambg);color:var(--amb);}
+.hc.ok{background:var(--greeng);color:var(--green);}
+.hc.dim{background:var(--blueg2);color:var(--fg3);}
+
+/* Main panel */
+.main{flex:1;overflow-y:auto;padding:0;}
+.panel{display:none;padding:24px 28px;}
+.panel.active{display:block;}
+
+/* Summary cards */
+.summary-header{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px;}
+.sum-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.sum-n{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;}
+.sum-n.red{color:var(--red);}
+.sum-n.amb{color:var(--amb);}
+.sum-n.green{color:var(--green);}
+.sum-n.blue{color:var(--blue);}
+.sum-l{font-size:10px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+
+/* Roblox account cards */
+.roblox-grid{display:grid;gap:12px;}
+.rb-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px 20px;transition:.15s;}
+.rb-card:hover{border-color:var(--border2);}
+.rb-top{display:flex;align-items:center;gap:14px;margin-bottom:12px;}
+.rb-avatar{width:48px;height:48px;border-radius:12px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.rb-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;}
+.rb-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--blue);text-decoration:none;margin-top:3px;}
+.rb-link:hover{text-decoration:underline;}
+.rb-sources{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.src-pill{font-size:10px;padding:3px 8px;border-radius:6px;background:var(--blueg2);border:1px solid var(--border);color:var(--fg2);}
+.rb-flags{margin-top:12px;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.rb-flags-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-bottom:8px;}
+.flag-row{font-family:'DM Mono',monospace;font-size:11px;color:var(--fg2);padding:2px 0;}
+.flag-row.sus{color:var(--amb);}
+.flag-row.crit{color:var(--red);}
+
+/* Discord account cards */
+.dc-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:10px;}
+.dc-top{display:flex;align-items:center;gap:12px;}
+.dc-icon{width:40px;height:40px;border-radius:50%;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.dc-name{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;}
+.dc-id{font-size:11px;color:var(--fg3);margin-top:2px;}
+.dc-sources{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+
+/* Pre blocks */
+.rpre{font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;color:var(--fg2);white-space:pre-wrap;word-break:break-all;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;max-height:600px;overflow-y:auto;}
+.rpre .hit-red{color:var(--red);}
+.rpre .hit-amb{color:var(--amb);}
+.rpre .hit-green{color:var(--green);}
+
+/* Section heading */
+.sec-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px;}
+.sec-sub{font-size:12px;color:var(--fg2);margin-bottom:16px;}
+.warn-box{border-radius:10px;padding:10px 14px;font-size:12px;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.warn-box.red{background:var(--redg);border:1px solid rgba(239,68,68,0.2);color:var(--red);}
+.warn-box.amb{background:var(--ambg);border:1px solid rgba(245,158,11,0.2);color:var(--amb);}
+.warn-box.green{background:var(--greeng);border:1px solid rgba(34,197,94,0.2);color:var(--green);}
+.warn-box.blue{background:var(--blueg2);border:1px solid var(--border2);color:var(--fg2);}
 </style>
 </head>
 <body>
 
-{% set has_scan = scan is not none %}
-{% set report = scan.report if has_scan else {} %}
-{% set verdict = scan.verdict if has_scan else 'PENDING' %}
-{% set roblox_accs = scan.roblox_accounts if has_scan else [] %}
-{% set sb_h  = report.get('shellbag_hits',0)|int %}
-{% set bam_h = report.get('bam_hits',0)|int %}
-{% set pf_h  = report.get('prefetch_hits',0)|int %}
-{% set ac_h  = report.get('appcompat_hits',0)|int %}
-{% set cs_h  = report.get('cheat_hits',0)|int %}
-{% set yr_h  = report.get('yara_hits',0)|int %}
-{% set us_h  = report.get('unsigned_count',0)|int %}
-{% set sm_h  = report.get('sysmain_hits',0)|int %}
-{% set pr_h  = report.get('process_hits',0)|int %}
-{% set cl_h  = report.get('cleaner_hits',0)|int %}
-{% set ff_h  = report.get('fastflags',[])|length %}
-{% set rl_h  = report.get('roblox_hits',0)|int %}
-{% set ev_h  = report.get('eventlog_hits',0)|int %}
-{% set disc  = report.get('discord_accounts',[]) %}
-
-<header class="snav">
-  <a href="/" class="brand"><div class="bmark">C</div><span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700">Comet</span></a>
-  <div class="nav-links"><a href="/">Home</a><a href="/download">Download</a><a href="/dashboard">Dashboard</a></div>
-  <div class="nav-right">
-    {% if has_scan %}<a href="/results/{{ pin.pin }}/download" class="pin-btn" style="color:var(--green);border-color:rgba(0,245,160,.25)">↓ Download Report</a>{% endif %}
-    {% if user %}<a href="/auth/logout" class="pin-btn">Sign out</a>{% endif %}
+<div class="nav">
+  <a href="/dashboard" class="brand"><div class="mark">C</div><span class="bname">Comet</span></a>
+  <span class="nav-pin">{{ pin.pin }}</span>
+  <span style="font-size:12px;color:var(--fg3)">{{ scan.pc_user or 'Unknown' }} · {{ scan.league }}</span>
+  <div class="nav-r">
+    <a href="/dashboard">← Dashboard</a>
+    <a href="/results/{{ pin.pin }}/download" class="btn-dl">↓ Download Report</a>
   </div>
-</header>
+</div>
 
 <div class="shell">
-  <nav class="sb">
-    <div class="sb-top">
-      <a href="/dashboard" class="back">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </a>
-      <div class="pin-code">{{ pin.pin }}</div>
-      <div class="pin-meta">{{ pin.league }} · {{ pin.created }}</div>
-      {% if has_scan %}
-      <div class="pin-actions">
-        <a href="/results/{{ pin.pin }}/download" class="pin-btn">↓ Download</a>
-        <button class="pin-btn del" onclick="delScan({{ scan.id }})">🗑 Delete</button>
-      </div>
-      {% endif %}
+  <!-- Sidebar -->
+  <div class="side">
+    <div class="side-sect">Overview</div>
+    <div class="tab active" onclick="sw('summary',this)">
+      <div class="tab-label"><span class="tab-icon">📊</span> Summary</div>
     </div>
 
-    <div class="tab-list">
-      <div class="tsect">Overview</div>
-      <div class="ti active" onclick="sw('summary',this)"><div class="tlab">◈ Summary</div></div>
-
-      <div class="tsect">Player Identity</div>
-      <div class="ti" onclick="sw('roblox',this)">
-        <div class="tlab">◉ Roblox Accounts</div>
-        {% if roblox_accs|length > 1 %}<span class="hc amb">{{ roblox_accs|length }}</span>
-        {% elif roblox_accs|length == 1 %}<span class="hc dim">1</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('discord',this)">
-        <div class="tlab">◉ Discord Accounts</div>
-        {% if disc|length > 1 %}<span class="hc amb">{{ disc|length }}</span>
-        {% elif disc|length == 1 %}<span class="hc dim">1</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('discord_memory',this)">
-        <div class="tlab">◉ Discord Downloads</div>
-        {% set dm_h = report.get('discord_memory_hits',0)|int %}
-        {% if dm_h > 0 %}<span class="hc red">{{ dm_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('alts',this)"><div class="tlab">◉ Alt Detection</div></div>
-
-      <div class="tsect">Forensics</div>
-      <div class="ti" onclick="sw('shellbags',this)">
-        <div class="tlab">◉ ShellBags</div>
-        {% if sb_h > 0 %}<span class="hc red">{{ sb_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('bam',this)">
-        <div class="tlab">◉ BAM</div>
-        {% if bam_h > 0 %}<span class="hc red">{{ bam_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('prefetch',this)">
-        <div class="tlab">◉ Prefetch</div>
-        {% if pf_h > 0 %}<span class="hc red">{{ pf_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('appcompat',this)">
-        <div class="tlab">◉ AppCompat</div>
-        {% if ac_h > 0 %}<span class="hc red">{{ ac_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('sysmain',this)">
-        <div class="tlab">◉ SysMain / Bypass</div>
-        {% if sm_h > 0 %}<span class="hc red">{{ sm_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('recycle',this)"><div class="tlab">◉ Recycle Bin</div></div>
-      <div class="ti" onclick="sw('eventlog',this)">
-        <div class="tlab">◉ Event Log</div>
-        {% if ev_h > 0 %}<span class="hc red">{{ ev_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-
-      <div class="tsect">Cheat Detection</div>
-      <div class="ti" onclick="sw('cheat',this)">
-        <div class="tlab">◉ Cheat Files</div>
-        {% if cs_h > 0 %}<span class="hc red">{{ cs_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('yara',this)">
-        <div class="tlab">◉ YARA / Heuristic</div>
-        {% if yr_h > 0 %}<span class="hc red">{{ yr_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('unsigned',this)">
-        <div class="tlab">◉ Unsigned Files</div>
-        {% if us_h > 0 %}<span class="hc amb">{{ us_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('processes',this)">
-        <div class="tlab">◉ Running Processes</div>
-        {% if pr_h > 0 %}<span class="hc red">{{ pr_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('cleaners',this)">
-        <div class="tlab">◉ Cleaners</div>
-        {% if cl_h > 0 %}<span class="hc amb">{{ cl_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('drives',this)"><div class="tlab">◉ USB / Drives</div></div>
-
-      <div class="tsect">2-PC & Recovery</div>
-      <div class="ti" onclick="sw('powerevents',this)">
-        <div class="tlab">◉ Power Timeline</div>
-        {% set pw_h = report.get('power_hits',0)|int %}
-        {% if pw_h > 0 %}<span class="hc amb">{{ pw_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('twopc',this)">
-        <div class="tlab">◉ 2-PC Bypass</div>
-        {% set tp_h = report.get('two_pc_hits',0)|int %}
-        {% if tp_h > 0 %}<span class="hc red">{{ tp_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('recovery',this)">
-        <div class="tlab">◉ Deleted Cheats</div>
-        {% set rc_h = report.get('recovery_hits',0)|int %}
-        {% if rc_h > 0 %}<span class="hc red">{{ rc_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-
-      <div class="tsect">Extra</div>
-      <div class="ti" onclick="sw('fastflags',this)">
-        <div class="tlab">◉ FastFlags</div>
-        {% if ff_h > 0 %}<span class="hc amb">{{ ff_h }}</span>{% else %}<span class="hc dim">0</span>{% endif %}
-      </div>
-      <div class="ti" onclick="sw('exechistory',this)"><div class="tlab">◈ Exec History</div></div>
-      <div class="ti" onclick="sw('raw',this)"><div class="tlab">◉ Raw Report</div></div>
+    <div class="side-sect">Identity</div>
+    <div class="tab" onclick="sw('roblox',this)">
+      <div class="tab-label"><span class="tab-icon">🎮</span> Roblox</div>
+      {% set rh = report.get('roblox_log_hits',0)|int %}
+      <span class="hc {% if rh>0 %}red{% else %}dim{% endif %}">{{ rh }}</span>
     </div>
-  </nav>
-
-  <div class="cnt">
-    <div class="tbar">
-      <div class="ptitle">Scan Results</div>
-      {% if has_scan %}
-      <span class="vbadge {{ verdict }}">{{ verdict }}</span>
-      <span style="font-size:11px;color:var(--fg3);margin-left:4px">{{ scan.total_hits }} hits</span>
-      {% else %}
-      <span class="vbadge PENDING">Pending</span>
-      {% endif %}
-      <div class="tbar-right">{{ scan.pc_user if has_scan else '—' }} · {{ pin.league }}</div>
+    <div class="tab" onclick="sw('discord',this)">
+      <div class="tab-label"><span class="tab-icon">💬</span> Discord</div>
+      {% set dh = (report.get('discord_accounts',[])|length) %}
+      <span class="hc {% if dh>1 %}amb{% else %}dim{% endif %}">{{ dh }}</span>
+    </div>
+    <div class="tab" onclick="sw('discord_memory',this)">
+      <div class="tab-label"><span class="tab-icon">🔗</span> DC Downloads</div>
+      {% set dm = report.get('discord_memory_hits',0)|int %}
+      <span class="hc {% if dm>0 %}amb{% else %}dim{% endif %}">{{ dm }}</span>
     </div>
 
-    <div class="main">
-    {% if not has_scan %}
-    <div class="pend">
-      <div class="pring"></div>
-      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:6px">Waiting for scan</div>
-      <div style="font-size:13px;color:var(--fg2)">Results appear here once the scanner submits.</div>
+    <div class="side-sect">Cheats</div>
+    <div class="tab" onclick="sw('cheat',this)">
+      <div class="tab-label"><span class="tab-icon">⚠️</span> Cheat Files</div>
+      {% set ch = report.get('cheat_hits',0)|int %}
+      <span class="hc {% if ch>0 %}red{% else %}dim{% endif %}">{{ ch }}</span>
     </div>
-    {% else %}
+    <div class="tab" onclick="sw('yara',this)">
+      <div class="tab-label"><span class="tab-icon">🔎</span> YARA</div>
+      {% set yh = report.get('yara_hits',0)|int %}
+      <span class="hc {% if yh>0 %}red{% else %}dim{% endif %}">{{ yh }}</span>
+    </div>
+    <div class="tab" onclick="sw('fastflags',this)">
+      <div class="tab-label"><span class="tab-icon">🚩</span> FastFlags</div>
+      {% set fh = report.get('fastflags',[])|length %}
+      <span class="hc {% if fh>0 %}amb{% else %}dim{% endif %}">{{ fh }}</span>
+    </div>
+    <div class="tab" onclick="sw('cleaners',this)">
+      <div class="tab-label"><span class="tab-icon">🧹</span> Cleaners</div>
+      {% set clh = report.get('cleaner_hits',0)|int %}
+      <span class="hc {% if clh>0 %}red{% else %}dim{% endif %}">{{ clh }}</span>
+    </div>
+    <div class="tab" onclick="sw('recovery',this)">
+      <div class="tab-label"><span class="tab-icon">🗑️</span> Deleted Files</div>
+      {% set rch = report.get('recovery_hits',0)|int %}
+      <span class="hc {% if rch>0 %}red{% else %}dim{% endif %}">{{ rch }}</span>
+    </div>
+
+    <div class="side-sect">Execution</div>
+    <div class="tab" onclick="sw('bam',this)">
+      <div class="tab-label"><span class="tab-icon">⚡</span> BAM</div>
+      {% set bh = report.get('bam_hits',0)|int %}
+      <span class="hc {% if bh>0 %}amb{% else %}dim{% endif %}">{{ bh }}</span>
+    </div>
+    <div class="tab" onclick="sw('prefetch',this)">
+      <div class="tab-label"><span class="tab-icon">📂</span> Prefetch</div>
+      {% set pfh = report.get('prefetch_hits',0)|int %}
+      <span class="hc {% if pfh>0 %}amb{% else %}dim{% endif %}">{{ pfh }}</span>
+    </div>
+    <div class="tab" onclick="sw('appcompat',this)">
+      <div class="tab-label"><span class="tab-icon">📋</span> AppCompat</div>
+      {% set ach = report.get('appcompat_hits',0)|int %}
+      <span class="hc {% if ach>0 %}amb{% else %}dim{% endif %}">{{ ach }}</span>
+    </div>
+    <div class="tab" onclick="sw('shellbags',this)">
+      <div class="tab-label"><span class="tab-icon">🗂️</span> ShellBags</div>
+      {% set sbh = report.get('shellbag_hits',0)|int %}
+      <span class="hc {% if sbh>0 %}amb{% else %}dim{% endif %}">{{ sbh }}</span>
+    </div>
+    <div class="tab" onclick="sw('exec_history',this)">
+      <div class="tab-label"><span class="tab-icon">🕐</span> Exec History</div>
+    </div>
+
+    <div class="side-sect">System</div>
+    <div class="tab" onclick="sw('power',this)">
+      <div class="tab-label"><span class="tab-icon">⏱️</span> Power Timeline</div>
+      {% set pwh = report.get('power_hits',0)|int %}
+      <span class="hc {% if pwh>0 %}red{% else %}dim{% endif %}">{{ pwh }}</span>
+    </div>
+    <div class="tab" onclick="sw('twopc',this)">
+      <div class="tab-label"><span class="tab-icon">🖥️</span> 2-PC Bypass</div>
+      {% set tph = report.get('two_pc_hits',0)|int %}
+      <span class="hc {% if tph>0 %}red{% else %}dim{% endif %}">{{ tph }}</span>
+    </div>
+    <div class="tab" onclick="sw('eventlog',this)">
+      <div class="tab-label"><span class="tab-icon">📜</span> Event Log</div>
+      {% set evh = report.get('eventlog_hits',0)|int %}
+      <span class="hc {% if evh>0 %}red{% else %}dim{% endif %}">{{ evh }}</span>
+    </div>
+    <div class="tab" onclick="sw('factory',this)">
+      <div class="tab-label"><span class="tab-icon">🔄</span> Factory Reset</div>
+    </div>
+    <div class="tab" onclick="sw('recycle',this)">
+      <div class="tab-label"><span class="tab-icon">♻️</span> Recycle Bin</div>
+      {% set rbh = report.get('sysmain_hits',0)|int %}
+      <span class="hc {% if rbh>0 %}amb{% else %}dim{% endif %}">{{ rbh }}</span>
+    </div>
+    <div class="tab" onclick="sw('network',this)">
+      <div class="tab-label"><span class="tab-icon">🌐</span> Network/VPN</div>
+    </div>
+    <div class="tab" onclick="sw('unsigned',this)">
+      <div class="tab-label"><span class="tab-icon">🔏</span> Unsigned Files</div>
+      {% set uh = report.get('unsigned_count',0)|int %}
+      <span class="hc {% if uh>0 %}amb{% else %}dim{% endif %}">{{ uh }}</span>
+    </div>
+    <div class="tab" onclick="sw('drives',this)">
+      <div class="tab-label"><span class="tab-icon">💾</span> Drives</div>
+    </div>
+    <div class="tab" onclick="sw('raw',this)">
+      <div class="tab-label"><span class="tab-icon">📄</span> Raw Report</div>
+    </div>
+  </div>
+
+  <!-- Panels -->
+  <div class="main">
 
     <!-- SUMMARY -->
     <div class="panel active" id="panel-summary">
+      <div class="sec-title">Scan Summary</div>
+      <p class="sec-sub">Submitted {{ scan.submitted }} · PC User: {{ scan.pc_user }} · League: {{ scan.league }}</p>
+      <div class="summary-header">
+        <div class="sum-card">
+          {% set t = scan.total_hits|int %}
+          <div class="sum-n {% if t>20 %}red{% elif t>5 %}amb{% else %}green{% endif %}">{{ t }}</div>
+          <div class="sum-l">Total Hits</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n blue">{{ report.get('cheat_hits',0) }}</div>
+          <div class="sum-l">Cheat Files</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n blue">{{ scan.roblox_accs or 0 }}</div>
+          <div class="sum-l">Roblox Accs</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n blue">{{ report.get('discord_accounts',[])|length }}</div>
+          <div class="sum-l">Discord Accs</div>
+        </div>
+      </div>
+      {% set t = scan.total_hits|int %}
+      {% if t > 20 %}
+      <div class="warn-box red">⚠ HIGH RISK — {{ t }} hits detected. Review cheat files, BAM, and execution history.</div>
+      {% elif t > 5 %}
+      <div class="warn-box amb">⚠ SUSPICIOUS — {{ t }} hits. Manual review recommended.</div>
+      {% else %}
+      <div class="warn-box green">✓ LOW RISK — {{ t }} hits detected.</div>
+      {% endif %}
       {% if report.get('sysmain_autofail') %}
-      <div class="wbox red" style="display:flex;gap:14px;align-items:flex-start;margin-bottom:20px">
-        <span style="font-size:20px">⚠</span>
-        <div><div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700">AUTO FAIL</div>
-        <div style="font-size:12px;opacity:.7;margin-top:3px">SysMain disabled + Prefetch empty — deliberate trace wiping</div></div>
-      </div>{% endif %}
-
-      <div class="igrid">
-        <div class="icard"><div class="ilabel">PC User</div><div class="ival">{{ scan.pc_user }}</div></div>
-        <div class="icard"><div class="ilabel">League</div><div class="ival">{{ scan.league }}</div></div>
-        <div class="icard"><div class="ilabel">Total Hits</div><div class="ival {{ 'red' if scan.total_hits > 0 else 'green' }}">{{ scan.total_hits }}</div></div>
-        <div class="icard"><div class="ilabel">Submitted</div><div class="ival" style="font-size:11px">{{ scan.submitted }}</div></div>
-        {% if report.get('cleaner_info') and report.get('cleaner_info') != 'None detected' %}
-        <div class="icard"><div class="ilabel">Cleaner Found</div><div class="ival amb" style="font-size:10px">{{ report.get('cleaner_info','')[:60] }}</div></div>
-        {% endif %}
-      </div>
-
-      <div class="mrow">
-        <div class="mcard"><div class="mlabel">System Forensics</div><div class="mval {{ 'red' if (sb_h+bam_h+pf_h+ac_h+sm_h) > 0 else 'green' }}">{{ sb_h+bam_h+pf_h+ac_h+sm_h }}</div></div>
-        <div class="mcard"><div class="mlabel">Cheat Files</div><div class="mval {{ 'red' if cs_h > 0 else 'green' }}">{{ cs_h }}</div></div>
-        <div class="mcard"><div class="mlabel">Process/Inject</div><div class="mval {{ 'red' if pr_h > 0 else 'green' }}">{{ pr_h }}</div></div>
-        <div class="mcard"><div class="mlabel">Event Log</div><div class="mval {{ 'red' if ev_h > 0 else 'green' }}">{{ ev_h }}</div></div>
-      </div>
-
-      {% set drows = [
-        ('ShellBag', sb_h, 10, 'hit'),('BAM', bam_h, 10, 'hit'),('Prefetch', pf_h, 10, 'hit'),
-        ('AppCompat', ac_h, 10, 'hit'),('SysMain', sm_h, 8, 'hit'),('Cheat Files', cs_h, 5, 'hit'),
-        ('YARA', yr_h, 5, 'hit'),('Unsigned EXEs', us_h, 20, 'amb'),
-        ('Processes', pr_h, 5, 'hit'),('Cleaners', cl_h, 3, 'amb'),
-        ('Event Log', ev_h, 8, 'hit'),('Log Tamper', rl_h, 6, 'amb'),('FastFlags', ff_h, 5, 'amb'),
-      ] %}
-      <div class="det-wrap">
-      {% for name,val,mx,cls in drows %}
-      {% set pct = [((val/mx)*100)|int,100]|min if mx>0 else 0 %}
-      <div class="drow {{ cls if val > 0 else '' }}">
-        <div class="dname">{{ name }}</div>
-        <div class="dbar-w"><div class="dbar" style="width:{{ pct }}%"></div></div>
-        <div class="dcnt">{{ val }}</div>
-      </div>
-      {% endfor %}
-      </div>
-
-      {% if roblox_accs %}
-      <div class="slabel">Roblox Accounts ({{ roblox_accs|length }})</div>
-      {% if roblox_accs|length > 1 %}<div class="wbox amb">⚠ {{ roblox_accs|length }} accounts — possible alt/ban evasion</div>{% endif %}
-      {% for acc in roblox_accs %}{% if acc is mapping %}
-      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--fg2);padding:6px 0;border-bottom:1px solid var(--b3)">
-        <span style="color:var(--fg)">{{ acc.username or 'Unknown' }}</span>
-        {% if acc.userid %} · <a href="https://www.roblox.com/users/{{ acc.userid }}/profile" target="_blank" style="color:var(--blue);text-decoration:none">{{ acc.userid }} ↗</a>{% endif %}
-        {% if acc.last_seen %} <span style="color:var(--fg3);font-size:10px">· {{ acc.last_seen }}</span>{% endif %}
-      </div>
-      {% endif %}{% endfor %}{% endif %}
+      <div class="warn-box red">⚠ SYSMAIN BYPASS — System main registry shows evidence of bypass tools.</div>{% endif %}
+      {% if report.get('two_pc_hits',0)|int > 0 %}
+      <div class="warn-box red">⚠ 2-PC BYPASS INDICATORS DETECTED — See 2-PC Bypass tab.</div>{% endif %}
+      {% if report.get('recovery_hits',0)|int > 0 %}
+      <div class="warn-box red">⚠ DELETED CHEAT FILES RECOVERED — Evidence of deleted cheats found.</div>{% endif %}
+      {% if report.get('cleaner_hits',0)|int > 0 %}
+      <div class="warn-box amb">⚠ CLEANING TOOLS DETECTED — Evidence of trace wiping found.</div>{% endif %}
     </div>
 
-    <!-- ROBLOX ACCOUNTS -->
+    <!-- ROBLOX -->
     <div class="panel" id="panel-roblox">
-      {% if roblox_accs|length > 1 %}<div class="wbox amb">⚠ {{ roblox_accs|length }} Roblox accounts — possible ban evasion or alt</div>{% endif %}
-      {% for acc in roblox_accs %}{% if acc is mapping %}
-      <div class="acard">
-        <div class="ahead">
-          <div class="aico">{{ acc.username[0].upper() if acc.username and acc.username != 'Unknown' else '?' }}</div>
-          <div>
-            <div class="aname">{{ acc.username or 'Unknown' }}</div>
-            <div class="aid">{% if acc.userid %}<a href="https://www.roblox.com/users/{{ acc.userid }}/profile" target="_blank">{{ acc.userid }} ↗</a>{% else %}Unknown ID{% endif %}</div>
-          </div>
-        </div>
-        <div class="agrid">
-          <div class="af"><div class="afl">Last Seen</div><div class="afv">{{ acc.last_seen or '—' }}</div></div>
-          <div class="af"><div class="afl">Sources</div><div class="afv">{{ ', '.join(acc.sources) if acc.sources else '—' }}</div></div>
-          <div class="af" style="grid-column:1/-1"><div class="afl">Place IDs</div><div class="afv">
-            {% if acc.placeids %}{% for pid in acc.placeids %}<a href="https://www.roblox.com/games/{{ pid }}" target="_blank" style="color:var(--blue);text-decoration:none">{{ pid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}
-          </div></div>
-        </div>
-      </div>
-      {% else %}<div class="acard"><div class="aname">{{ acc }}</div></div>
-      {% endif %}{% else %}<div style="color:var(--fg2);font-size:13px;padding:16px 0">No Roblox accounts detected.</div>{% endfor %}
-      <div class="slabel">Log Analysis</div>
-      <div class="rpre" id="pre-roblox">{{ report.get('roblox_raw','No data') }}</div>
-    </div>
-
-    <!-- DISCORD ACCOUNTS — no email, username+ID only -->
-    <div class="panel" id="panel-discord">
-      {% if disc|length > 1 %}<div class="wbox amb">⚠ {{ disc|length }} Discord accounts — possible alts</div>{% endif %}
-      {% if disc %}
-        {% for d in disc %}
-        <div class="acard">
-          <div class="ahead">
-            <div class="aico" style="background:var(--bld);color:var(--blue)">D</div>
+      <div class="sec-title">Roblox Account Detection</div>
+      <p class="sec-sub">All Roblox accounts found across logs, registry, Bloxstrap, and browser storage.</p>
+      {% set accs = scan.roblox_accounts if scan.roblox_accounts else [] %}
+      {% if accs %}
+      <div class="roblox-grid">
+        {% for acc in accs %}
+        <div class="rb-card">
+          <div class="rb-top">
+            <div class="rb-avatar">🎮</div>
             <div>
-              <div class="aname">@{{ (d.username if d is mapping else d) or 'Unknown' }}</div>
-              {% if d is mapping and d.id %}<div class="aid">ID: {{ d.id }}</div>{% endif %}
+              <div class="rb-name">{{ acc.username or 'Unknown' }}</div>
+              {% if acc.userid %}
+              <a href="https://www.roblox.com/users/{{ acc.userid }}/profile" target="_blank" class="rb-link">
+                ↗ View Roblox Profile ({{ acc.userid }})
+              </a>
+              {% endif %}
             </div>
           </div>
-          {% if d is mapping %}
-          <div class="agrid">
-            <div class="af"><div class="afl">Last Switched</div><div class="afv">{{ d.last_switched or '—' }}</div></div>
-            <div class="af"><div class="afl">Found In</div><div class="afv">{{ d.source or '—' }}</div></div>
-            {% if d.has_token %}
-            <div class="af" style="grid-column:1/-1;background:var(--rd);border:1px solid rgba(255,77,109,.2)">
-              <div class="afl" style="color:var(--red)">⚠ Auth Token Cached</div>
-              <div class="afv" style="color:rgba(255,77,109,.8)">Active session token found in browser/app storage</div>
-            </div>
-            {% endif %}
+          {% if acc.sources %}
+          <div class="rb-sources">
+            {% for src in acc.sources %}<span class="src-pill">{{ src }}</span>{% endfor %}
           </div>
+          {% endif %}
+          {% if acc.last_seen %}
+          <div style="font-size:11px;color:var(--fg3);margin-top:8px;">Last seen: {{ acc.last_seen }}</div>
           {% endif %}
         </div>
         {% endfor %}
+      </div>
       {% else %}
-        <div style="color:var(--fg2);font-size:13px;padding:16px 0">No Discord accounts found in cache.</div>
+      <div class="warn-box blue">ℹ No Roblox accounts detected in logs.</div>
       {% endif %}
+      <div class="sec-title" style="margin-top:20px;font-size:14px;">Raw Log Data</div>
+      <div class="rpre" id="pre-roblox">{{ report.get('roblox_raw','No data') }}</div>
     </div>
 
-    <!-- DISCORD DOWNLOADS/MEMORY -->
+    <!-- DISCORD -->
+    <div class="panel" id="panel-discord">
+      <div class="sec-title">Discord Account Detection</div>
+      <p class="sec-sub">All Discord accounts found across app cache and browser storage.</p>
+      {% set daccs = report.get('discord_accounts',[]) %}
+      {% if daccs|length > 1 %}
+      <div class="warn-box amb">⚠ Multiple Discord accounts detected ({{ daccs|length }}) — possible alt accounts.</div>
+      {% endif %}
+      {% for acc in daccs %}
+      <div class="dc-card">
+        <div class="dc-top">
+          <div class="dc-icon">💬</div>
+          <div>
+            <div class="dc-name">{{ acc.username or 'Unknown' }}{% if acc.discriminator and acc.discriminator != '0' %}#{{ acc.discriminator }}{% endif %}</div>
+            <div class="dc-id">ID: {{ acc.id or 'Unknown' }}</div>
+          </div>
+        </div>
+        {% if acc.sources %}
+        <div class="dc-sources">
+          {% for s in acc.sources %}<span class="src-pill">{{ s }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="warn-box blue">ℹ No Discord accounts detected.</div>
+      {% endfor %}
+      <div class="sec-title" style="margin-top:16px;font-size:14px;">Raw Data</div>
+      <div class="rpre">{{ report.get('discord_raw','No data') }}</div>
+    </div>
+
+    <!-- DISCORD MEMORY -->
     <div class="panel" id="panel-discord_memory">
-      {% set dm_h = report.get('discord_memory_hits',0)|int %}
-      {% if dm_h > 0 %}<div class="wbox red">⚠ {{ dm_h }} suspicious Discord download(s) — cheat-related files found</div>{% endif %}
-      <div class="slabel">Discord CDN Download History</div>
-      <div class="rpre" id="pre-discord_memory">{{ report.get('discord_memory_raw','No data') }}</div>
-    </div>
-
-    <!-- ALT DETECTION -->
-    <div class="panel" id="panel-alts">
-      <div class="slabel">Registry / Deep Alt Detection</div>
-      <div class="rpre" id="pre-alts">{{ report.get('registry_extra_raw','No data') }}</div>
-    </div>
-
-    <!-- SHELLBAGS -->
-    <div class="panel" id="panel-shellbags">
-      {% if sb_h > 0 %}<div class="wbox red">⚠ {{ sb_h }} ShellBag hit(s) — cheat-related folder access</div>{% endif %}
-      <div class="rpre" id="pre-shellbags">{{ report.get('shellbags_raw','No data') }}</div>
-    </div>
-
-    <!-- BAM -->
-    <div class="panel" id="panel-bam">
-      {% if bam_h > 0 %}<div class="wbox red">⚠ {{ bam_h }} BAM hit(s) — execution history for flagged programs</div>{% endif %}
-      <div class="rpre" id="pre-bam">{{ report.get('bam_raw','No data') }}</div>
-    </div>
-
-    <!-- PREFETCH -->
-    <div class="panel" id="panel-prefetch">
-      {% if pf_h > 0 %}<div class="wbox red">⚠ {{ pf_h }} Prefetch hit(s)</div>{% endif %}
-      <div class="rpre" id="pre-prefetch">{{ report.get('prefetch_raw','No data') }}</div>
-    </div>
-
-    <!-- APPCOMPAT -->
-    <div class="panel" id="panel-appcompat">
-      {% if ac_h > 0 %}<div class="wbox red">⚠ {{ ac_h }} AppCompat / UserAssist hit(s)</div>{% endif %}
-      <div class="rpre" id="pre-appcompat">{{ report.get('appcompat_raw','No data') }}</div>
-    </div>
-
-    <!-- SYSMAIN -->
-    <div class="panel" id="panel-sysmain">
-      {% if report.get('sysmain_autofail') %}<div class="wbox red">✗ AUTO FAIL — SysMain disabled AND Prefetch empty</div>
-      {% elif sm_h > 0 %}<div class="wbox amb">⚠ SysMain anomalies detected</div>{% endif %}
-      <div class="rpre" id="pre-sysmain">{{ report.get('sysmain_raw','No data') }}</div>
-    </div>
-
-    <!-- RECYCLE BIN -->
-    <div class="panel" id="panel-recycle">
-      <div class="rpre" id="pre-recycle">{{ report.get('recycle_raw','No data') }}</div>
-    </div>
-
-    <!-- EVENT LOG -->
-    <div class="panel" id="panel-eventlog">
-      {% if ev_h > 0 %}<div class="wbox red">⚠ {{ ev_h }} Event Log anomaly/anomalies — cleared or disabled</div>{% endif %}
-      <div class="rpre" id="pre-eventlog">{{ report.get('eventlog_raw','No data') }}</div>
+      <div class="sec-title">Discord Download History</div>
+      <p class="sec-sub">Files downloaded via Discord CDN found in app memory/cache.</p>
+      <div class="rpre">{{ report.get('discord_memory_raw','No data') }}</div>
     </div>
 
     <!-- CHEAT FILES -->
     <div class="panel" id="panel-cheat">
-      {% if cs_h > 0 %}<div class="wbox red">⚠ {{ cs_h }} cheat file(s) — keyword + hash detection</div>{% endif %}
+      <div class="sec-title">Cheat File Detection</div>
+      {% set ch = report.get('cheat_hits',0)|int %}
+      {% if ch > 0 %}<div class="warn-box red">⚠ {{ ch }} cheat file hit(s) found.</div>{% endif %}
       <div class="rpre" id="pre-cheat">{{ report.get('cheat_raw','No data') }}</div>
     </div>
 
     <!-- YARA -->
     <div class="panel" id="panel-yara">
-      {% if yr_h > 0 %}<div class="wbox red">⚠ {{ yr_h }} YARA / heuristic hit(s)</div>{% endif %}
-      <div class="rpre" id="pre-yara">{{ report.get('yara_raw','No data') }}</div>
-    </div>
-
-    <!-- UNSIGNED -->
-    <div class="panel" id="panel-unsigned">
-      <div class="slabel">Unsigned Executables ({{ us_h }})</div>
-      <div class="rpre" id="pre-unsigned">{{ report.get('unsigned_raw','No data') }}</div>
-    </div>
-
-    <!-- PROCESSES -->
-    <div class="panel" id="panel-processes">
-      {% if pr_h > 0 %}<div class="wbox red">⚠ {{ pr_h }} suspicious process / injection hit(s)</div>{% endif %}
-      <div class="rpre" id="pre-processes">{{ report.get('processes_raw','No data') }}</div>
-    </div>
-
-    <!-- CLEANERS -->
-    <div class="panel" id="panel-cleaners">
-      {% if cl_h > 0 %}<div class="wbox amb">⚠ Cleaning / evidence-wiping tool: {{ report.get('cleaner_info','') }}</div>{% endif %}
-      <div class="rpre" id="pre-cleaners">{{ report.get('cleaners_raw','No data') }}</div>
-    </div>
-
-    <!-- USB / DRIVES -->
-    <div class="panel" id="panel-drives">
-      {% if report.get('drive_warn') %}<div class="wbox amb">⚠ External/USB drive activity detected</div>{% endif %}
-      <div class="rpre" id="pre-drives">{{ report.get('drive_info','No data') }}</div>
+      <div class="sec-title">YARA / Heuristic Detection</div>
+      <div class="rpre">{{ report.get('yara_raw','No data') }}</div>
     </div>
 
     <!-- FASTFLAGS -->
     <div class="panel" id="panel-fastflags">
-      {% if ff_h > 0 %}<div class="wbox amb">⚠ {{ ff_h }} suspicious FastFlag(s)</div>{% endif %}
-      {% if report.get('fastflags') %}
-        {% for ff in report.fastflags %}<div class="wbox amb" style="margin-bottom:6px;font-family:'DM Mono',monospace;font-size:11px">{{ ff }}</div>{% endfor %}
-      {% else %}<div class="wbox green">✓ No suspicious FastFlags.</div>{% endif %}
-    </div>
-
-    <!-- EXECUTION HISTORY — interactive USN drill-down -->
-    <div class="panel" id="panel-exechistory">
-      <div style="margin-bottom:12px">
-        <input id="eh-search" placeholder="Search..." oninput="ehFilter()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--fg);font-family:'DM Mono',monospace;font-size:12px;padding:10px 14px;outline:none;">
-      </div>
-      <div id="eh-summary" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--fg2);margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;"></div>
-      <div id="eh-list"></div>
-    </div>
-
-    <!-- POWER EVENTS / PC TIMELINE -->
-    <div class="panel" id="panel-powerevents">
-      {% set pw_h = report.get('power_hits',0)|int %}
-      {% if pw_h > 0 %}<div class="wbox amb">⚠ {{ pw_h }} power anomaly/anomalies detected — check timeline for 2-PC gaps</div>{% endif %}
-      <div class="wbox blue" style="background:rgba(77,159,255,0.06);border-color:rgba(77,159,255,0.2);color:var(--blue);margin-bottom:16px">
-        ℹ If the PC was OFF during the screenshare window but the player claims they were on it — that's a 2-PC bypass.
-      </div>
-      <div class="slabel">PC Power On/Off Timeline</div>
-      <div class="rpre" id="pre-powerevents">{{ report.get('power_events_raw','No data') }}</div>
-    </div>
-
-    <!-- 2-PC BYPASS DETECTION -->
-    <div class="panel" id="panel-twopc">
-      {% set tp_h = report.get('two_pc_hits',0)|int %}
-      {% if tp_h > 0 %}
-      <div class="wbox red">⚠ {{ tp_h }} dual-PC / streaming indicator(s) found — possible bypass</div>
+      <div class="sec-title">FastFlag Detection</div>
+      <p class="sec-sub">Active Roblox FastFlags — suspicious flags are highlighted.</p>
+      {% set flags = report.get('fastflags',[]) %}
+      {% if flags %}
+      <div class="warn-box amb">⚠ {{ flags|length }} suspicious FastFlag(s) detected.</div>
+      <div class="rpre">{% for f in flags %}{{ f }}
+{% endfor %}</div>
+      {% else %}
+      <div class="warn-box green">✓ No suspicious FastFlags detected.</div>
       {% endif %}
-      <div class="slabel">Stream & Remote Desktop Detection</div>
-      <div class="rpre" id="pre-twopc">{{ report.get('two_pc_raw','No data') }}</div>
+      <div class="sec-title" style="margin-top:16px;font-size:14px;">Full FastFlag Data</div>
+      <div class="rpre">{{ report.get('fastflag_raw','No data') }}</div>
     </div>
 
-    <!-- DELETED CHEAT RECOVERY -->
+    <!-- CLEANERS -->
+    <div class="panel" id="panel-cleaners">
+      <div class="sec-title">Cleaner / Bypass Tool Detection</div>
+      {% set clh = report.get('cleaner_hits',0)|int %}
+      {% if clh > 0 %}<div class="warn-box red">⚠ {{ clh }} cleaning/bypass tool indicator(s) found.</div>{% endif %}
+      <div class="rpre">{{ report.get('cleaners_raw','No data') }}</div>
+    </div>
+
+    <!-- DELETED RECOVERY -->
     <div class="panel" id="panel-recovery">
-      {% set rc_h = report.get('recovery_hits',0)|int %}
-      {% if rc_h > 0 %}
-      <div class="wbox red">⚠ {{ rc_h }} deleted cheat file(s) found with forensic evidence — report saved to player's Desktop</div>
-      {% endif %}
-      <div class="slabel">Deleted/Missing Cheat File Evidence</div>
-      <div class="rpre" id="pre-recovery">{{ report.get('deleted_recovery_raw','No data') }}</div>
+      <div class="sec-title">Deleted Cheat Recovery</div>
+      {% set rch = report.get('recovery_hits',0)|int %}
+      {% if rch > 0 %}<div class="warn-box red">⚠ {{ rch }} deleted cheat file(s) found with forensic evidence. Report saved to player's Desktop.</div>{% endif %}
+      <div class="rpre">{{ report.get('deleted_recovery_raw','No data') }}</div>
     </div>
 
-    <!-- RAW REPORT -->
+    <!-- BAM -->
+    <div class="panel" id="panel-bam">
+      <div class="sec-title">BAM Execution History</div>
+      <p class="sec-sub">Background Activity Monitor — shows every executable that ran with timestamps.</p>
+      {% set bh = report.get('bam_hits',0)|int %}
+      {% if bh > 0 %}<div class="warn-box amb">⚠ {{ bh }} suspicious BAM entry/entries.</div>{% endif %}
+      <div class="rpre">{{ report.get('bam_raw','No data') }}</div>
+    </div>
+
+    <!-- PREFETCH -->
+    <div class="panel" id="panel-prefetch">
+      <div class="sec-title">Prefetch</div>
+      <div class="rpre">{{ report.get('prefetch_raw','No data') }}</div>
+    </div>
+
+    <!-- APPCOMPAT -->
+    <div class="panel" id="panel-appcompat">
+      <div class="sec-title">AppCompat / UserAssist</div>
+      <div class="rpre">{{ report.get('appcompat_raw','No data') }}</div>
+    </div>
+
+    <!-- SHELLBAGS -->
+    <div class="panel" id="panel-shellbags">
+      <div class="sec-title">ShellBag Detection</div>
+      <p class="sec-sub">Registry entries showing folder access history — includes timestamps.</p>
+      <div class="rpre">{{ report.get('shellbags_raw','No data') }}</div>
+    </div>
+
+    <!-- EXEC HISTORY -->
+    <div class="panel" id="panel-exec_history">
+      <div class="sec-title">Execution History</div>
+      <div class="rpre">{{ report.get('exec_history_text_raw','No data') }}</div>
+    </div>
+
+    <!-- POWER TIMELINE -->
+    <div class="panel" id="panel-power">
+      <div class="sec-title">Logon / Logoff Session Timeline</div>
+      <p class="sec-sub">Past 15 days of PC on/off sessions. If PC was off during the game window — possible 2-PC bypass.</p>
+      {% set pwh = report.get('power_hits',0)|int %}
+      {% if pwh > 0 %}<div class="warn-box red">⚠ Power anomaly detected — review timeline.</div>{% endif %}
+      <div class="rpre">{{ report.get('power_events_raw','No data') }}</div>
+    </div>
+
+    <!-- 2-PC -->
+    <div class="panel" id="panel-twopc">
+      <div class="sec-title">2-PC / Stream Bypass Detection</div>
+      {% set tph = report.get('two_pc_hits',0)|int %}
+      {% if tph > 0 %}<div class="warn-box red">⚠ {{ tph }} dual-PC/streaming indicator(s) found.</div>{% endif %}
+      <div class="rpre">{{ report.get('two_pc_raw','No data') }}</div>
+    </div>
+
+    <!-- EVENT LOG -->
+    <div class="panel" id="panel-eventlog">
+      <div class="sec-title">Event Log</div>
+      <div class="rpre">{{ report.get('eventlog_raw','No data') }}</div>
+    </div>
+
+    <!-- FACTORY RESET -->
+    <div class="panel" id="panel-factory">
+      <div class="sec-title">Factory Reset / System Age</div>
+      <div class="rpre">{{ report.get('factory_reset_raw','No data') }}</div>
+    </div>
+
+    <!-- RECYCLE BIN -->
+    <div class="panel" id="panel-recycle">
+      <div class="sec-title">Recycle Bin</div>
+      <div class="rpre">{{ report.get('recycle_raw','No data') }}</div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="panel" id="panel-network">
+      <div class="sec-title">Network / VPN</div>
+      <div class="rpre">{{ report.get('network_raw','No data') }}</div>
+    </div>
+
+    <!-- UNSIGNED -->
+    <div class="panel" id="panel-unsigned">
+      <div class="sec-title">Unsigned Executables</div>
+      <div class="rpre">{{ report.get('unsigned_raw','No data') }}</div>
+    </div>
+
+    <!-- DRIVES -->
+    <div class="panel" id="panel-drives">
+      <div class="sec-title">USB / Drive History</div>
+      <div class="rpre">{{ report.get('drives_raw','No data') }}</div>
+    </div>
+
+    <!-- RAW -->
     <div class="panel" id="panel-raw">
-      <div class="rpre" id="pre-raw" style="max-height:calc(100vh - 160px)">{{ report.get('full_report','No raw report available.') }}</div>
+      <div class="sec-title">Raw Full Report</div>
+      <div class="rpre">{{ scan.full_report or report }}</div>
     </div>
 
-    {% endif %}
-    </div>
-  </div>
-</div>
-
-<!-- USN Journal popup -->
-<div class="usn-overlay" id="usn-overlay" onclick="if(event.target===this)closeUsn()">
-  <div class="usn-box">
-    <div class="usn-head" style="display:flex;align-items:flex-start">
-      <div style="flex:1">
-        <div class="usn-head-title">USN Journal Events</div>
-        <div class="usn-head-path" id="usn-path"></div>
-        <div class="usn-head-meta" id="usn-meta"></div>
-      </div>
-      <button class="usn-close" onclick="closeUsn()">Close</button>
-    </div>
-    <div class="usn-body" id="usn-body"></div>
   </div>
 </div>
 
 <script>
-// ── Tab switching ──────────────────────────────────────
-function sw(k,el){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.ti').forEach(t=>t.classList.remove('active'));
-  const p=document.getElementById('panel-'+k);
-  if(p){p.classList.add('active');colorPre(p);}
-  if(el)el.classList.add('active');
+function sw(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const p = document.getElementById('panel-' + name);
+  if (p) p.classList.add('active');
+  if (el) el.classList.add('active');
+  // Color code pre blocks
+  const pre = p ? p.querySelector('.rpre') : null;
+  if (pre) colorPre(pre);
 }
 
-// ── Colour raw-pre lines ────────────────────────────────
-// Red = super suspicious, Amber = suspicious, Green = clean, dim = metadata
-const RED_PAT  = /✗|CRITICAL|AUTO FAIL|CHEATER|KNOWN CHEAT|CRASH.*INJECT|INJECT.*CRASH|CLEARED|SERVICE DISABLED|HASH-BASED|hash.*detect/i;
-const AMB_PAT  = /⚠|WARNING|SUSPICIOUS|TAMPER|bypass|BAM.*bypass|Prefetch.*bypass|DISABLED|LOW.*count|DELETED|renamed|alt account|ban evasion|cleaner|inject|unsigned.*roaming|temp.*exe/i;
-const GRN_PAT  = /✓|Normal|No cheat|no suspicious|no matching|no hit|clean|valid|ok\b|not found|0 entries.*ok/i;
-const HDR_PAT  = /^[\s─━═◈◉]+$|^[─━═]{3,}/;
-const DIM_PAT  = /^\s{2,}|^[A-Za-z\s]+\s*:/;
+function colorPre(el) {
+  const lines = el.textContent.split('\n');
+  el.innerHTML = lines.map(l => {
+    const ll = l.toLowerCase();
+    if (/✗|critical|cleared|executor|matcha|volt|wave|krnl|cheat|bypass|deleted|⚠/.test(ll))
+      return '<span class="hit-red">' + esc(l) + '</span>';
+    if (/warning|suspicious|unusual|unsigned|⚡/.test(ll))
+      return '<span class="hit-amb">' + esc(l) + '</span>';
+    if (/✓|clean|normal|no hits/.test(ll))
+      return '<span class="hit-green">' + esc(l) + '</span>';
+    return esc(l);
+  }).join('\n');
+}
 
-function colorLine(line){
-  if(!line.trim()) return `<span class="L-dim"> </span>`;
-  if(RED_PAT.test(line))  return `<span class="L-red">${esc(line)}</span>`;
-  if(AMB_PAT.test(line))  return `<span class="L-amb">${esc(line)}</span>`;
-  if(GRN_PAT.test(line))  return `<span class="L-grn">${esc(line)}</span>`;
-  if(HDR_PAT.test(line))  return `<span class="L-grn">${esc(line)}</span>`;
-  if(DIM_PAT.test(line))  return `<span class="L-dim">${esc(line)}</span>`;
-  return `<span class="L-def">${esc(line)}</span>`;
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function colorPre(panel){
-  panel.querySelectorAll('.rpre').forEach(pre=>{
-    if(pre.dataset.colored) return;
-    pre.dataset.colored='1';
-    const lines=pre.textContent.split('\n');
-    pre.innerHTML=lines.map(colorLine).join('\n');
-  });
-}
-// Color visible panel on load
-document.addEventListener('DOMContentLoaded',()=>{
-  const active=document.querySelector('.panel.active');
-  if(active)colorPre(active);
-  buildEH();
+
+// Color the default visible panel
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.rpre').forEach(colorPre);
 });
-
-// ── Execution History ───────────────────────────────────
-const EH_DATA = {{ report.get('exec_history', []) | tojson }};
-
-function buildEH(){
-  const list=document.getElementById('eh-list');
-  const sumEl=document.getElementById('eh-summary');
-  if(!EH_DATA||!EH_DATA.length){
-    sumEl.textContent='No execution history data collected.';
-    return;
-  }
-  const flagged=EH_DATA.filter(e=>e.flagged);
-  const clean  =EH_DATA.filter(e=>!e.flagged);
-  sumEl.innerHTML=`Today's History: <span style="color:var(--fg)">${EH_DATA.length} total</span> `+
-    (flagged.length?`(<span style="color:var(--amber)">${flagged.length} flagged</span>)`:'(0 flagged)');
-
-  list.innerHTML='';
-  if(flagged.length) renderSection(list,'─── Flagged ('+flagged.length+') ───','var(--amber)',flagged);
-  if(clean.length)   renderSection(list,'─── Signed / OK ('+clean.length+') ───','var(--green)',clean);
-}
-
-function renderSection(container,title,color,entries){
-  const hdr=document.createElement('div');
-  hdr.style.cssText=`font-family:'DM Mono',monospace;font-size:11px;color:${color};padding:10px 0 6px;`;
-  hdr.textContent=title; container.appendChild(hdr);
-  entries.forEach(e=>container.appendChild(makeRow(e)));
-}
-
-function makeRow(e){
-  const outer=document.createElement('div');
-  outer.style.cssText='border-bottom:1px solid var(--b3);';
-  outer.dataset.path=(e.path||'').toLowerCase();
-
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 4px;cursor:'+(e.flagged?'pointer':'default');
-  row.innerHTML=buildRowHTML(e);
-  outer.appendChild(row);
-
-  if(e.flagged){
-    const det=document.createElement('div');
-    det.style.display='none';
-    outer.appendChild(det);
-    row.addEventListener('click',()=>{
-      const isOpen=det.style.display!=='none';
-      det.style.display=isOpen?'none':'block';
-      row.querySelector('.eh-arrow').textContent=isOpen?'▶':'▼';
-      if(!isOpen) buildDetail(det,e);
-    });
-  }
-  return outer;
-}
-
-function buildRowHTML(e){
-  const reasons=(e.reasons||[]);
-  const isDel=reasons.includes('File deleted');
-  let tagHtml='';
-  if(e.flagged){
-    const tags=['WARNING'];
-    if(isDel)tags.push('Directory Deleted');
-    reasons.filter(r=>r&&r!=='File deleted').slice(0,1).forEach(r=>tags.push(r));
-    tagHtml=tags.map(t=>`<span style="color:var(--amber);font-size:10px;font-weight:700">[${esc(t)}]</span>`).join(' ');
-  } else {
-    tagHtml=`<span style="color:var(--green);font-size:10px;font-weight:700">[OK]</span>`;
-  }
-  const arrow=e.flagged?`<span class="eh-arrow" style="color:var(--amber);width:12px;font-size:10px">▶</span>`:'<span style="width:12px"></span>';
-  const pathColor=e.flagged?'var(--red)':'var(--fg2)';
-  return `${arrow}${tagHtml}<span style="font-family:'DM Mono',monospace;font-size:11px;color:${pathColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.path||'')}</span><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--fg3);white-space:nowrap;padding-left:8px">${esc(e.time||'')}</span>`;
-}
-
-function buildDetail(container,e){
-  const evts=e.usn_events&&e.usn_events.length?e.usn_events:
-    (e.reasons&&e.reasons.includes('File deleted')?[
-      {type:'Execute',name:e.path?e.path.split('\\').pop():'',time:e.time,reason:'Execution recorded in system artifacts',usn:'N/A'},
-      {type:'Delete',name:e.path?e.path.split('\\').pop():'',time:'after '+e.time,reason:'File no longer present on disk',usn:'N/A'}
-    ]:[]);
-
-  const times=evts.map(v=>v.time).filter(Boolean);
-  const meta=times.length>=2?`created ${times[0]} → deleted ${times[times.length-1]}`:'';
-
-  let html=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;margin:4px 0 8px;padding:14px 18px;cursor:pointer" onclick="openUsn(${JSON.stringify(e).replace(/"/g,'&quot;')})">`;
-  html+=`<div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase;margin-bottom:4px">USN JOURNAL EVENTS <span style="color:var(--fg3);font-weight:400">— click to expand</span></div>`;
-  html+=`<div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--fg)">${esc(e.path||'')}</div>`;
-  if(meta)html+=`<div style="font-size:11px;color:var(--fg2);margin-top:4px">${esc(meta)}</div>`;
-  html+=`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">`;
-  evts.slice(0,3).forEach(ev=>{
-    const tc={'Create':'var(--green)','Delete':'var(--red)','Execute':'var(--cyan)','Rename':'var(--amber)','Type':'var(--amber)'}[ev.type]||'var(--fg2)';
-    html+=`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--s3);color:${tc}">${esc(ev.type)}</span>`;
-  });
-  html+=`</div></div>`;
-  if(e.reasons&&e.reasons.length){
-    html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--amber);padding:4px 0 8px">Flags: ${esc(e.reasons.join(' | '))}</div>`;
-  }
-  container.innerHTML=html;
-}
-
-function openUsn(data){
-  const e=typeof data==='string'?JSON.parse(data):data;
-  const evts=e.usn_events&&e.usn_events.length?e.usn_events:[
-    {type:'Execute',name:e.path?e.path.split('\\').pop():'',time:e.time,reason:'Execution recorded',usn:'N/A'},
-    {type:'Delete',name:e.path?e.path.split('\\').pop():'',time:'after '+e.time,reason:'File no longer on disk',usn:'N/A'}
-  ];
-  document.getElementById('usn-path').textContent=e.path||'';
-  const times=evts.map(v=>v.time).filter(Boolean);
-  document.getElementById('usn-meta').textContent=times.length>=2?`created ${times[0]} → deleted ${times[times.length-1]}, lived ${diffTime(times[0],times[times.length-1])}`:'';
-  const TC={'Create':'usn-type-Create','Delete':'usn-type-Delete','Type':'usn-type-Type','Rename':'usn-type-Rename','Execute':'usn-type-Close','Close':'usn-type-Close'};
-  document.getElementById('usn-body').innerHTML=evts.map(ev=>`
-    <div class="usn-evt">
-      <div>Type: <span class="${TC[ev.type]||'usn-type-Close'}">${esc(ev.type)}</span></div>
-      <div class="usn-detail">
-        <div><span>Details:</span></div>
-        <div style="padding-left:16px"><span>USN:</span>${esc(ev.usn||'N/A')}</div>
-        <div style="padding-left:16px"><span>name:</span>${esc(ev.name||'')}</div>
-        <div style="padding-left:16px"><span>time:</span>${esc(ev.time||'')}</div>
-        <div style="padding-left:16px"><span>reason:</span>${esc(ev.reason||'')}</div>
-      </div>
-    </div>`).join('');
-  document.getElementById('usn-overlay').classList.add('open');
-}
-function closeUsn(){document.getElementById('usn-overlay').classList.remove('open');}
-function diffTime(a,b){
-  try{const da=new Date('1970-01-01T'+a.split('T').pop()),db=new Date('1970-01-01T'+b.split('T').pop());
-  const s=Math.abs((db-da)/1000);return s<60?Math.round(s)+'s':Math.round(s/60)+'m';}catch{return '';}
-}
-
-function ehFilter(){
-  const q=document.getElementById('eh-search').value.toLowerCase();
-  document.querySelectorAll('#eh-list>div').forEach(row=>{
-    row.style.display=!q||row.dataset.path.includes(q)?'':'none';
-  });
-}
-
-// ── Delete scan ─────────────────────────────────────────
-async function delScan(id){
-  if(!confirm('Delete this scan? This cannot be undone.'))return;
-  const r=await fetch(`/api/scans/${id}`,{method:'DELETE'});
-  if((await r.json()).ok) window.location.href='/dashboard';
-}
 </script>
 </body>
 </html>
