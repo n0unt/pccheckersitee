@@ -117,9 +117,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
   <span style="font-size:12px;color:var(--fg3)">{{ scan.pc_user or 'Unknown' }} · {{ scan.league }}</span>
   <div class="nav-r">
     <a href="/dashboard">← Dashboard</a>
+    {% if has_scan %}
     <a href="/results/{{ pin.pin }}/download" class="btn-dl">↓ Download Report</a>
+    {% endif %}
   </div>
 </div>
+
+{% if not has_scan %}
+<div style="padding:60px 40px;text-align:center;color:var(--fg2);">
+  <div class="sec-title" style="margin-bottom:8px;">Waiting for scan…</div>
+  <p class="sec-sub">This PIN hasn't received a submitted scan yet. This page will show results once the scan finishes.</p>
+</div>
+{% else %}
 
 <div class="shell">
   <!-- Sidebar -->
@@ -256,7 +265,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
           <div class="sum-l">Cheat Files</div>
         </div>
         <div class="sum-card">
-          <div class="sum-n blue">{{ scan.roblox_accs or 0 }}</div>
+          <!-- FIX: was {{ scan.roblox_accs }} which printed the raw JSON column -->
+          <div class="sum-n blue">{{ (scan.roblox_accounts or [])|length }}</div>
           <div class="sum-l">Roblox Accs</div>
         </div>
         <div class="sum-card">
@@ -498,6 +508,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 
   </div>
 </div>
+{% endif %}
 
 <script>
 function sw(name, el) {
