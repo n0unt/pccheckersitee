@@ -301,6 +301,39 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
           <div id="user-msg" style="font-size:12px;margin-top:10px;color:var(--blue)"></div>
         </div>
       </div>
+
+      <!-- Scanner Download upload — was missing entirely before -->
+      <div class="sec">
+        <div class="sec-hdr"><span class="sec-title">Scanner Download (CometScanner.exe)</span></div>
+        <div class="sec-body">
+          <p style="font-size:12px;color:var(--fg2);margin-bottom:14px;">
+            Upload the scanner executable here — this is the exact file served to players at the
+            <code>/download</code> page. Uploading a new file replaces the current one immediately.
+          </p>
+          <div class="user-grid">
+            <div>
+              <div class="input-group">
+                <div class="input-label">Version Label</div>
+                <div class="input-box"><input id="exe-version" type="text" placeholder="v5.0"></div>
+              </div>
+            </div>
+            <div>
+              <div class="input-group">
+                <div class="input-label">Scanner .exe File</div>
+                <div class="input-box"><input id="exe-file" type="file" accept=".exe" style="padding:8px 14px;"></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-gen" onclick="uploadExe()">Upload &amp; Publish</button>
+          <div id="exe-msg" style="font-size:12px;margin-top:10px;color:var(--blue)"></div>
+          <div id="exe-progress-wrap" style="display:none;margin-top:10px;">
+            <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;height:8px;overflow:hidden;">
+              <div id="exe-progress-bar" style="background:var(--blue);height:8px;width:0%;transition:width .15s;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="sec">
         <div class="sec-hdr"><span class="sec-title">All Users</span></div>
         <table class="tbl">
@@ -431,6 +464,68 @@ async function resetPw(id,name) {
     const d=await r.json();
     alert(d.ok?'Password reset for '+name:d.error||'Failed');
   } catch(e){alert('Error: '+e);}
+}
+
+// ── Scanner .exe upload — was missing from the UI entirely ──
+async function uploadExe() {
+  const fileInput = document.getElementById('exe-file');
+  const version = document.getElementById('exe-version').value.trim() || 'v3.0';
+  const msg = document.getElementById('exe-msg');
+  const progressWrap = document.getElementById('exe-progress-wrap');
+  const progressBar = document.getElementById('exe-progress-bar');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = 'Choose a .exe file first.';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('version', version);
+
+  msg.style.color = 'var(--blue)';
+  msg.textContent = 'Uploading ' + file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)…';
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/admin/upload-exe');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = pct + '%';
+      }
+    };
+    xhr.onload = () => {
+      progressWrap.style.display = 'none';
+      try {
+        const d = JSON.parse(xhr.responseText);
+        if (xhr.status === 200 && d.ok) {
+          msg.style.color = 'var(--green)';
+          msg.textContent = 'Uploaded ' + d.version + ' (' + d.size + '). Live on /download now.';
+        } else {
+          msg.style.color = 'var(--red)';
+          msg.textContent = d.error || 'Upload failed (HTTP ' + xhr.status + ')';
+        }
+      } catch (err) {
+        msg.style.color = 'var(--red)';
+        msg.textContent = 'Upload failed — unexpected response.';
+      }
+    };
+    xhr.onerror = () => {
+      progressWrap.style.display = 'none';
+      msg.style.color = 'var(--red)';
+      msg.textContent = 'Network error during upload.';
+    };
+    xhr.send(formData);
+  } catch (e) {
+    progressWrap.style.display = 'none';
+    msg.style.color = 'var(--red)';
+    msg.textContent = 'Error: ' + e;
+  }
 }
 </script>
 </body>
