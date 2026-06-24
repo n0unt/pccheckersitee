@@ -135,115 +135,115 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
   <div class="side">
     <div class="side-sect">Overview</div>
     <div class="tab active" onclick="sw('summary',this)">
-      <div class="tab-label"><span class="tab-icon">📊</span> Summary</div>
+      <div class="tab-label"><span class="tab-icon"></span> Summary</div>
     </div>
 
     <div class="side-sect">Identity</div>
     <div class="tab" onclick="sw('roblox',this)">
-      <div class="tab-label"><span class="tab-icon">🎮</span> Roblox</div>
+      <div class="tab-label"><span class="tab-icon"></span> Roblox</div>
       {% set rh = report.get('roblox_log_hits',0)|int %}
       <span class="hc {% if rh>0 %}red{% else %}dim{% endif %}">{{ rh }}</span>
     </div>
     <div class="tab" onclick="sw('discord',this)">
-      <div class="tab-label"><span class="tab-icon">💬</span> Discord</div>
+      <div class="tab-label"><span class="tab-icon"></span> Discord</div>
       {% set dh = (report.get('discord_accounts',[])|length) %}
       <span class="hc {% if dh>1 %}amb{% else %}dim{% endif %}">{{ dh }}</span>
     </div>
     <div class="tab" onclick="sw('discord_memory',this)">
-      <div class="tab-label"><span class="tab-icon">🔗</span> DC Downloads</div>
+      <div class="tab-label"><span class="tab-icon"></span> DC Downloads</div>
       {% set dm = report.get('discord_memory_hits',0)|int %}
       <span class="hc {% if dm>0 %}amb{% else %}dim{% endif %}">{{ dm }}</span>
     </div>
 
     <div class="side-sect">Cheats</div>
     <div class="tab" onclick="sw('cheat',this)">
-      <div class="tab-label"><span class="tab-icon">⚠️</span> Cheat Files</div>
+      <div class="tab-label"><span class="tab-icon"></span> Cheat Files</div>
       {% set ch = report.get('cheat_hits',0)|int %}
       <span class="hc {% if ch>0 %}red{% else %}dim{% endif %}">{{ ch }}</span>
     </div>
     <div class="tab" onclick="sw('yara',this)">
-      <div class="tab-label"><span class="tab-icon">🔎</span> YARA</div>
+      <div class="tab-label"><span class="tab-icon"></span> YARA</div>
       {% set yh = report.get('yara_hits',0)|int %}
       <span class="hc {% if yh>0 %}red{% else %}dim{% endif %}">{{ yh }}</span>
     </div>
     <div class="tab" onclick="sw('fastflags',this)">
-      <div class="tab-label"><span class="tab-icon">🚩</span> FastFlags</div>
+      <div class="tab-label"><span class="tab-icon"></span> FastFlags</div>
       {% set fh = report.get('fastflags',[])|length %}
       <span class="hc {% if fh>0 %}amb{% else %}dim{% endif %}">{{ fh }}</span>
     </div>
     <div class="tab" onclick="sw('cleaners',this)">
-      <div class="tab-label"><span class="tab-icon">🧹</span> Cleaners</div>
+      <div class="tab-label"><span class="tab-icon"></span> Cleaners</div>
       {% set clh = report.get('cleaner_hits',0)|int %}
       <span class="hc {% if clh>0 %}red{% else %}dim{% endif %}">{{ clh }}</span>
     </div>
     <div class="tab" onclick="sw('recovery',this)">
-      <div class="tab-label"><span class="tab-icon">🗑️</span> Deleted Files</div>
+      <div class="tab-label"><span class="tab-icon"></span> Deleted Files</div>
       {% set rch = report.get('recovery_hits',0)|int %}
       <span class="hc {% if rch>0 %}red{% else %}dim{% endif %}">{{ rch }}</span>
     </div>
 
     <div class="side-sect">Execution</div>
     <div class="tab" onclick="sw('bam',this)">
-      <div class="tab-label"><span class="tab-icon">⚡</span> BAM</div>
+      <div class="tab-label"><span class="tab-icon"></span> BAM</div>
       {% set bh = report.get('bam_hits',0)|int %}
       <span class="hc {% if bh>0 %}amb{% else %}dim{% endif %}">{{ bh }}</span>
     </div>
     <div class="tab" onclick="sw('prefetch',this)">
-      <div class="tab-label"><span class="tab-icon">📂</span> Prefetch</div>
+      <div class="tab-label"><span class="tab-icon"></span> Prefetch</div>
       {% set pfh = report.get('prefetch_hits',0)|int %}
       <span class="hc {% if pfh>0 %}amb{% else %}dim{% endif %}">{{ pfh }}</span>
     </div>
     <div class="tab" onclick="sw('appcompat',this)">
-      <div class="tab-label"><span class="tab-icon">📋</span> AppCompat</div>
+      <div class="tab-label"><span class="tab-icon"></span> AppCompat</div>
       {% set ach = report.get('appcompat_hits',0)|int %}
       <span class="hc {% if ach>0 %}amb{% else %}dim{% endif %}">{{ ach }}</span>
     </div>
     <div class="tab" onclick="sw('shellbags',this)">
-      <div class="tab-label"><span class="tab-icon">🗂️</span> ShellBags</div>
+      <div class="tab-label"><span class="tab-icon"></span> ShellBags</div>
       {% set sbh = report.get('shellbag_hits',0)|int %}
       <span class="hc {% if sbh>0 %}amb{% else %}dim{% endif %}">{{ sbh }}</span>
     </div>
     <div class="tab" onclick="sw('exec_history',this)">
-      <div class="tab-label"><span class="tab-icon">🕐</span> Exec History</div>
+      <div class="tab-label"><span class="tab-icon"></span> Exec History</div>
     </div>
 
     <div class="side-sect">System</div>
     <div class="tab" onclick="sw('power',this)">
-      <div class="tab-label"><span class="tab-icon">⏱️</span> Power Timeline</div>
+      <div class="tab-label"><span class="tab-icon"></span> Power Timeline</div>
       {% set pwh = report.get('power_hits',0)|int %}
       <span class="hc {% if pwh>0 %}red{% else %}dim{% endif %}">{{ pwh }}</span>
     </div>
     <div class="tab" onclick="sw('twopc',this)">
-      <div class="tab-label"><span class="tab-icon">🖥️</span> 2-PC Bypass</div>
+      <div class="tab-label"><span class="tab-icon"></span> 2-PC Bypass</div>
       {% set tph = report.get('two_pc_hits',0)|int %}
       <span class="hc {% if tph>0 %}red{% else %}dim{% endif %}">{{ tph }}</span>
     </div>
     <div class="tab" onclick="sw('eventlog',this)">
-      <div class="tab-label"><span class="tab-icon">📜</span> Event Log</div>
+      <div class="tab-label"><span class="tab-icon"></span> Event Log</div>
       {% set evh = report.get('eventlog_hits',0)|int %}
       <span class="hc {% if evh>0 %}red{% else %}dim{% endif %}">{{ evh }}</span>
     </div>
     <div class="tab" onclick="sw('factory',this)">
-      <div class="tab-label"><span class="tab-icon">🔄</span> Factory Reset</div>
+      <div class="tab-label"><span class="tab-icon"></span> Factory Reset</div>
     </div>
     <div class="tab" onclick="sw('recycle',this)">
-      <div class="tab-label"><span class="tab-icon">♻️</span> Recycle Bin</div>
+      <div class="tab-label"><span class="tab-icon"></span> Recycle Bin</div>
       {% set rbh = report.get('sysmain_hits',0)|int %}
       <span class="hc {% if rbh>0 %}amb{% else %}dim{% endif %}">{{ rbh }}</span>
     </div>
     <div class="tab" onclick="sw('network',this)">
-      <div class="tab-label"><span class="tab-icon">🌐</span> Network/VPN</div>
+      <div class="tab-label"><span class="tab-icon"></span> Network/VPN</div>
     </div>
     <div class="tab" onclick="sw('unsigned',this)">
-      <div class="tab-label"><span class="tab-icon">🔏</span> Unsigned Files</div>
+      <div class="tab-label"><span class="tab-icon"></span> Unsigned Files</div>
       {% set uh = report.get('unsigned_count',0)|int %}
       <span class="hc {% if uh>0 %}amb{% else %}dim{% endif %}">{{ uh }}</span>
     </div>
     <div class="tab" onclick="sw('drives',this)">
-      <div class="tab-label"><span class="tab-icon">💾</span> Drives</div>
+      <div class="tab-label"><span class="tab-icon"></span> Drives</div>
     </div>
     <div class="tab" onclick="sw('raw',this)">
-      <div class="tab-label"><span class="tab-icon">📄</span> Raw Report</div>
+      <div class="tab-label"><span class="tab-icon"></span> Raw Report</div>
     </div>
   </div>
 
@@ -302,7 +302,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
         {% for acc in accs %}
         <div class="rb-card">
           <div class="rb-top">
-            <div class="rb-avatar">🎮</div>
+            <div class="rb-avatar"></div>
             <div>
               <div class="rb-name">{{ acc.username or 'Unknown' }}</div>
               {% if acc.userid %}
