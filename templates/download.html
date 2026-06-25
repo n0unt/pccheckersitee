@@ -3,21 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comet — Download</title>
+<title>Zevora — Download</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#030508;--s1:#060a12;--s2:#0a1020;--s3:#0e1830;--border:rgba(59,130,246,0.12);--border2:rgba(59,130,246,0.25);--fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;--blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.12);--blueg2:rgba(59,130,246,0.06);--red:#ef4444;}
+:root{
+  --bg:#0a0000;--s1:#110000;--s2:#180000;--s3:#200005;
+  --border:rgba(101,0,11,0.25);--border2:rgba(101,0,11,0.5);
+  --fg:#f5e8e8;--fg2:#b07080;--fg3:#603040;
+  --blue:#65000b;--blue2:#4a0008;--blueg:rgba(101,0,11,0.18);--blueg2:rgba(101,0,11,0.08);
+  --red:#ef4444;
+}
 html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;min-height:100%;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(59,130,246,0.07),transparent);}
-nav{position:sticky;top:0;z-index:100;background:rgba(3,5,8,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 40px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(101,0,11,0.1),transparent);}
+nav{position:sticky;top:0;z-index:100;background:rgba(10,0,0,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 40px;}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:36px;}
-.mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;box-shadow:0 0 20px rgba(59,130,246,0.4);}
-.bname{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.brand img{height:34px;width:auto;}
+.bname{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--fg);}
 .nav-links{display:flex;gap:4px;}
 .nav-links a{color:var(--fg2);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:8px;transition:.15s;}
 .nav-links a:hover{color:var(--fg);background:var(--blueg2);}
-.nav-links a.active{color:var(--blue);}
+.nav-links a.active{color:#c0392b;}
 .nav-r{margin-left:auto;}
 .btn-blue{background:var(--blue);color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:7px 16px;border-radius:9px;transition:.15s;}
 .btn-blue:hover{background:var(--blue2);}
@@ -29,22 +35,23 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
 .dl-icon{font-size:48px;margin-bottom:16px;}
 .dl-name{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:6px;}
 .dl-desc{color:var(--fg2);font-size:13px;margin-bottom:24px;line-height:1.6;}
-.btn-dl{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:12px;border:none;cursor:pointer;transition:.2s;box-shadow:0 0 28px rgba(59,130,246,0.35);}
-.btn-dl:hover{background:var(--blue2);box-shadow:0 0 40px rgba(59,130,246,0.5);transform:translateY(-1px);}
+.btn-dl{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:12px;border:none;cursor:pointer;transition:.2s;box-shadow:0 0 28px rgba(101,0,11,0.4);}
+.btn-dl:hover{background:var(--blue2);box-shadow:0 0 40px rgba(101,0,11,0.6);transform:translateY(-1px);}
 .btn-dl:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
 .tags{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:20px;}
 .tag{font-size:11px;color:var(--fg3);display:flex;align-items:center;gap:4px;}
-.tag b{color:var(--blue);}
+.tag b{color:#c0392b;}
 .steps{display:grid;gap:12px;}
 .step{display:flex;gap:16px;background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;align-items:flex-start;}
-.step-num{width:32px;height:32px;border-radius:50%;background:var(--blueg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--blue);flex-shrink:0;}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--blueg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:#c0392b;flex-shrink:0;}
 .step h3{font-size:14px;font-weight:600;margin-bottom:3px;}
 .step p{font-size:12px;color:var(--fg2);line-height:1.5;}
+.section-label{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--fg2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em;}
 </style>
 </head>
 <body>
 <nav>
-  <a href="/" class="brand"><div class="mark">C</div><span class="bname">Comet</span></a>
+  <a href="/" class="brand"><img src="/static/zevora-icon.png" alt="Zevora"><span class="bname">Zevora</span></a>
   <div class="nav-links">
     <a href="/">Home</a>
     <a href="/download" class="active">Download</a>
@@ -57,12 +64,12 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
   </div>
 </nav>
 <div class="page">
-  <h1>Download Comet</h1>
+  <h1>Download Zevora</h1>
   <p class="sub">Run as admin when prompted. You'll need a PIN from your agent before the scan will start.</p>
 
   <div class="dl-card">
     <div class="dl-icon">🛡️</div>
-    <div class="dl-name">Comet Scanner</div>
+    <div class="dl-name">Zevora Scanner</div>
     <div class="dl-desc">
       Latest version — Windows 10/11 64-bit. Automatically requests admin privileges.<br>
       Results are sent directly to your agent — you will not see them.
@@ -72,7 +79,7 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
     {% if has_exe %}
     <a href="/download/exe" class="btn-dl">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download Comet.exe
+      Download Zevora.exe
     </a>
     {% else %}
     <button class="btn-dl" disabled>
@@ -90,10 +97,10 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
     </div>
   </div>
 
-  <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--fg2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em">How it works</div>
+  <div class="section-label">How it works</div>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div><h3>Get a PIN</h3><p>Your screenshare agent will generate a one-time PIN from the Comet portal and give it to you.</p></div></div>
-    <div class="step"><div class="step-num">2</div><div><h3>Run Comet.exe</h3><p>Double-click Comet.exe. Windows will ask for admin permission — click Yes. This is required to scan system forensic data.</p></div></div>
+    <div class="step"><div class="step-num">1</div><div><h3>Get a PIN</h3><p>Your screenshare agent will generate a one-time PIN from the Zevora portal and give it to you.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div><h3>Run Zevora.exe</h3><p>Double-click Zevora.exe. Windows will ask for admin permission — click Yes. This is required to scan system forensic data.</p></div></div>
     <div class="step"><div class="step-num">3</div><div><h3>Accept terms & enter PIN</h3><p>Read and accept both terms, then enter the PIN your agent gave you and click Start Scan.</p></div></div>
     <div class="step"><div class="step-num">4</div><div><h3>Wait for completion</h3><p>The scan runs automatically. When complete, results are sent directly to your agent. You will see a confirmation screen.</p></div></div>
   </div>
