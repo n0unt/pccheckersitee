@@ -3,39 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comet — Terms of Service</title>
+<title>Zevora — Terms of Service</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030508;--s1:#060a12;--s2:#0a1020;
-  --border:rgba(59,130,246,0.12);--border2:rgba(59,130,246,0.25);
-  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
-  --blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.1);--blueg2:rgba(59,130,246,0.06);
+  --bg:#0a0000;--s1:#110000;--s2:#180000;
+  --border:rgba(101,0,11,0.25);--border2:rgba(101,0,11,0.5);
+  --fg:#f5e8e8;--fg2:#b07080;--fg3:#603040;
+  --blue:#65000b;--blue2:#4a0008;--blueg:rgba(101,0,11,0.15);--blueg2:rgba(101,0,11,0.07);
 }
 html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(59,130,246,0.06),transparent 60%);}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(59,130,246,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,0.02) 1px,transparent 1px);background-size:50px 50px;}
-nav{position:sticky;top:0;z-index:100;background:rgba(3,5,8,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 40px;gap:16px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(101,0,11,0.08),transparent 60%);}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(101,0,11,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(101,0,11,0.03) 1px,transparent 1px);background-size:50px 50px;}
+nav{position:sticky;top:0;z-index:100;background:rgba(10,0,0,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 40px;gap:16px;}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:#fff;box-shadow:0 0 16px rgba(59,130,246,0.35);}
+.brand img{height:30px;width:auto;}
 .bname{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--fg);}
 .nav-links{display:flex;gap:4px;}
 .nav-links a{color:var(--fg2);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:8px;transition:.15s;}
 .nav-links a:hover{color:var(--fg);background:var(--blueg2);}
-.nav-links a.active{color:var(--blue);}
+.nav-links a.active{color:#c0392b;}
 .nav-r{margin-left:auto;}
 .btn-blue{background:var(--blue);color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:7px 16px;border-radius:9px;}
 .btn-blue:hover{background:var(--blue2);}
-
 .page{max-width:780px;margin:0 auto;padding:60px 20px 100px;}
-.page-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:12px;}
+.page-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c0392b;margin-bottom:12px;}
 h1{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:800;margin-bottom:8px;}
 .updated{font-size:12px;color:var(--fg3);margin-bottom:48px;}
 .toc{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:40px;}
 .toc-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-bottom:12px;}
 .toc a{display:block;font-size:13px;color:var(--fg2);text-decoration:none;padding:4px 0;transition:.15s;}
-.toc a:hover{color:var(--blue);}
+.toc a:hover{color:#c0392b;}
 h2{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;margin:40px 0 12px;color:var(--fg);}
 p{font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:14px;}
 ul{padding-left:20px;margin-bottom:14px;}
@@ -47,7 +46,7 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
 </head>
 <body>
 <nav>
-  <a href="/" class="brand"><div class="mark">C</div><span class="bname">Comet</span></a>
+  <a href="/" class="brand"><img src="/static/zevora-icon.png" alt="Zevora"><span class="bname">Zevora</span></a>
   <div class="nav-links">
     <a href="/">Home</a>
     <a href="/download">Download</a>
@@ -69,7 +68,7 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
   <div class="toc">
     <div class="toc-title">Contents</div>
     <a href="#agreement">1. Agreement</a>
-    <a href="#what-comet-does">2. What Comet Does</a>
+    <a href="#what-zevora-does">2. What Zevora Does</a>
     <a href="#consent">3. Your Consent</a>
     <a href="#data">4. Data Collection</a>
     <a href="#use">5. Authorized Use</a>
@@ -78,15 +77,15 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
   </div>
 
   <div class="highlight">
-    <p>By running the Comet scanner or using this website, you agree to these terms. If you do not agree, close the scanner and do not use this service.</p>
+    <p>By running the Zevora scanner or using this website, you agree to these terms. If you do not agree, close the scanner and do not use this service.</p>
   </div>
 
   <h2 id="agreement">1. Agreement</h2>
-  <p>This is a binding legal agreement between you (the person running this software, and where applicable the person who requested the scan) and the creator of Comet. By using this software or website, you agree to all terms listed here.</p>
+  <p>This is a binding legal agreement between you (the person running this software, and where applicable the person who requested the scan) and the creator of Zevora. By using this software or website, you agree to all terms listed here.</p>
 
-  <h2 id="what-comet-does">2. What Comet Does</h2>
-  <p>Comet is a forensic PC scanner designed to detect cheating in competitive Roblox flag football leagues. When run, it reads forensic artifacts from the local PC and transmits the results to the league agent who requested the scan. It does not install anything, does not run in the background, and is deleted after the scan completes.</p>
-  <p>Comet may read and transmit the following types of information:</p>
+  <h2 id="what-zevora-does">2. What Zevora Does</h2>
+  <p>Zevora is a forensic PC scanner designed to detect cheating in competitive Roblox flag football leagues. When run, it reads forensic artifacts from the local PC and transmits the results to the league agent who requested the scan. It does not install anything, does not run in the background, and is deleted after the scan completes.</p>
+  <p>Zevora may read and transmit the following types of information:</p>
   <ul>
     <li>System and OS configuration and installation history</li>
     <li>Records of programs run, installed, opened, or deleted (prefetch, registry, event logs, shellbags, recycle bin, and similar)</li>
@@ -107,26 +106,26 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
   </ul>
 
   <h2 id="data">4. Data Collection</h2>
-  <p>Scan results are stored on secure servers and are accessible only to authorized league agents, admins, and the owner of the Comet platform. Results are used solely to determine whether cheating occurred during a league screenshare session.</p>
-  <p>The creator of Comet does not share scan results with any third parties outside of the requesting league. IP addresses are not stored or transmitted in publicly viewable reports.</p>
+  <p>Scan results are stored on secure servers and are accessible only to authorized league agents, admins, and the owner of the Zevora platform. Results are used solely to determine whether cheating occurred during a league screenshare session.</p>
+  <p>The creator of Zevora does not share scan results with any third parties outside of the requesting league. IP addresses are not stored or transmitted in publicly viewable reports.</p>
 
   <h2 id="use">5. Authorized Use</h2>
-  <p>Comet may only be used by leagues and individuals who have received explicit authorization from the creator. Unauthorized use — including running the scanner on someone else's PC without their consent, or using Comet outside of an authorized league context — is strictly prohibited and will result in immediate access revocation.</p>
-  <p>If you believe the software is being used on you without authorization, contact us immediately via Discord (converts_19942) or by joining the Comet server and opening a ticket.</p>
+  <p>Zevora may only be used by leagues and individuals who have received explicit authorization from the creator. Unauthorized use — including running the scanner on someone else's PC without their consent, or using Zevora outside of an authorized league context — is strictly prohibited and will result in immediate access revocation.</p>
+  <p>If you believe the software is being used on you without authorization, contact us immediately via Discord (converts_19942) or by joining the Zevora server and opening a ticket.</p>
 
   <h2 id="liability">6. Liability</h2>
-  <p>The creator of Comet is not responsible for how scan results are used by third-party leagues or individuals. Suspension, banning, or other disciplinary actions taken by leagues based on scan results are the sole responsibility of those leagues.</p>
-  <p>Comet is provided as-is. We make no guarantee of accuracy, completeness, or fitness for any particular purpose. The creator shall not be liable for any damages arising from the use or misuse of this software.</p>
+  <p>The creator of Zevora is not responsible for how scan results are used by third-party leagues or individuals. Suspension, banning, or other disciplinary actions taken by leagues based on scan results are the sole responsibility of those leagues.</p>
+  <p>Zevora is provided as-is. We make no guarantee of accuracy, completeness, or fitness for any particular purpose. The creator shall not be liable for any damages arising from the use or misuse of this software.</p>
 
   <h2 id="contact">7. Contact</h2>
   <p>For questions about these terms or to report unauthorized use, contact us via:</p>
   <ul>
     <li>Discord: <strong>converts_19942</strong></li>
-    <li>Comet Discord Server — open a ticket</li>
+    <li>Zevora Discord Server — open a ticket</li>
   </ul>
 
   <hr>
-  <p style="font-size:12px;color:var(--fg3)">These terms may be updated at any time. Continued use of Comet constitutes acceptance of the most current version.</p>
+  <p style="font-size:12px;color:var(--fg3)">These terms may be updated at any time. Continued use of Zevora constitutes acceptance of the most current version.</p>
 </div>
 </body>
 </html>
