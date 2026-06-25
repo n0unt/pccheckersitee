@@ -3,27 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Comet — Dashboard</title>
+<title>Zevora — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030508;--s1:#060a12;--s2:#0a1020;--s3:#0d1528;
-  --border:rgba(59,130,246,0.1);--border2:rgba(59,130,246,0.22);
-  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
-  --blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.1);--blueg2:rgba(59,130,246,0.06);
+  --bg:#0a0000;--s1:#110000;--s2:#180000;--s3:#200005;
+  --border:rgba(101,0,11,0.2);--border2:rgba(101,0,11,0.4);
+  --fg:#f5e8e8;--fg2:#b07080;--fg3:#603040;
+  --blue:#65000b;--blue2:#4a0008;--blueg:rgba(101,0,11,0.18);--blueg2:rgba(101,0,11,0.08);
   --red:#ef4444;--redg:rgba(239,68,68,0.08);
   --amb:#f59e0b;--ambg:rgba(245,158,11,0.08);
   --green:#22c55e;--greeng:rgba(34,197,94,0.08);
   --side:220px;
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 50% at 10% 0%,rgba(59,130,246,0.05),transparent 55%);}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 50% at 10% 0%,rgba(101,0,11,0.07),transparent 55%);}
 
-/* Nav */
-.nav{height:52px;background:rgba(3,5,8,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;position:relative;z-index:200;flex-shrink:0;}
+.nav{height:52px;background:rgba(10,0,0,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;position:relative;z-index:200;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;}
-.mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:800;color:#fff;box-shadow:0 0 14px rgba(59,130,246,0.35);}
+.brand img{height:28px;width:auto;}
 .bname{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--fg);}
 .nav-r{margin-left:auto;display:flex;align-items:center;gap:12px;}
 .nav-user{font-size:12px;color:var(--fg2);}
@@ -33,49 +32,43 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 .btn-blue-sm{font-size:11px;color:#fff;text-decoration:none;padding:5px 12px;border-radius:7px;background:var(--blue);transition:.15s;border:none;cursor:pointer;}
 .btn-blue-sm:hover{background:var(--blue2);}
 
-/* Layout */
 .shell{display:flex;height:calc(100vh - 52px);}
 .side{width:var(--side);background:var(--s1);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex-shrink:0;}
 .side-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);padding:8px 10px 4px;}
 .slink{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;text-decoration:none;color:var(--fg2);font-size:13px;transition:.15s;cursor:pointer;border:none;background:none;width:100%;}
 .slink:hover{background:var(--blueg2);color:var(--fg);}
-.slink.active{background:var(--blueg);color:var(--blue);}
+.slink.active{background:var(--blueg);color:#c0392b;}
 .slink svg{opacity:.6;flex-shrink:0;}
 .slink.active svg{opacity:1;}
-.badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--blueg);color:var(--blue);}
+.badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--blueg);color:#c0392b;}
 
-/* Main */
 .main{flex:1;overflow-y:auto;padding:28px 32px;}
 .page-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:4px;}
 .page-sub{font-size:13px;color:var(--fg2);margin-bottom:24px;}
 
-/* Stats row */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
 .stat-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px 20px;}
-.stat-n{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:var(--blue);}
+.stat-n{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#c0392b;}
 .stat-l{font-size:11px;color:var(--fg3);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;}
 
-/* Section */
 .sec{background:var(--s1);border:1px solid var(--border);border-radius:14px;margin-bottom:20px;overflow:hidden;}
 .sec-hdr{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
 .sec-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;}
 .sec-sub{font-size:11px;color:var(--fg3);margin-left:auto;}
 .sec-body{padding:20px;}
 
-/* PIN generator */
 .pin-row{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
 .sel{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;color:var(--fg);outline:none;cursor:pointer;}
 .sel:focus{border-color:var(--blue);}
 .btn-gen{background:var(--blue);color:#fff;border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;}
 .btn-gen:hover{background:var(--blue2);}
 .pin-result{background:var(--s2);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;display:none;}
-.pin-code{font-family:'DM Mono',monospace;font-size:2rem;font-weight:700;color:var(--blue);letter-spacing:.12em;margin-bottom:8px;}
+.pin-code{font-family:'DM Mono',monospace;font-size:2rem;font-weight:700;color:#c0392b;letter-spacing:.12em;margin-bottom:8px;}
 .pin-meta{font-size:11px;color:var(--fg3);line-height:1.7;}
 .pin-meta b{color:var(--fg2);}
-.btn-copy{font-size:11px;color:var(--blue);background:var(--blueg);border:1px solid var(--border2);border-radius:7px;padding:4px 10px;cursor:pointer;margin-top:10px;transition:.15s;}
+.btn-copy{font-size:11px;color:#c0392b;background:var(--blueg);border:1px solid var(--border2);border-radius:7px;padding:4px 10px;cursor:pointer;margin-top:10px;transition:.15s;}
 .btn-copy:hover{background:var(--border2);}
 
-/* Scans table */
 .tbl{width:100%;border-collapse:collapse;}
 .tbl th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);padding:0 14px 10px;text-align:left;}
 .tbl td{padding:10px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--fg2);vertical-align:middle;}
@@ -85,18 +78,17 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 .pill.green{background:var(--greeng);color:var(--green);}
 .pill.red{background:var(--redg);color:var(--red);}
 .pill.amb{background:var(--ambg);color:var(--amb);}
-.pill.blue{background:var(--blueg);color:var(--blue);}
+.pill.blue{background:var(--blueg);color:#c0392b;}
 .hits-num{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;}
 .hits-num.red{color:var(--red);}
 .hits-num.amb{color:var(--amb);}
 .hits-num.green{color:var(--green);}
-.btn-view{font-size:11px;color:var(--blue);text-decoration:none;padding:3px 8px;border-radius:6px;background:var(--blueg);transition:.15s;}
+.btn-view{font-size:11px;color:#c0392b;text-decoration:none;padding:3px 8px;border-radius:6px;background:var(--blueg);transition:.15s;}
 .btn-view:hover{background:var(--border2);}
 .btn-del{font-size:11px;color:var(--red);padding:3px 8px;border-radius:6px;background:var(--redg);border:none;cursor:pointer;transition:.15s;}
 .btn-del:hover{opacity:.8;}
 .no-scans{padding:40px;text-align:center;color:var(--fg3);font-size:13px;}
 
-/* User management */
 .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .input-group{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
 .input-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);}
@@ -105,7 +97,6 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 .input-box input,.input-box select{width:100%;background:transparent;border:none;outline:none;padding:10px 14px;font-size:13px;color:var(--fg);font-family:'DM Sans',sans-serif;}
 .input-box select option{background:var(--s2);}
 
-/* Modal */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
 .modal.open{display:flex;}
 .modal-card{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:360px;}
@@ -119,7 +110,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 <body>
 
 <div class="nav">
-  <a href="/" class="brand"><div class="mark">C</div><span class="bname">Comet</span></a>
+  <a href="/" class="brand"><img src="/static/zevora-icon.png" alt="Zevora"><span class="bname">Zevora</span></a>
   <div class="nav-r">
     <span class="nav-user">Signed in as <b>{{ user.username }}</b> · {{ user.role }}</span>
     <a href="/" class="btn-sm">Home</a>
@@ -128,7 +119,6 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 </div>
 
 <div class="shell">
-  <!-- Sidebar -->
   <div class="side">
     <div class="side-label">Overview</div>
     <button class="slink active" onclick="showTab('scans',this)">
@@ -149,10 +139,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
     {% endif %}
   </div>
 
-  <!-- Main -->
   <div class="main">
 
-    <!-- Stats -->
     <div class="stats-row">
       <div class="stat-card"><div class="stat-n">{{ scans|length }}</div><div class="stat-l">Total Scans</div></div>
       <div class="stat-card"><div class="stat-n" style="color:var(--red)">{{ scans|selectattr('verdict','eq','REVIEW')|list|length }}</div><div class="stat-l">Flagged</div></div>
@@ -209,14 +197,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
     <!-- PIN Tab -->
     <div id="tab-pins" style="display:none">
       <div class="page-title">Generate PIN</div>
-      <p class="page-sub">Create a one-time PIN for a screenshare session. Share it with the player — they enter it in the scanner. Results appear automatically when the scan finishes.</p>
+      <p class="page-sub">Create a one-time PIN for a screenshare session. Share it with the player — they enter it in the scanner.</p>
       <div class="sec">
         <div class="sec-hdr"><span class="sec-title">New PIN</span></div>
         <div class="sec-body">
           <div class="pin-row">
             <select class="sel" id="pin-league">
               <option value="UFF">UFF</option>
-              <option value="FFL">FFL</option>
+              <option value="KFA">KFA</option>
             </select>
             <button class="btn-gen" onclick="genPin()">Generate PIN</button>
           </div>
@@ -291,20 +279,19 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
                   <select id="new-league">
                     <option value="ALL">All Leagues</option>
                     <option value="UFF">UFF Only</option>
-                    <option value="FFL">FFL Only</option>
+                    <option value="KFA">KFA Only</option>
                   </select>
                 </div>
               </div>
             </div>
           </div>
           <button class="btn-gen" onclick="createUser()">Create Account</button>
-          <div id="user-msg" style="font-size:12px;margin-top:10px;color:var(--blue)"></div>
+          <div id="user-msg" style="font-size:12px;margin-top:10px;color:#c0392b"></div>
         </div>
       </div>
 
-      <!-- Scanner Download upload — was missing entirely before -->
       <div class="sec">
-        <div class="sec-hdr"><span class="sec-title">Scanner Download (CometScanner.exe)</span></div>
+        <div class="sec-hdr"><span class="sec-title">Scanner Download (ZevoraScanner.exe)</span></div>
         <div class="sec-body">
           <p style="font-size:12px;color:var(--fg2);margin-bottom:14px;">
             Upload the scanner executable here — this is the exact file served to players at the
@@ -325,7 +312,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
             </div>
           </div>
           <button class="btn-gen" onclick="uploadExe()">Upload &amp; Publish</button>
-          <div id="exe-msg" style="font-size:12px;margin-top:10px;color:var(--blue)"></div>
+          <div id="exe-msg" style="font-size:12px;margin-top:10px;color:#c0392b"></div>
           <div id="exe-progress-wrap" style="display:none;margin-top:10px;">
             <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;height:8px;overflow:hidden;">
               <div id="exe-progress-bar" style="background:var(--blue);height:8px;width:0%;transition:width .15s;"></div>
@@ -360,7 +347,6 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
   </div>
 </div>
 
-<!-- Delete Modal -->
 <div class="modal" id="del-modal">
   <div class="modal-card">
     <div class="modal-title">Delete Scan?</div>
@@ -466,66 +452,40 @@ async function resetPw(id,name) {
   } catch(e){alert('Error: '+e);}
 }
 
-// ── Scanner .exe upload — was missing from the UI entirely ──
 async function uploadExe() {
   const fileInput = document.getElementById('exe-file');
-  const version = document.getElementById('exe-version').value.trim() || 'v3.0';
+  const version = document.getElementById('exe-version').value.trim() || 'v5.0';
   const msg = document.getElementById('exe-msg');
   const progressWrap = document.getElementById('exe-progress-wrap');
   const progressBar = document.getElementById('exe-progress-bar');
-
   if (!fileInput.files || !fileInput.files[0]) {
-    msg.style.color = 'var(--red)';
-    msg.textContent = 'Choose a .exe file first.';
-    return;
+    msg.style.color = 'var(--red)'; msg.textContent = 'Choose a .exe file first.'; return;
   }
-
   const file = fileInput.files[0];
   const formData = new FormData();
   formData.append('file', file);
   formData.append('version', version);
-
-  msg.style.color = 'var(--blue)';
+  msg.style.color = '#c0392b';
   msg.textContent = 'Uploading ' + file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)…';
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
-
   try {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/admin/upload-exe');
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        progressBar.style.width = pct + '%';
-      }
+      if (e.lengthComputable) progressBar.style.width = Math.round((e.loaded/e.total)*100)+'%';
     };
     xhr.onload = () => {
       progressWrap.style.display = 'none';
       try {
         const d = JSON.parse(xhr.responseText);
-        if (xhr.status === 200 && d.ok) {
-          msg.style.color = 'var(--green)';
-          msg.textContent = 'Uploaded ' + d.version + ' (' + d.size + '). Live on /download now.';
-        } else {
-          msg.style.color = 'var(--red)';
-          msg.textContent = d.error || 'Upload failed (HTTP ' + xhr.status + ')';
-        }
-      } catch (err) {
-        msg.style.color = 'var(--red)';
-        msg.textContent = 'Upload failed — unexpected response.';
-      }
+        if (xhr.status===200 && d.ok) { msg.style.color='var(--green)'; msg.textContent='Uploaded '+d.version+' ('+d.size+'). Live on /download now.'; }
+        else { msg.style.color='var(--red)'; msg.textContent=d.error||'Upload failed (HTTP '+xhr.status+')'; }
+      } catch(err) { msg.style.color='var(--red)'; msg.textContent='Upload failed — unexpected response.'; }
     };
-    xhr.onerror = () => {
-      progressWrap.style.display = 'none';
-      msg.style.color = 'var(--red)';
-      msg.textContent = 'Network error during upload.';
-    };
+    xhr.onerror = () => { progressWrap.style.display='none'; msg.style.color='var(--red)'; msg.textContent='Network error during upload.'; };
     xhr.send(formData);
-  } catch (e) {
-    progressWrap.style.display = 'none';
-    msg.style.color = 'var(--red)';
-    msg.textContent = 'Error: ' + e;
-  }
+  } catch(e) { progressWrap.style.display='none'; msg.style.color='var(--red)'; msg.textContent='Error: '+e; }
 }
 </script>
 </body>
