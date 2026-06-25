@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comet — Sign In</title>
+<title>Zevora — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030508;--s1:#060a12;--s2:#0a1020;
-  --border:rgba(59,130,246,0.15);--border2:rgba(59,130,246,0.3);
-  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
-  --blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.12);
+  --bg:#0a0000;--s1:#110000;--s2:#180000;
+  --border:rgba(101,0,11,0.25);--border2:rgba(101,0,11,0.5);
+  --fg:#f5e8e8;--fg2:#b07080;--fg3:#603040;
+  --blue:#65000b;--blue2:#4a0008;--blueg:rgba(101,0,11,0.15);
   --red:#ef4444;--redg:rgba(239,68,68,0.1);
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(59,130,246,0.08),transparent 60%);}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(59,130,246,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,0.02) 1px,transparent 1px);background-size:50px 50px;}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:32px;position:relative;z-index:1;}
-.mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;box-shadow:0 0 24px rgba(59,130,246,0.4);}
-.bname{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--fg);}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(101,0,11,0.1),transparent 60%);}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(101,0,11,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(101,0,11,0.03) 1px,transparent 1px);background-size:50px 50px;}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:32px;position:relative;z-index:1;}
+.brand img{height:40px;width:auto;}
+.bname{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--fg);}
 .card{width:100%;max-width:400px;background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:36px;position:relative;z-index:1;overflow:hidden;}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--blue),transparent);}
 h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px;}
@@ -30,13 +30,13 @@ h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6p
 .fw input{width:100%;background:transparent;border:none;outline:none;padding:12px 14px;font-size:14px;color:var(--fg);font-family:'DM Mono',monospace;}
 .fw input::placeholder{color:var(--fg3);}
 .err{background:var(--redg);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:16px;}
-.btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 0 20px rgba(59,130,246,0.3);}
+.btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 0 20px rgba(101,0,11,0.35);}
 .btn:hover{background:var(--blue2);}
 .note{font-size:11px;color:var(--fg3);text-align:center;margin-top:20px;line-height:1.6;}
 </style>
 </head>
 <body>
-<div class="brand"><div class="mark">C</div><span class="bname">Comet</span></div>
+<div class="brand"><img src="/static/zevora-icon.png" alt="Zevora"><span class="bname">Zevora</span></div>
 <div class="card">
   <h1>Sign in</h1>
   <p class="sub">Agent & admin access only.</p>
@@ -48,7 +48,7 @@ h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6p
     <div class="fw"><input name="password" type="password" placeholder="••••••••" required></div>
     <button class="btn" type="submit">Sign in →</button>
   </form>
-  <div class="note">Comet Forensic Scanner · Authorized personnel only</div>
+  <div class="note">Zevora Forensic Scanner · Authorized personnel only</div>
 </div>
 </body>
 </html>
