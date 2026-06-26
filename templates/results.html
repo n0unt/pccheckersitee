@@ -8,23 +8,23 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030508;--s1:#060a12;--s2:#0a1020;--s3:#0d1528;
-  --border:rgba(59,130,246,0.1);--border2:rgba(59,130,246,0.22);
-  --fg:#e8f0fe;--fg2:#7090b8;--fg3:#304060;
-  --blue:#3b82f6;--blue2:#2563eb;--blueg:rgba(59,130,246,0.12);--blueg2:rgba(59,130,246,0.06);
+  --bg:#0a0303;--s1:#120505;--s2:#180707;--s3:#1f0909;
+  --border:rgba(101,0,11,0.18);--border2:rgba(101,0,11,0.38);
+  --fg:#ffffff;--fg2:#c9a3a8;--fg3:#6b3a3e;
+  --blue:#65000b;--blue2:#8a0010;--blueg:rgba(101,0,11,0.16);--blueg2:rgba(101,0,11,0.08);
   --red:#ef4444;--redg:rgba(239,68,68,0.08);--redg2:rgba(239,68,68,0.15);
   --amb:#f59e0b;--ambg:rgba(245,158,11,0.08);
   --green:#22c55e;--greeng:rgba(34,197,94,0.08);
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(59,130,246,0.05),transparent);}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(101,0,11,0.10),transparent);}
 
 /* Nav */
-.nav{height:52px;background:rgba(3,5,8,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;position:relative;z-index:200;flex-shrink:0;}
+.nav{height:52px;background:rgba(10,3,3,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;position:relative;z-index:200;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;}
 .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:11px;font-weight:800;color:#fff;}
 .bname{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--fg);}
-.nav-pin{font-family:'DM Mono',monospace;font-size:13px;color:var(--blue);background:var(--blueg);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;}
+.nav-pin{font-family:'DM Mono',monospace;font-size:13px;color:#ff5a6e;background:var(--blueg);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;}
 .nav-r{margin-left:auto;display:flex;gap:10px;align-items:center;}
 .nav-r a{font-size:12px;color:var(--fg3);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:7px;transition:.15s;}
 .nav-r a:hover{color:var(--fg2);border-color:var(--border2);}
@@ -44,7 +44,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
   border:1px solid transparent;
 }
 .tab:hover{background:var(--blueg2);color:var(--fg);}
-.tab.active{background:var(--blueg);border-color:var(--border2);color:var(--blue);}
+.tab.active{background:var(--blueg);border-color:var(--border2);color:#ff5a6e;}
 .tab-label{display:flex;align-items:center;gap:8px;}
 .tab-icon{font-size:13px;line-height:1;}
 .hc{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;min-width:18px;text-align:center;}
@@ -65,7 +65,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 .sum-n.red{color:var(--red);}
 .sum-n.amb{color:var(--amb);}
 .sum-n.green{color:var(--green);}
-.sum-n.blue{color:var(--blue);}
+.sum-n.blue{color:#ff5a6e;}
 .sum-l{font-size:10px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
 
 /* Roblox account cards */
@@ -75,7 +75,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 .rb-top{display:flex;align-items:center;gap:14px;margin-bottom:12px;}
 .rb-avatar{width:48px;height:48px;border-radius:12px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .rb-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;}
-.rb-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--blue);text-decoration:none;margin-top:3px;}
+.rb-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#ff5a6e;text-decoration:none;margin-top:3px;}
 .rb-link:hover{text-decoration:underline;}
 .rb-sources{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
 .src-pill{font-size:10px;padding:3px 8px;border-radius:6px;background:var(--blueg2);border:1px solid var(--border);color:var(--fg2);}
