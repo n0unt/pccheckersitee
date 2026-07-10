@@ -2,51 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Zevora — Terms of Service</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0000;--s1:#110000;--s2:#180000;
-  --border:rgba(101,0,11,0.25);--border2:rgba(101,0,11,0.5);
-  --fg:#f5e8e8;--fg2:#b07080;--fg3:#603040;
-  --blue:#65000b;--blue2:#4a0008;--blueg:rgba(101,0,11,0.15);--blueg2:rgba(101,0,11,0.07);
+  --bg:#0a0a0b;--s1:#111113;--s2:#18181b;--s3:#27272a;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --fg:#fafafa;--fg2:#a1a1aa;--fg3:#52525b;
+  --accent:#4ade80;--accentg:rgba(74,222,128,0.1);
 }
 html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(101,0,11,0.08),transparent 60%);}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(101,0,11,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(101,0,11,0.03) 1px,transparent 1px);background-size:50px 50px;}
-nav{position:sticky;top:0;z-index:100;background:rgba(10,0,0,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 40px;gap:16px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(74,222,128,0.04),transparent 60%);}
+
+nav{position:sticky;top:0;z-index:100;background:rgba(10,10,11,0.92);backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 40px;gap:16px;}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.brand img{height:30px;width:auto;}
-.bname{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--fg);}
+.brand-mark{width:28px;height:28px;border-radius:7px;background:var(--s2);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:var(--fg);}
+.bname{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
 .nav-links{display:flex;gap:4px;}
 .nav-links a{color:var(--fg2);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:8px;transition:.15s;}
-.nav-links a:hover{color:var(--fg);background:var(--blueg2);}
-.nav-links a.active{color:#c0392b;}
+.nav-links a:hover{color:var(--fg);background:rgba(255,255,255,0.05);}
+.nav-links a.active{color:var(--accent);}
 .nav-r{margin-left:auto;}
-.btn-blue{background:var(--blue);color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:7px 16px;border-radius:9px;}
-.btn-blue:hover{background:var(--blue2);}
-.page{max-width:780px;margin:0 auto;padding:60px 20px 100px;}
-.page-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c0392b;margin-bottom:12px;}
+.btn-nav{background:var(--accent);color:#000;text-decoration:none;font-size:13px;font-weight:700;padding:7px 14px;border-radius:8px;}
+.btn-nav:hover{opacity:.88;}
+
+.page{max-width:760px;margin:0 auto;padding:60px 20px 100px;}
+.page-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
 h1{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:800;margin-bottom:8px;}
 .updated{font-size:12px;color:var(--fg3);margin-bottom:48px;}
 .toc{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:40px;}
-.toc-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-bottom:12px;}
-.toc a{display:block;font-size:13px;color:var(--fg2);text-decoration:none;padding:4px 0;transition:.15s;}
-.toc a:hover{color:#c0392b;}
-h2{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;margin:40px 0 12px;color:var(--fg);}
+.toc-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-bottom:10px;}
+.toc a{display:block;font-size:13px;color:var(--fg2);text-decoration:none;padding:3px 0;transition:.15s;}
+.toc a:hover{color:var(--accent);}
+h2{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;margin:40px 0 12px;color:var(--fg);}
 p{font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:14px;}
 ul{padding-left:20px;margin-bottom:14px;}
 ul li{font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:4px;}
-.highlight{background:var(--blueg);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;margin:20px 0;}
+.highlight{background:var(--accentg);border:1px solid rgba(74,222,128,0.2);border-radius:10px;padding:14px 18px;margin:20px 0;}
 .highlight p{margin:0;color:var(--fg);}
 hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
 </style>
 </head>
 <body>
 <nav>
-  <a href="/" class="brand"><img src="/static/zevora-icon.png" alt="Zevora"><span class="bname">Zevora</span></a>
+  <a href="/" class="brand"><div class="brand-mark">Z</div><span class="bname">Zevora</span></a>
   <div class="nav-links">
     <a href="/">Home</a>
     <a href="/download">Download</a>
@@ -55,25 +59,26 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
     <a href="/privacy">Privacy</a>
   </div>
   <div class="nav-r">
-    {% if user %}<a href="/auth/logout" class="btn-blue">Sign out</a>
-    {% else %}<a href="/login" class="btn-blue">Sign in</a>{% endif %}
+    {% if user %}<a href="/auth/logout" class="btn-nav">Sign out</a>
+    {% else %}<a href="/login" class="btn-nav">Sign in</a>{% endif %}
   </div>
 </nav>
 
 <div class="page">
   <div class="page-label">Legal</div>
   <h1>Terms of Service</h1>
-  <div class="updated">Last updated: June 2026</div>
+  <div class="updated">Last updated: July 2026</div>
 
   <div class="toc">
     <div class="toc-title">Contents</div>
     <a href="#agreement">1. Agreement</a>
     <a href="#what-zevora-does">2. What Zevora Does</a>
     <a href="#consent">3. Your Consent</a>
-    <a href="#data">4. Data Collection</a>
+    <a href="#data">4. Data Collection & Storage</a>
     <a href="#use">5. Authorized Use</a>
-    <a href="#liability">6. Liability</a>
-    <a href="#contact">7. Contact</a>
+    <a href="#subscriptions">6. Subscriptions</a>
+    <a href="#liability">7. Liability</a>
+    <a href="#contact">8. Contact</a>
   </div>
 
   <div class="highlight">
@@ -81,16 +86,18 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
   </div>
 
   <h2 id="agreement">1. Agreement</h2>
-  <p>This is a binding legal agreement between you (the person running this software, and where applicable the person who requested the scan) and the creator of Zevora. By using this software or website, you agree to all terms listed here.</p>
+  <p>This is a binding legal agreement between you (the person running this software, and where applicable the person who requested the scan) and the creator of Zevora. By using this software or website in any capacity, you agree to all terms listed here.</p>
 
   <h2 id="what-zevora-does">2. What Zevora Does</h2>
-  <p>Zevora is a forensic PC scanner designed to detect cheating in competitive Roblox flag football leagues. When run, it reads forensic artifacts from the local PC and transmits the results to the league agent who requested the scan. It does not install anything, does not run in the background, and is deleted after the scan completes.</p>
-  <p>Zevora may read and transmit the following types of information:</p>
+  <p>Zevora is a forensic PC scanner designed to detect cheating in competitive Roblox football leagues. When run, it reads forensic artifacts from the local PC and transmits results to the agent who requested the scan. It does not install anything permanently and does not run in the background after the scan completes.</p>
+  <p>Zevora may read and transmit the following:</p>
   <ul>
-    <li>System and OS configuration and installation history</li>
-    <li>Records of programs run, installed, opened, or deleted (prefetch, registry, event logs, shellbags, recycle bin, and similar)</li>
+    <li>System and OS configuration, installation history, and factory reset evidence</li>
+    <li>Records of programs run, installed, opened, or deleted — including prefetch, registry, event logs, shellbags, recycle bin, and raw MFT records that may survive a factory reset</li>
     <li>Roblox and Discord account identifiers and game log data</li>
     <li>File system metadata including filenames, paths, and timestamps</li>
+    <li>DLLs and modules loaded in running processes (injection detection)</li>
+    <li>PowerShell and command history</li>
     <li>Network adapter information and VPN indicators</li>
     <li>FastFlag configuration data</li>
     <li>Power on/off and logon/logoff session history</li>
@@ -99,26 +106,28 @@ hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
   <h2 id="consent">3. Your Consent</h2>
   <p>By checking both consent boxes in the scanner and clicking "Accept & Continue", you:</p>
   <ul>
-    <li>Voluntarily consent to this scan and the collection of your data</li>
+    <li>Voluntarily consent to this scan and the collection of your data as described above</li>
     <li>Certify that you own this device or have explicit, documented authorization to scan it</li>
-    <li>Acknowledge that results will be shared with the league agent who issued your PIN</li>
-    <li>Understand that this software reads sensitive system data and transmits it off your device</li>
+    <li>Acknowledge that results will be shared with the agent who issued your PIN</li>
+    <li>Understand that Zevora may recover deleted file metadata from your device, including evidence that survives a factory reset</li>
   </ul>
 
-  <h2 id="data">4. Data Collection</h2>
-  <p>Scan results are stored on secure servers and are accessible only to authorized league agents, admins, and the owner of the Zevora platform. Results are used solely to determine whether cheating occurred during a league screenshare session.</p>
-  <p>The creator of Zevora does not share scan results with any third parties outside of the requesting league. IP addresses are not stored or transmitted in publicly viewable reports.</p>
+  <h2 id="data">4. Data Collection & Storage</h2>
+  <p>Scan results are stored on secure servers and are accessible only to the authorized agent who issued the PIN, their league administrators, and the Zevora platform owner. Results are used solely to determine whether cheating occurred during a league screenshare session.</p>
+  <p>IP addresses collected during scans are not stored in publicly viewable reports. Zevora does not share scan results with any third parties outside the requesting league.</p>
 
   <h2 id="use">5. Authorized Use</h2>
   <p>Zevora may only be used by leagues and individuals who have received explicit authorization from the creator. Unauthorized use — including running the scanner on someone else's PC without their consent, or using Zevora outside of an authorized league context — is strictly prohibited and will result in immediate access revocation.</p>
-  <p>If you believe the software is being used on you without authorization, contact us immediately via Discord (converts_19942) or by joining the Zevora server and opening a ticket.</p>
+  <p>If you believe this software is being used on you without authorization, contact us immediately via Discord: <strong>converts_19942</strong>.</p>
 
-  <h2 id="liability">6. Liability</h2>
-  <p>The creator of Zevora is not responsible for how scan results are used by third-party leagues or individuals. Suspension, banning, or other disciplinary actions taken by leagues based on scan results are the sole responsibility of those leagues.</p>
-  <p>Zevora is provided as-is. We make no guarantee of accuracy, completeness, or fitness for any particular purpose. The creator shall not be liable for any damages arising from the use or misuse of this software.</p>
+  <h2 id="subscriptions">6. Subscriptions</h2>
+  <p>Access to Zevora is provided via subscription, either at the league (Enterprise) or individual (User) level. Subscriptions are managed by the platform owner and are non-refundable once a PIN has been generated and used.</p>
+  <p>Enterprise subscriptions grant access to a league and all agents assigned to that league. Individual subscriptions grant access to a single account. Subscriptions expire on the date shown in the admin panel — expired accounts lose the ability to generate PINs until renewed.</p>
 
-  <h2 id="contact">7. Contact</h2>
-  <p>For questions about these terms or to report unauthorized use, contact us via:</p>
+  <h2 id="liability">7. Liability</h2>
+  <p>Zevora is provided as-is. The creator is not responsible for disciplinary actions taken by leagues based on scan results. Suspension, banning, or other actions are the sole responsibility of those leagues. We make no guarantee of accuracy, completeness, or fitness for any particular purpose. The creator shall not be liable for any damages arising from the use or misuse of this software.</p>
+
+  <h2 id="contact">8. Contact</h2>
   <ul>
     <li>Discord: <strong>converts_19942</strong></li>
     <li>Zevora Discord Server — open a ticket</li>
