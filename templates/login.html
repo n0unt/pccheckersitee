@@ -12,7 +12,9 @@
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --fg:#ececf0;--fg2:#8888a0;--fg3:#404055;
   --accent:#2bba8f;--accent2:#1d9e76;
+  --discord:#5865F2;--discord2:#4752c4;
   --red:#f85149;--redg:rgba(248,81,73,0.1);
+  --amb:#d29922;--ambg:rgba(210,153,34,0.1);
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(43,186,143,0.06),transparent 55%);}
@@ -26,7 +28,37 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;background-ima
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.6;}
 
 h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:5px;}
-.sub{font-size:13px;color:var(--fg2);margin-bottom:28px;line-height:1.5;}
+.sub{font-size:13px;color:var(--fg2);margin-bottom:24px;line-height:1.5;}
+
+.err{background:var(--redg);border:1px solid rgba(248,81,73,0.25);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:18px;line-height:1.5;}
+.err a{color:var(--red);text-decoration:underline;}
+
+/* Discord button — primary CTA */
+.btn-discord{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  background:var(--discord);color:#fff;border:none;border-radius:11px;
+  padding:13px;font-size:14px;font-weight:700;cursor:pointer;
+  text-decoration:none;transition:background .15s;
+  box-shadow:0 0 20px rgba(88,101,242,0.25);
+}
+.btn-discord:hover{background:var(--discord2);}
+.btn-discord svg{flex-shrink:0;}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:12px;margin:22px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border2);}
+.divider span{font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em;}
+
+/* Toggle to show/hide password form */
+.toggle-pw{
+  width:100%;background:none;border:1px solid var(--border2);border-radius:10px;
+  color:var(--fg2);font-size:13px;font-weight:600;padding:11px;cursor:pointer;
+  transition:.15s;margin-bottom:0;
+}
+.toggle-pw:hover{background:var(--s2);color:var(--fg);}
+
+.pw-form{display:none;margin-top:18px;}
+.pw-form.open{display:block;}
 
 .fl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);margin-bottom:7px;margin-top:14px;}
 .fl:first-of-type{margin-top:0;}
@@ -35,18 +67,15 @@ h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:5p
 .fw input{width:100%;background:transparent;border:none;outline:none;padding:12px 14px;font-size:14px;color:var(--fg);font-family:'DM Mono',monospace;}
 .fw input::placeholder{color:var(--fg3);}
 
-.err{background:var(--redg);border:1px solid rgba(248,81,73,0.25);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:16px;margin-top:4px;}
-
-.btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;font-family:'DM Sans',sans-serif;margin-top:22px;box-shadow:0 0 20px rgba(43,186,143,0.25);}
+.btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;font-family:'DM Sans',sans-serif;margin-top:18px;box-shadow:0 0 20px rgba(43,186,143,0.2);}
 .btn:hover{background:var(--accent2);}
 
-.note{font-size:11px;color:var(--fg3);text-align:center;margin-top:20px;line-height:1.7;}
+.note{font-size:11px;color:var(--fg3);text-align:center;margin-top:22px;line-height:1.7;}
 .note a{color:var(--fg2);text-decoration:none;}
 .note a:hover{color:var(--fg);}
-
-.dots{display:flex;gap:6px;justify-content:center;margin-bottom:32px;}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--border2);}
-.dot:nth-child(2){background:var(--accent);opacity:.5;}
+.join-note{font-size:12px;color:var(--fg2);text-align:center;margin-top:14px;}
+.join-note a{color:var(--accent);text-decoration:none;font-weight:600;}
+.join-note a:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -60,9 +89,20 @@ h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:5p
   <h1>Sign in</h1>
   <p class="sub">Agent &amp; admin access only. Unauthorized access is prohibited.</p>
 
-  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  {% if error %}<div class="err">{{ error|safe }}</div>{% endif %}
 
-  <form method="POST" action="/auth/login">
+  {% if discord_login_url %}
+  <a href="{{ discord_login_url }}" class="btn-discord">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.834 19.834 0 0 0 6.001-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.419 0 1.333-.946 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.419 0 1.333-.946 2.419-2.157 2.419z"/></svg>
+    Continue with Discord
+  </a>
+
+  <div class="divider"><span>or</span></div>
+
+  <button class="toggle-pw" onclick="togglePw()" id="pw-toggle">Sign in with username &amp; password</button>
+  {% endif %}
+
+  <form method="POST" action="/auth/login" class="pw-form {% if not discord_login_url %}open{% endif %}" id="pw-form">
     <div class="fl">Username</div>
     <div class="fw"><input name="username" type="text" placeholder="username" autocomplete="off" required></div>
     <div class="fl">Password</div>
@@ -70,11 +110,26 @@ h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:5p
     <button class="btn" type="submit">Sign in &rarr;</button>
   </form>
 
+  {% if discord_invite %}
+  <div class="join-note">
+    Not in our server yet? <a href="{{ discord_invite }}" target="_blank">Join Zevora Discord &rarr;</a>
+  </div>
+  {% endif %}
+
   <div class="note">
     Zevora Forensic Scanner &nbsp;·&nbsp; Authorized personnel only<br>
     <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
   </div>
 </div>
+
+<script>
+function togglePw(){
+  var f = document.getElementById('pw-form');
+  var btn = document.getElementById('pw-toggle');
+  var open = f.classList.toggle('open');
+  btn.textContent = open ? 'Hide password sign in' : 'Sign in with username & password';
+}
+</script>
 
 </body>
 </html>
