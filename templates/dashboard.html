@@ -8,78 +8,75 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0b;--s1:#111113;--s2:#18181b;--s3:#27272a;--s4:#3f3f46;
+  --bg:#0a0a0d;--s1:#111116;--s2:#18181d;--s3:#1e1e24;--s4:#27272e;
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --fg:#fafafa;--fg2:#a1a1aa;--fg3:#52525b;
-  --accent:#4ade80;--accent-dim:rgba(74,222,128,0.12);--accent-dim2:rgba(74,222,128,0.06);
-  --red:#ef4444;--redg:rgba(239,68,68,0.1);--redg2:rgba(239,68,68,0.18);
-  --amb:#f59e0b;--ambg:rgba(245,158,11,0.1);
+  --fg:#ececf0;--fg2:#8888a0;--fg3:#404055;
+  --accent:#2bba8f;--accent-dim:rgba(43,186,143,0.12);--accent-dim2:rgba(43,186,143,0.06);
+  --red:#f85149;--redg:rgba(248,81,73,0.1);--redg2:rgba(248,81,73,0.18);
+  --amb:#d29922;--ambg:rgba(210,153,34,0.1);
   --green:#22c55e;--greeng:rgba(34,197,94,0.1);
-  --blue:#60a5fa;--blueg:rgba(96,165,250,0.1);
+  --blue:#58a6ff;--blueg:rgba(88,166,255,0.1);
+  --discord:#5865F2;
   --side:220px;
 }
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(43,186,143,0.05),transparent);}
 
 /* ── LAYOUT ── */
 .shell{display:flex;height:100vh;}
 
-/* ── SIDEBAR ── */
+/* ── SIDEBAR — glass ── */
 .side{
   width:var(--side);flex-shrink:0;
-  background:var(--s1);border-right:1px solid var(--border);
+  background:rgba(255,255,255,0.035);backdrop-filter:blur(20px);
+  border-right:1px solid var(--border);
   display:flex;flex-direction:column;transition:width .2s;
   position:relative;z-index:50;
 }
 .side.collapsed{width:56px;}
-.side-top{padding:14px 12px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);min-height:56px;}
-.brand-logo{width:32px;height:32px;border-radius:9px;background:var(--s3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--fg);flex-shrink:0;}
+.side-top{padding:14px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);min-height:56px;}
+.brand-logo{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--fg);flex-shrink:0;}
 .brand-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;}
-.side.collapsed .brand-name{display:none;}
-.side.collapsed .slink-label{display:none;}
-.side.collapsed .badge{display:none;}
-.side.collapsed .side-group-label{display:none;}
+.side.collapsed .brand-name,.side.collapsed .slink-label,.side.collapsed .badge,.side.collapsed .side-group-label{display:none;}
 
 .side-body{flex:1;overflow-y:auto;padding:10px 8px;}
 .side-group-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);padding:12px 10px 5px;white-space:nowrap;overflow:hidden;}
 .slink{
-  display:flex;align-items:center;gap:10px;
-  padding:8px 10px;border-radius:9px;
-  font-size:13px;color:var(--fg2);
-  cursor:pointer;border:none;background:none;width:100%;
-  text-decoration:none;transition:.13s;
-  white-space:nowrap;overflow:hidden;
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;
+  font-size:13px;color:var(--fg2);cursor:pointer;border:none;background:none;width:100%;
+  text-decoration:none;transition:.13s;white-space:nowrap;overflow:hidden;
 }
-.slink:hover{background:var(--s2);color:var(--fg);}
-.slink.active{background:var(--accent-dim);color:var(--accent);}
+.slink:hover{background:rgba(255,255,255,0.05);color:var(--fg);}
+.slink.active{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);}
 .slink svg{flex-shrink:0;opacity:.55;}
 .slink.active svg{opacity:1;}
 .slink-label{flex:1;overflow:hidden;text-overflow:ellipsis;}
-.badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--s3);color:var(--fg2);flex-shrink:0;}
+.badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--s3);color:var(--fg2);flex-shrink:0;}
 .slink.active .badge{background:var(--accent-dim);color:var(--accent);}
 
 .side-bottom{padding:10px 8px;border-top:1px solid var(--border);}
-.collapse-btn{
-  display:flex;align-items:center;justify-content:center;
-  width:100%;padding:7px;border-radius:8px;
-  background:none;border:none;color:var(--fg3);cursor:pointer;
-  transition:.13s;
-}
-.collapse-btn:hover{background:var(--s2);color:var(--fg2);}
+.collapse-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:7px;border-radius:9px;background:none;border:none;color:var(--fg3);cursor:pointer;transition:.13s;}
+.collapse-btn:hover{background:rgba(255,255,255,0.05);color:var(--fg2);}
 
 /* ── MAIN ── */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .topbar{
-  height:56px;background:var(--s1);border-bottom:1px solid var(--border);
+  height:60px;background:rgba(255,255,255,0.03);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
   display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;
 }
 .topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
 .topbar-r{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.user-chip{font-size:12px;color:var(--fg2);background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+.user-chip{font-size:12px;color:var(--fg2);background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;padding:5px 12px;}
 .user-chip b{color:var(--fg);}
-.btn-sm{font-size:11px;color:var(--fg3);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:7px;transition:.13s;background:none;cursor:pointer;}
-.btn-sm:hover{color:var(--fg2);border-color:var(--border2);}
-.btn-accent{font-size:12px;color:#000;background:var(--accent);border:none;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer;transition:.13s;display:flex;align-items:center;gap:6px;}
-.btn-accent:hover{opacity:.88;}
+.btn-sm{font-size:11px;color:var(--fg3);text-decoration:none;padding:5px 11px;border:1px solid var(--border2);border-radius:9px;transition:.13s;background:rgba(255,255,255,0.03);}
+.btn-sm:hover{color:var(--fg2);border-color:var(--fg3);}
+.btn-accent{
+  font-size:12px;color:#03150f;background:rgba(43,186,143,0.9);border:1px solid rgba(43,186,143,0.4);
+  border-radius:10px;padding:7px 15px;font-weight:700;cursor:pointer;transition:.13s;
+  display:flex;align-items:center;gap:6px;box-shadow:0 2px 12px rgba(43,186,143,0.2);
+}
+.btn-accent:hover{background:var(--accent);color:#fff;}
 
 .content{flex:1;overflow-y:auto;padding:24px;}
 .page{display:none;}
@@ -87,7 +84,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 
 /* ── STATS ROW ── */
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
-.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:16px 18px;}
+.stat-card{background:rgba(255,255,255,0.035);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:14px;padding:16px 18px;}
 .stat-n{font-family:'Syne',sans-serif;font-size:1.75rem;font-weight:800;}
 .stat-n.green{color:var(--accent);}
 .stat-n.red{color:var(--red);}
@@ -96,18 +93,18 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 .stat-sub{font-size:10px;color:var(--fg3);margin-top:2px;}
 
 /* ── CARDS / TABLES ── */
-.card{background:var(--s1);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin-bottom:16px;}
+.card{background:rgba(255,255,255,0.035);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;}
 .card-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
 .card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;}
 .card-sub{font-size:11px;color:var(--fg3);margin-left:auto;}
 .card-body{padding:18px;}
 
 .search-row{display:flex;gap:10px;align-items:center;margin-bottom:16px;}
-.search-wrap{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 12px;}
+.search-wrap{flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;}
 .search-wrap input{background:none;border:none;outline:none;padding:9px 0;font-size:13px;color:var(--fg);flex:1;font-family:'DM Sans',sans-serif;}
 .search-wrap input::placeholder{color:var(--fg3);}
 .search-wrap svg{opacity:.4;flex-shrink:0;}
-.btn-refresh{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:9px 14px;color:var(--fg2);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.13s;}
+.btn-refresh{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--fg2);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.13s;}
 .btn-refresh:hover{border-color:var(--border2);color:var(--fg);}
 
 .tbl{width:100%;border-collapse:collapse;}
@@ -117,7 +114,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 .tbl td:first-child{color:var(--fg);font-weight:600;font-family:'DM Mono',monospace;font-size:13px;}
 .no-rows{padding:40px;text-align:center;color:var(--fg3);font-size:13px;}
 
-.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em;}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;}
 .pill.green{background:var(--greeng);color:var(--green);}
 .pill.red{background:var(--redg);color:var(--red);}
 .pill.amb{background:var(--ambg);color:var(--amb);}
@@ -129,30 +126,30 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 .hits-num.red{color:var(--red);}
 .hits-num.amb{color:var(--amb);}
 .hits-num.green{color:var(--accent);}
-.btn-view{font-size:11px;color:var(--accent);text-decoration:none;padding:4px 10px;border-radius:6px;background:var(--accent-dim2);border:1px solid rgba(74,222,128,0.15);transition:.13s;display:inline-flex;align-items:center;gap:4px;}
+.btn-view{font-size:11px;color:var(--accent);text-decoration:none;padding:4px 10px;border-radius:7px;background:var(--accent-dim2);border:1px solid rgba(43,186,143,0.15);transition:.13s;display:inline-flex;align-items:center;gap:4px;}
 .btn-view:hover{background:var(--accent-dim);}
-.btn-del{font-size:11px;color:var(--red);padding:4px 8px;border-radius:6px;background:var(--redg);border:none;cursor:pointer;transition:.13s;}
+.btn-del{font-size:11px;color:var(--red);padding:4px 8px;border-radius:7px;background:var(--redg);border:none;cursor:pointer;transition:.13s;}
 .btn-del:hover{background:var(--redg2);}
 
 /* ── PIN SECTION ── */
-.pin-gen-row{display:flex;gap:10px;align-items:center;margin-bottom:16px;}
-.sel{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;color:var(--fg);outline:none;cursor:pointer;transition:.13s;}
+.sel{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--fg);outline:none;cursor:pointer;transition:.13s;}
 .sel:focus{border-color:var(--accent);}
-.pin-result{background:var(--s2);border:1px solid var(--border2);border-radius:12px;padding:20px;display:none;}
+.sel option{background:var(--s2);}
+.pin-result{background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:14px;padding:20px;display:none;}
 .pin-code{font-family:'DM Mono',monospace;font-size:2.2rem;font-weight:700;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;}
 .pin-meta{font-size:11px;color:var(--fg3);line-height:1.8;}
 .pin-meta b{color:var(--fg2);}
 .pin-actions{display:flex;gap:8px;margin-top:12px;align-items:center;}
-.btn-copy{font-size:11px;color:var(--accent);background:var(--accent-dim2);border:1px solid rgba(74,222,128,0.15);border-radius:7px;padding:5px 12px;cursor:pointer;transition:.13s;}
+.btn-copy{font-size:11px;color:var(--accent);background:var(--accent-dim2);border:1px solid rgba(43,186,143,0.15);border-radius:8px;padding:5px 12px;cursor:pointer;transition:.13s;}
 .btn-copy:hover{background:var(--accent-dim);}
 
 /* ── TEAM PAGE ── */
 .league-section{margin-bottom:24px;}
 .league-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.league-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:var(--accent-dim);color:var(--accent);letter-spacing:.05em;}
+.league-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:7px;background:var(--accent-dim);color:var(--accent);letter-spacing:.05em;}
 .league-count{font-size:11px;color:var(--fg3);}
 .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
-.member-card{background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;transition:.13s;}
+.member-card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;transition:.13s;}
 .member-card:hover{border-color:var(--border2);}
 .member-name{font-weight:600;font-size:13px;margin-bottom:4px;}
 .member-role{font-size:10px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;}
@@ -161,28 +158,27 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 .member-stat b{color:var(--fg2);display:block;font-size:13px;font-weight:700;}
 
 /* ── ADMIN ── */
-.admin-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);padding:0 0 0;margin-bottom:20px;}
+.admin-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;}
 .admin-tab{padding:10px 16px;font-size:13px;color:var(--fg3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.13s;}
 .admin-tab:hover{color:var(--fg2);}
 .admin-tab.active{color:var(--fg);border-bottom-color:var(--accent);}
 .admin-page{display:none;}
 .admin-page.active{display:block;}
 
-.grant-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:20px;}
+.grant-card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px;}
 .grant-title{font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
 .grant-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
 .field-group{display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px;}
 .field-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);}
-.field-input{background:var(--s1);border:1px solid var(--border);border-radius:8px;transition:.13s;}
+.field-input{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;transition:.13s;}
 .field-input:focus-within{border-color:var(--accent);}
 .field-input input,.field-input select{width:100%;background:transparent;border:none;outline:none;padding:9px 12px;font-size:13px;color:var(--fg);font-family:'DM Sans',sans-serif;}
 .field-input select option{background:var(--s2);}
 .role-toggle{display:flex;gap:4px;}
-.role-btn{padding:7px 14px;border-radius:7px;border:1px solid var(--border);background:var(--s1);color:var(--fg2);font-size:12px;font-weight:600;cursor:pointer;transition:.13s;}
-.role-btn.active{background:var(--accent-dim);border-color:rgba(74,222,128,0.3);color:var(--accent);}
+.role-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--fg2);font-size:12px;font-weight:600;cursor:pointer;transition:.13s;}
+.role-btn.active{background:var(--accent-dim);border-color:rgba(43,186,143,0.3);color:var(--accent);}
 .role-btn:hover:not(.active){border-color:var(--border2);color:var(--fg);}
 
-/* User table with subscriptions */
 .user-name{font-size:13px;font-weight:600;color:var(--fg);}
 .user-id{font-size:10px;color:var(--fg3);font-family:'DM Mono',monospace;margin-top:2px;}
 .sub-info{font-size:11px;color:var(--fg2);}
@@ -194,18 +190,18 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
 .sub-action-btn.danger{color:var(--red);}
 .sub-action-btn.danger:hover{color:#ff6b6b;}
 .sep{color:var(--fg3);font-size:10px;}
-.revoke-btn{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--red);background:var(--redg);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;transition:.13s;}
+.revoke-btn{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--red);background:var(--redg);border:none;border-radius:7px;padding:4px 10px;cursor:pointer;transition:.13s;}
 .revoke-btn:hover{background:var(--redg2);}
 
 /* ── MODAL ── */
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .modal.open{display:flex;}
-.modal-card{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:380px;}
+.modal-card{background:rgba(24,24,29,0.95);backdrop-filter:blur(20px);border:1px solid var(--border2);border-radius:18px;padding:28px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
 .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:8px;}
 .modal-sub{font-size:13px;color:var(--fg2);margin-bottom:22px;line-height:1.6;}
 .modal-btns{display:flex;gap:10px;}
-.modal-cancel{flex:1;background:var(--s2);color:var(--fg2);border:1px solid var(--border);border-radius:9px;padding:10px;font-size:13px;cursor:pointer;}
-.modal-confirm{flex:1;background:var(--red);color:#fff;border:none;border-radius:9px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;}
+.modal-cancel{flex:1;background:rgba(255,255,255,0.04);color:var(--fg2);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;}
+.modal-confirm{flex:1;background:var(--red);color:#fff;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;}
 
 /* ── EXE UPLOAD ── */
 .progress-wrap{display:none;margin-top:12px;}
@@ -241,8 +237,8 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
       <button class="slink" onclick="showPage('admin',this)" id="nav-admin">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span class="slink-label">Admin</span>
-        {% if pending_count is defined and pending_count %}
-        <span class="badge" style="background:var(--redg2);color:var(--red)">{{ pending_count }}</span>
+        {% if expired_count %}
+        <span class="badge" style="background:var(--redg2);color:var(--red)">{{ expired_count }}</span>
         {% endif %}
       </button>
       {% endif %}
@@ -259,7 +255,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
     <div class="topbar">
       <span class="topbar-title" id="topbar-title">My Pins</span>
       <div class="topbar-r">
-        <span class="user-chip">Signed in as <b>{{ user.username }}</b> · {{ user.role }}</span>
+        <span class="user-chip">Signed in as <b>{{ user.username }}</b> &middot; {{ user.role }}</span>
         <a href="/" class="btn-sm">Home</a>
         <a href="/auth/logout" class="btn-sm">Sign out</a>
         <button class="btn-accent" onclick="openCreatePin()" id="create-pin-btn">
@@ -339,27 +335,24 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
           </div>
         </div>
 
-        <!-- Create PIN result display -->
         <div class="pin-result" id="pin-result">
           <div class="pin-code" id="pin-code-display">——————</div>
           <div class="pin-meta">
-            League: <b id="pin-league-show">—</b> &nbsp;·&nbsp;
-            Expires: <b id="pin-expires-show">1 hour</b> &nbsp;·&nbsp;
+            League: <b id="pin-league-show">—</b> &nbsp;&middot;&nbsp;
+            Expires: <b id="pin-expires-show">1 hour</b> &nbsp;&middot;&nbsp;
             One-time use
           </div>
           <div class="pin-actions">
             <button class="btn-copy" onclick="copyPin()">Copy PIN</button>
-            <a id="pin-watch-link" href="#" class="btn-view" style="text-decoration:none">
-              ↗ Watch results live
-            </a>
+            <a id="pin-watch-link" href="#" class="btn-view" style="text-decoration:none">View results live</a>
           </div>
         </div>
       </div>
 
       <!-- MY TEAM PAGE -->
       <div class="page" id="page-team">
-        {% if user.role == 'owner' %}
-          {% if all_leagues is defined %}
+        {% if user.role in ['owner','admin'] %}
+          {% if all_leagues %}
             {% for league_name, members in all_leagues.items() %}
             <div class="league-section">
               <div class="league-header">
@@ -386,7 +379,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
         {% else %}
           <div class="league-section">
             <div class="league-header">
-              <span class="league-badge">{{ user.league or 'Your League' }}</span>
+              <span class="league-badge">Your Leagues</span>
               <span class="league-count">{{ team_members|length if team_members else 0 }} member{{ 's' if (team_members|length if team_members else 0) != 1 }}</span>
             </div>
             {% if team_members %}
@@ -417,9 +410,9 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
           <button class="admin-tab" onclick="showAdmin('users',this)">Users</button>
           <button class="admin-tab" onclick="showAdmin('expired',this)">
             Expired
-            {% set exp = all_users|selectattr('subscription_expired','defined')|list %}
-            {% if exp|length %}<span style="margin-left:6px;background:var(--redg2);color:var(--red);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px">{{ exp|length }}</span>{% endif %}
+            {% if expired_users %}<span style="margin-left:6px;background:var(--redg2);color:var(--red);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px">{{ expired_users|length }}</span>{% endif %}
           </button>
+          <button class="admin-tab" onclick="showAdmin('leagues',this)">Leagues</button>
           {% if user.role == 'owner' %}
           <button class="admin-tab" onclick="showAdmin('scanner',this)">Scanner Upload</button>
           {% endif %}
@@ -447,8 +440,8 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                   <span class="hits-num {% if h>20 %}red{% elif h>5 %}amb{% else %}green{% endif %}">{{ h }}</span>
                 </td>
                 <td>
-                  {% if s.verdict == 'REVIEW' %}<span class="pill red">⚠ Review</span>
-                  {% elif s.verdict == 'CLEAN' %}<span class="pill green">✓ Clean</span>
+                  {% if s.verdict == 'REVIEW' %}<span class="pill red">Review</span>
+                  {% elif s.verdict == 'CLEAN' %}<span class="pill green">Clean</span>
                   {% else %}<span class="pill gray">{{ s.verdict }}</span>{% endif %}
                 </td>
                 <td style="font-size:11px;color:var(--fg3)">{{ s.submitted[:16] if s.submitted else '—' }}</td>
@@ -457,7 +450,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     View
                   </a>
-                  <button class="btn-del" onclick="confirmDelete({{ s.id }},'{{ s.pin_used }}')">✕</button>
+                  <button class="btn-del" onclick="confirmDelete({{ s.id }},'{{ s.pin_used }}')">Delete</button>
                 </td>
               </tr>
               {% endfor %}
@@ -480,13 +473,17 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                 <div class="field-input"><input id="new-user" type="text" placeholder="username"></div>
               </div>
               <div class="field-group" style="max-width:180px">
+                <div class="field-label">Discord ID (optional)</div>
+                <div class="field-input"><input id="new-discord-id" type="text" placeholder="123456789012345678"></div>
+              </div>
+              <div class="field-group" style="max-width:180px">
                 <div class="field-label">Password</div>
                 <div class="field-input"><input id="new-pass" type="password" placeholder="••••••••"></div>
               </div>
               <div class="field-group" style="max-width:140px">
                 <div class="field-label">Role</div>
                 <div class="role-toggle">
-                  <button class="role-btn active" id="role-user" onclick="setRole('user')">User</button>
+                  <button class="role-btn active" id="role-user" onclick="setRole('agent')">Agent</button>
                   <button class="role-btn" id="role-enterprise" onclick="setRole('enterprise')">Enterprise</button>
                 </div>
               </div>
@@ -495,8 +492,9 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                 <div class="field-input">
                   <select id="new-league">
                     <option value="ALL">All Leagues</option>
-                    <option value="UFF">UFF</option>
-                    <option value="KFA">KFA</option>
+                    {% for lg in leagues %}
+                    <option value="{{ lg.slug }}">{{ lg.name }}</option>
+                    {% endfor %}
                   </select>
                 </div>
               </div>
@@ -531,28 +529,31 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                 <td>
                   {% if u.role == 'owner' %}<span class="pill red">owner</span>
                   {% elif u.role == 'admin' %}<span class="pill amb">admin</span>
-                  {% elif u.role == 'enterprise' %}<span class="pill accent">enterprise · {{ u.league or '—' }}</span>
+                  {% elif u.sub_type == 'enterprise' %}<span class="pill accent">enterprise &middot; {{ u.league_display or '—' }}</span>
                   {% else %}<span class="pill gray">user</span>{% endif %}
                 </td>
                 <td>
-                  {% if u.subscription_expiry %}
-                    {% set days_left = u.days_left if u.days_left is defined else 0 %}
-                    <div class="sub-info {% if days_left < 0 %}expired{% elif days_left < 7 %}expiring{% endif %}">
-                      {{ u.subscription_expiry[:10] if u.subscription_expiry else '—' }}
-                      {% if days_left < 0 %}(Expired){% elif days_left >= 0 %}({{ days_left }}d left){% endif %}
+                  {% if u.sub_expires %}
+                    <div class="sub-info {% if u.days_left is not none and u.days_left < 0 %}expired{% elif u.days_left is not none and u.days_left < 7 %}expiring{% endif %}">
+                      {{ u.sub_expires[:10] }}
+                      {% if u.days_left is not none %}
+                        {% if u.days_left < 0 %}(Expired){% else %}({{ u.days_left }}d left){% endif %}
+                      {% endif %}
                     </div>
                     <div class="sub-actions">
                       <button class="sub-action-btn" onclick="editSub({{ u.id }})">Edit</button>
-                      <span class="sep">·</span>
+                      <span class="sep">&middot;</span>
                       <button class="sub-action-btn" onclick="extendSub({{ u.id }},1)">+1 month</button>
-                      <span class="sep">·</span>
+                      <span class="sep">&middot;</span>
                       <button class="sub-action-btn danger" onclick="endSub({{ u.id }})">End</button>
                     </div>
                   {% else %}
-                    <div class="sub-info" style="color:var(--fg3)">No subscription</div>
+                    <div class="sub-info" style="color:var(--fg3)">{% if u.role in ['owner','admin'] %}N/A{% else %}No subscription{% endif %}</div>
+                    {% if u.role not in ['owner','admin'] %}
                     <div class="sub-actions">
                       <button class="sub-action-btn" onclick="setSub({{ u.id }})">Set</button>
                     </div>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td style="font-size:11px;color:var(--fg3)">{{ u.granted_by or '—' }}</td>
@@ -578,17 +579,17 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
             <table class="tbl">
               <thead><tr><th>User</th><th>Role / League</th><th>Expired</th><th>Actions</th></tr></thead>
               <tbody>
-              {% for u in all_users if u.subscription_expired is defined and u.subscription_expired %}
+              {% for u in expired_users %}
               <tr>
                 <td><div class="user-name">{{ u.username }}</div></td>
                 <td>
-                  {% if u.role == 'enterprise' %}<span class="pill accent">enterprise · {{ u.league or '—' }}</span>
+                  {% if u.sub_type == 'enterprise' %}<span class="pill accent">enterprise &middot; {{ u.league_display or '—' }}</span>
                   {% else %}<span class="pill gray">{{ u.role }}</span>{% endif %}
                 </td>
-                <td><span class="sub-info expired">{{ u.subscription_expiry[:10] if u.subscription_expiry else '—' }}</span></td>
+                <td><span class="sub-info expired">{{ u.sub_expires[:10] if u.sub_expires else '—' }}</span></td>
                 <td>
                   <button class="sub-action-btn" onclick="extendSub({{ u.id }},1)" style="color:var(--accent)">+1 month</button>
-                  <span class="sep">·</span>
+                  <span class="sep">&middot;</span>
                   <button class="revoke-btn" onclick="confirmRevoke({{ u.id }},'{{ u.username }}')">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
                     Revoke
@@ -597,6 +598,45 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
               </tr>
               {% else %}
               <tr><td colspan="4"><div class="no-rows">No expired subscriptions.</div></td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Leagues -->
+        <div class="admin-page" id="admin-leagues">
+          <div class="grant-card">
+            <div class="grant-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add League
+            </div>
+            <div class="grant-row">
+              <div class="field-group" style="max-width:220px">
+                <div class="field-label">League Name</div>
+                <div class="field-input"><input id="new-league-name" type="text" placeholder="e.g. ACFL"></div>
+              </div>
+              <button class="btn-accent" onclick="createLeague()">Add League</button>
+            </div>
+            <div class="msg-out" id="league-msg"></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">All Leagues</span></div>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Slug</th><th>Created</th><th>Actions</th></tr></thead>
+              <tbody>
+              {% for lg in leagues %}
+              <tr>
+                <td><div class="user-name">{{ lg.name }}</div></td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px">{{ lg.slug }}</td>
+                <td style="font-size:11px;color:var(--fg3)">{{ lg.created[:10] if lg.created else '—' }}</td>
+                <td>
+                  <button class="revoke-btn" onclick="deleteLeague({{ lg.id }},'{{ lg.name }}')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                    Delete
+                  </button>
+                </td>
+              </tr>
               {% endfor %}
               </tbody>
             </table>
@@ -619,7 +659,7 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
                   <div class="field-label">Scanner .exe</div>
                   <div class="field-input"><input id="exe-file" type="file" accept=".exe" style="padding:8px 12px"></div>
                 </div>
-                <button class="btn-accent" onclick="uploadExe()">Upload & Publish</button>
+                <button class="btn-accent" onclick="uploadExe()">Upload &amp; Publish</button>
               </div>
               <div class="progress-wrap" id="exe-progress-wrap">
                 <div class="progress-track"><div class="progress-fill" id="exe-progress-fill"></div></div>
@@ -669,20 +709,21 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans'
       <div>
         <div class="field-label" style="margin-bottom:6px">League</div>
         <select class="sel" id="pin-league" style="width:100%">
-          <option value="UFF">UFF</option>
-          <option value="KFA">KFA</option>
+          {% for lg in leagues %}
+          <option value="{{ lg.slug }}">{{ lg.name }}</option>
+          {% endfor %}
         </select>
       </div>
     </div>
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeModal('pin-modal')">Cancel</button>
-      <button class="modal-confirm" style="background:var(--accent);color:#000" onclick="genPin()">Generate PIN</button>
+      <button class="modal-confirm" style="background:var(--accent);color:#03150f" onclick="genPin()">Generate PIN</button>
     </div>
   </div>
 </div>
 
 <script>
-let _delId = null, _revokeId = null, _selRole = 'user';
+let _delId = null, _revokeId = null, _selRole = 'agent';
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -707,11 +748,7 @@ function toggleSide() {
   const s = document.getElementById('sidebar');
   const ico = document.getElementById('collapse-icon');
   s.classList.toggle('collapsed');
-  if (s.classList.contains('collapsed')) {
-    ico.innerHTML = '<path d="M9 18l6-6-6-6"/>';
-  } else {
-    ico.innerHTML = '<path d="M15 18l-6-6 6-6"/>';
-  }
+  ico.innerHTML = s.classList.contains('collapsed') ? '<path d="M9 18l6-6-6-6"/>' : '<path d="M15 18l-6-6 6-6"/>';
 }
 
 function filterPins(q) {
@@ -721,9 +758,7 @@ function filterPins(q) {
   });
 }
 
-function openCreatePin() {
-  document.getElementById('pin-modal').classList.add('open');
-}
+function openCreatePin() { document.getElementById('pin-modal').classList.add('open'); }
 
 async function genPin() {
   const league = document.getElementById('pin-league').value;
@@ -736,13 +771,12 @@ async function genPin() {
     const d = await r.json();
     if (d.pin) {
       document.getElementById('pin-code-display').textContent = d.pin;
-      document.getElementById('pin-league-show').textContent = league;
-      document.getElementById('pin-expires-show').textContent = d.expires || '1 hour';
+      document.getElementById('pin-league-show').textContent = d.league;
+      document.getElementById('pin-expires-show').textContent = d.expires || '4 hours';
       document.getElementById('pin-watch-link').href = '/results/' + d.pin;
       const res = document.getElementById('pin-result');
       res.style.display = 'block';
       res.scrollIntoView({behavior:'smooth'});
-      // Update badge
       const badge = document.getElementById('pin-badge');
       if (badge) badge.textContent = parseInt(badge.textContent||0)+1;
     } else {
@@ -787,29 +821,28 @@ async function doRevoke() {
   else alert(d.error || 'Failed');
 }
 
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function setRole(role) {
   _selRole = role;
-  document.getElementById('role-user').classList.toggle('active', role === 'user');
+  document.getElementById('role-user').classList.toggle('active', role === 'agent');
   document.getElementById('role-enterprise').classList.toggle('active', role === 'enterprise');
   document.getElementById('league-field').style.display = role === 'enterprise' ? '' : 'none';
 }
-setRole('user'); // init
+setRole('agent');
 
 async function createUser() {
   const u = document.getElementById('new-user').value.trim();
   const p = document.getElementById('new-pass').value.trim();
+  const discordId = document.getElementById('new-discord-id').value.trim();
   const league = document.getElementById('new-league')?.value || 'ALL';
   const months = parseInt(document.getElementById('new-sub-months').value);
-  if (!u || !p) { alert('Fill in username and password'); return; }
+  if (!u) { alert('Enter a username'); return; }
   const msg = document.getElementById('user-msg');
   try {
     const r = await fetch('/api/admin/users/create', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username:u, password:p, role:_selRole, league, sub_months:months})
+      body: JSON.stringify({username:u, password:p, discord_id:discordId, role:_selRole, league, months})
     });
     const d = await r.json();
     if (d.ok) {
@@ -825,20 +858,17 @@ async function createUser() {
 
 async function extendSub(id, months) {
   const r = await fetch('/api/admin/users/' + id + '/extend-sub', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({months})
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({months})
   });
   const d = await r.json();
-  if (d.ok) location.reload();
-  else alert(d.error || 'Failed');
+  if (d.ok) location.reload(); else alert(d.error || 'Failed');
 }
 
 async function endSub(id) {
   if (!confirm('End subscription for this user?')) return;
   const r = await fetch('/api/admin/users/' + id + '/end-sub', {method:'POST'});
   const d = await r.json();
-  if (d.ok) location.reload();
-  else alert(d.error || 'Failed');
+  if (d.ok) location.reload(); else alert(d.error || 'Failed');
 }
 
 async function setSub(id) {
@@ -851,12 +881,31 @@ async function editSub(id) {
   const date = prompt('New expiry date (YYYY-MM-DD):');
   if (!date) return;
   const r = await fetch('/api/admin/users/' + id + '/set-sub', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({expiry: date})
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({expiry: date})
   });
   const d = await r.json();
-  if (d.ok) location.reload();
-  else alert(d.error || 'Failed');
+  if (d.ok) location.reload(); else alert(d.error || 'Failed');
+}
+
+async function createLeague() {
+  const name = document.getElementById('new-league-name').value.trim();
+  if (!name) { alert('Enter a league name'); return; }
+  const msg = document.getElementById('league-msg');
+  try {
+    const r = await fetch('/api/admin/leagues', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})
+    });
+    const d = await r.json();
+    if (d.ok) { msg.className='msg-out ok'; msg.textContent='League added: '+d.name; setTimeout(()=>location.reload(),800); }
+    else { msg.className='msg-out err'; msg.textContent=d.error||'Failed'; }
+  } catch(e) { alert('Error: '+e); }
+}
+
+async function deleteLeague(id, name) {
+  if (!confirm('Delete league "'+name+'"? Existing scans/pins keep their league name but no new pins can use it.')) return;
+  const r = await fetch('/api/admin/leagues/'+id, {method:'DELETE'});
+  const d = await r.json();
+  if (d.ok) location.reload(); else alert(d.error||'Failed');
 }
 
 async function uploadExe() {
@@ -865,9 +914,7 @@ async function uploadExe() {
   const msg = document.getElementById('exe-msg');
   const pw = document.getElementById('exe-progress-wrap');
   const pf = document.getElementById('exe-progress-fill');
-  if (!fileInput.files?.[0]) {
-    msg.className = 'msg-out err'; msg.textContent = 'Choose a .exe file first.'; return;
-  }
+  if (!fileInput.files?.[0]) { msg.className = 'msg-out err'; msg.textContent = 'Choose a .exe file first.'; return; }
   const file = fileInput.files[0];
   const fd = new FormData();
   fd.append('file', file); fd.append('version', version);
@@ -888,7 +935,6 @@ async function uploadExe() {
   xhr.send(fd);
 }
 
-// Close modals on backdrop click
 document.querySelectorAll('.modal').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
