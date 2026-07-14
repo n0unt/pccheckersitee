@@ -3,8 +3,8 @@ Comet Scanner v5 — Forensic Scanner
 Build: pyinstaller --onefile --noconsole --icon=comet.ico --name=Comet --manifest=comet.manifest comet_scanner.py
 """
 import sys as _sys, os as _os
+import tkinter.font as _tkfont
 
-# ── Crash logger — writes errors to Desktop so nothing is silent ──────────
 def _setup_crash_log():
     try:
         import traceback, datetime
@@ -30,7 +30,6 @@ def _setup_crash_log():
         pass
 _setup_crash_log()
 
-# ── Auto-elevation via manifest (preferred) — this is a Python fallback ──
 def _is_admin():
     try:
         import ctypes
@@ -41,31 +40,23 @@ def _is_admin():
 if _os.name == "nt" and not _is_admin():
     import ctypes
     try:
-        # For frozen EXE: executable IS the script
-        # For .py: need to pass script path as argument to python
         if getattr(_sys, "frozen", False):
-            exe  = _sys.executable          # the .exe itself
+            exe  = _sys.executable
             args = " ".join(f'"{a}"' for a in _sys.argv[1:])
-            ret  = ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", exe, args if args else None, None, 1)
+            ret  = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args if args else None, None, 1)
         else:
-            exe    = _sys.executable        # python.exe
+            exe    = _sys.executable
             script = _os.path.abspath(__file__)
             args   = f'"{script}"' + (" " + " ".join(f'"{a}"' for a in _sys.argv[1:]) if _sys.argv[1:] else "")
-            ret    = ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", exe, args, None, 1)
+            ret    = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args, None, 1)
         if int(ret) > 32:
             _sys.exit(0)
     except Exception:
-        pass  # UAC cancelled — continue without admin
+        pass
 
-# ============================================================
-#  CONFIG
-# ============================================================
 import base64 as _b64
 def _d(s): return _b64.b64decode(s).decode()
 
-# Keywords — encoded to prevent trivial bypass by name
 _KW_ENC = [
     "dm9sdA==","bWF0Y2hh","Y2x1bXN5","c29sYXJh","eGVubw==",
     "cG90YXNzaXVt","Y3J5cHRpYw==","dmVsb2NpdHk=","c2lyaHVydA==",
@@ -75,22 +66,43 @@ _KW_ENC = [
     "c2NyaXB0d2FyZQ==","ZmluYWxlZA==","YXdha2VuZWQ=",
     "aW5qZWN0b3I=","Y2hlYXRlbmdpbmU=","YXJ0aWZpY2lhbGFpbQ==",
     "c3luYXBzZXg=","a3JuczQ=","ZXhlY3V0b3J4","c2t5aHVieA==",
+    # --- new additions ---
+    "Ynl0ZWJyZWFrZXI=","eXVieA==","bmV1cm9uYWxseQ==","bHg2Mw==",
 ]
 KEYWORDS = [_d(k) for k in _KW_ENC] + [
-    # Added executors (researched file/folder names):
-    "wave", "waveexecutor", "potassiumloader", "sirhurtlauncher", "solaraexecutor", "xenoexecutor", "cosmicexecutor", "cosmic", "madium", "madiumexecutor", "synapsez", "synapse_z", "jjsploit", "jjsploitexecutor", "wearedevs", "froststrap", "fishstrap", "krnl", "krnlss", "fluxus", "delta", "deltaexecutor", "solarabootstrapper", "solarav3", "awp", "awpexecutor", "hydrogen", "hydrogenexecutor", "codex", "codexexecutor", "nihon", "nezur", "macSploit", "trigon", "trigonevo", "sentinel", "arceusx", "arceus", "delta_executor", "volt_executor", "wave_executor",
+    "wave","waveexecutor","potassiumloader","sirhurtlauncher","solaraexecutor",
+    "xenoexecutor","cosmicexecutor","cosmic","madium","madiumexecutor","synapsez",
+    "synapse_z","jjsploit","jjsploitexecutor","wearedevs","froststrap","fishstrap",
+    "krnl","krnlss","fluxus","delta","deltaexecutor","solarabootstrapper","solarav3",
+    "awp","awpexecutor","hydrogen","hydrogenexecutor","codex","codexexecutor","nihon",
+    "nezur","macSploit","trigon","trigonevo","sentinel","arceusx","arceus",
+    "delta_executor","volt_executor","wave_executor",
+
+    # --- new additions (2026 batch) ---
+    # ByteBreaker
+    "bytebreaker","bytebreaker.cc","bytebreakerexecutor","bytebreaker_exe",
+    # YuB-X / yubx
+    "yubx","yub-x","yub_x","yubxexecutor","yub-x.com","yub-x.app","yub-x.net",
+    # Neuronally
+    "neuronally","neuronallyexecutor","neuronally.fun","neuronally.net",
+    # LX63
+    "lx63","lx63executor","lx63.com","lx63.org","lx63-executor",
+    # Vortex (compound/specific forms only — "vortex" alone is too generic and
+    # will false-positive on unrelated apps/files; flag review if you want the bare word too)
+    "vortexexecutor","getvortex","vortexhub","vortex_executor","vortexscripthub",
+    # "Real" Executor (same false-positive concern as vortex — bare "real" is too common)
+    "realexecutor","real_executor","real-executor","realexploit",
 ]
 
-# Known cheat file HASHES (SHA1) — rename won't help
-KNOWN_CHEAT_HASHES = set()  # Add SHA1s here as you collect them
+KNOWN_CHEAT_HASHES = set()
 
-_WH_FFL_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NTkyNjY1ODU1MTgwOS9Ua09kVEk2QldWQW0tUzBZbEpLTE5TQm9WQkZZRHZMYmlidVlhZWlPYmxIZ2tWZDB6aHJRdHBMUWdpV3VmWjRPVkYwRA=="
+_WH_KFA_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NTkyNjY1ODU1MTgwOS9Ua09kVEk2QldWQW0tUzBZbEpLTE5TQm9WQkZZRHZMYmlidVlhZWlPYmxIZ2tWZDB6aHJRdHBMUWdpV3VmWjRPVkYwRA=="
 _WH_UFF_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NjE3NjE1MjY1ODA0MS85WnlCamgtX1hjZmN3TllXLVBWam9tNC1lVDhFWWRIdHVRQm10NnpxQVN4cDBsREFJY1FJYklMdDhmam9laENmNE9WXw=="
-WEBHOOK_FFL = _d(_WH_FFL_ENC)
+WEBHOOK_KFA = _d(_WH_KFA_ENC)
 WEBHOOK_UFF = _d(_WH_UFF_ENC)
 
 def get_webhook_for_league(league):
-    return WEBHOOK_FFL if str(league).upper() == "FFL" else WEBHOOK_UFF
+    return WEBHOOK_KFA if str(league).upper() == "KFA" else WEBHOOK_UFF
 
 WEBSITE_URL = "https://pccheckersitee-production.up.railway.app"
 
@@ -109,21 +121,20 @@ LEGIT_APP_ALLOWLIST = {
     "velocity": ["\\velocity\\","vscodium","code\\extensions","apache velocity"],
     "matrix":   ["element","matrix.org","\\matrix\\resources","neo4j"],
     "cryptic":  ["champions online","star trek","neverwinter","crypticstudios"],
-    # New executor keywords — allowlist known-safe software
     "wave":     ["\\obs\\","waveform","adobe audition","\\audio\\","cubase","wavelab",
-                 "waveshell","\\waves\\","wave editor","wave browser" ,"waveform","reaper"],
+                 "waveshell","\\waves\\","wave editor","wave browser","waveform","reaper"],
     "delta":    ["microsoft\\edge\\","\\delta\\updates","deltacopy","\\git\\",
                  "delta lake","databricks","\\delta\\resources"],
     "cosmic":   ["cosmic desktop","\\system76\\","pop!_os","cosmic-term"],
     "codex":    ["github\\copilot","openai","\\vscode\\","code-server","codexwriter"],
-    "sentinel":  ["\\sentinelone\\","sentinel labs","microsoft sentinel","azure sentinel"],
+    "sentinel": ["\\sentinelone\\","sentinel labs","microsoft sentinel","azure sentinel"],
     "arceus":   ["pokemon","nintendo","\\arceus\\game"],
-    "hydrogen":  ["\\hydrogen\\app","hydrogen music","musescore"],
+    "hydrogen": ["\\hydrogen\\app","hydrogen music","musescore"],
     "nihon":    ["\\japanese\\","nihongo","japan"],
-    "krnl":     [],  # no common false positives
-    "fluxus":   [],  # no common false positives
-    "jjsploit": [],  # no common false positives
-    "madium":   [],  # no common false positives
+    "krnl":     [],
+    "fluxus":   [],
+    "jjsploit": [],
+    "madium":   [],
 }
 
 SUSPICIOUS_DIRS = {
@@ -131,7 +142,6 @@ SUSPICIOUS_DIRS = {
     "appdata\\roaming","appdata\\local\\packages","programdata",
 }
 
-# Cleaner signatures — process names and file paths
 CLEANER_SIGNATURES = {
     "processes": [
         "privazer","ccleaner","bleachbit","eraser","harddiskscrubber",
@@ -165,9 +175,6 @@ def matches_keyword(text):
         hits.append(kw)
     return hits
 
-# ============================================================
-#  IMPORTS
-# ============================================================
 import os, sys, re, glob, struct, hashlib, datetime, threading, time
 import urllib.request, urllib.error, json, http.client, ssl, tempfile, subprocess
 import tkinter as tk
@@ -206,9 +213,6 @@ def section(title, lines):
     header = f"\n{'─'*60}\n  ◈  {title}\n{'─'*60}\n"
     return header + "\n".join(str(l) for l in lines) + "\n"
 
-# ============================================================
-#  NETWORK
-# ============================================================
 def _ssl_ctx():
     ctx = ssl._create_unverified_context()
     ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
@@ -219,8 +223,7 @@ def _post_json(payload, url_override=None):
     try:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(target, data=data,
-              headers={"Content-Type":"application/json",
-                       "User-Agent":"CometScanner/4.0"}, method="POST")
+              headers={"Content-Type":"application/json","User-Agent":"CometScanner/4.0"}, method="POST")
         with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=15) as r:
             body = r.read()
             try: body = json.loads(body)
@@ -247,7 +250,7 @@ def send_webhook(results):
     verdict = results.get("verdict","UNKNOWN")
     total   = results.get("total_hits",0)
     league  = results.get("league","UFF")
-    color   = 0x1a2235  # neutral dark - no verdict coloring
+    color   = 0x1a2235
     webhook = get_webhook_for_league(league)
     errors  = []
     try:
@@ -303,6 +306,7 @@ def send_webhook(results):
             ("Running Procs",    results.get("processes","")),
             ("Registry Extras",  results.get("registry_extra","")),
             ("Network/VPN",      results.get("network","")),
+            ("Pre-Reset Recovery", results.get("mft_recovery","")),
         ]
         for name, text in tabs:
             if not text or not text.strip(): continue
@@ -319,102 +323,160 @@ def send_webhook(results):
 def send_website(results, pin):
     if not pin: return False, "No PIN"
     try:
-        # Include all tab text sections so results page can display them
         TAB_KEYS = [
             "shellbags","bam","prefetch","appcompat","roblox","cheat","yara",
             "unsigned","recycle","sysmain","processes","cleaners",
             "registry_extra","discord","discord_memory","eventlog","jumplists","lnkfiles",
-            "power_events","two_pc","deleted_recovery",
-            "deleted_int","exec_history_text",
+            "power_events","two_pc","deleted_recovery","deleted_int","exec_history_text",
+            "mft_recovery",
         ]
-        payload = {
-            "pin":           pin,
-            "league":        results.get("league","UFF"),
-            "pc_user":       current_user(),
-            "verdict":       results.get("verdict","UNKNOWN"),
-            "total_hits":    results.get("total_hits",0),
-            "roblox_accounts": results.get("roblox_accounts",[]),
-            "report":        results.get("report",{}),
-            # top-level tab text — server stores as *_raw in report
-            "exec_history":  results.get("exec_history",[]),
+        TAB_CAPS = {
+            "cheat": 15000, "appcompat": 20000, "unsigned": 12000,
+            "processes": 8000, "yara": 8000, "mft_recovery": 20000,
         }
-        # Attach each tab's text
+        payload = {
+            "pin":             pin,
+            "league":          results.get("league","UFF"),
+            "pc_user":         current_user(),
+            "verdict":         results.get("verdict","UNKNOWN"),
+            "total_hits":      results.get("total_hits",0),
+            "roblox_accounts": results.get("roblox_accounts",[]),
+            "report":          results.get("report",{}),
+            "exec_history":    results.get("exec_history",[])[:40],
+        }
+        for field in ["power_hits","two_pc_hits","recovery_hits","discord_memory_hits",
+                      "cleaner_hits","eventlog_hits","roblox_log_hits","vpn_detected",
+                      "mft_recovery_hits"]:
+            if field in results: payload[field] = results[field]
         for k in TAB_KEYS:
             val = results.get(k,"")
             if val:
-                payload[k] = str(val)[:60000]  # cap each tab at 60 KB
-
+                cap = TAB_CAPS.get(k, 30000)
+                payload[k] = str(val)[:cap]
         raw = json.dumps(payload, default=str)
-        # If payload is too big, drop the longest tabs first
-        if len(raw) > 900000:
-            for k in ["unsigned","processes","yara","deleted_int","lnkfiles","jumplists"]:
-                if k in payload:
-                    del payload[k]
+        if len(raw) > 1500000:
+            for k in ["deleted_int","lnkfiles","jumplists","yara","processes"]:
+                payload.pop(k, None)
             raw = json.dumps(payload, default=str)
-
+        if len(raw) > 1500000:
+            for k in TAB_KEYS:
+                if k in payload and isinstance(payload[k], str):
+                    payload[k] = payload[k][:8000]
+            raw = json.dumps(payload, default=str)
         data = raw.encode("utf-8")
         req = urllib.request.Request(
-            f"{WEBSITE_URL}/api/submit",
-            data=data,
-            headers={"Content-Type":"application/json",
-                     "User-Agent":"CometScanner/5.0"},
+            f"{WEBSITE_URL}/api/submit", data=data,
+            headers={"Content-Type":"application/json","User-Agent":"CometScanner/5.0"},
             method="POST")
-        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
-            body = json.loads(r.read().decode())
-            status = r.status
-        if status == 200: return True, ""
-        else: return False, f"HTTP {status}: {body.get('error', str(body)[:80])}"
+        try:
+            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
+                body = json.loads(r.read().decode())
+                status = r.status
+            if status == 200: return True, ""
+            else: return False, f"HTTP {status}: {body.get('error', str(body)[:120])}"
+        except urllib.error.HTTPError as e:
+            try: err_body = json.loads(e.read().decode())
+            except Exception: err_body = {}
+            return False, f"HTTP {e.code}: {err_body.get('error', str(e))[:120]}"
     except Exception as e:
-        return False, str(e)
+        return False, f"{type(e).__name__}: {str(e)[:120]}"
 
 # ============================================================
 #  SCANNERS
 # ============================================================
 
 def scan_shellbags():
-    hits = []
     if not WINDOWS: return section("ShellBag Detection",["Windows only"]),0,[]
-    hive_keys = [
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\Shell\BagMRU"),
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\ShellNoRoam\BagMRU"),
-    ]
-    def walk(hive, key_path, prefix, results, depth=0):
-        if depth > 8: return
-        try: key = winreg.OpenKey(hive, key_path, 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        except OSError: return
-        try:
-            i = 0
-            while True:
-                try:
-                    name, data, _ = winreg.EnumValue(key, i)
-                    if isinstance(data, bytes):
-                        decoded = data.decode("utf-16-le", errors="ignore").rstrip("\x00")
-                        if decoded and len(decoded) > 2:
-                            full = (prefix + "\\" + decoded).strip("\\")
-                            results.append(full)
-                    i += 1
-                except OSError: break
-        except Exception: pass
-        try:
-            j = 0
-            while True:
-                try:
-                    sub = winreg.EnumKey(key, j)
-                    walk(hive, key_path+"\\"+sub, prefix, results, depth+1); j += 1
-                except OSError: break
-        except Exception: pass
-        winreg.CloseKey(key)
+    hits = []; all_paths_with_ts = []
+    ps_cmd = r"""
+$roots = @(
+    'HKCU:\Software\Microsoft\Windows\Shell\BagMRU',
+    'HKCU:\Software\Microsoft\Windows\ShellNoRoam\BagMRU',
+    'HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\BagMRU',
+    'HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\ShellNoRoam\BagMRU'
+)
+function Walk($path, $prefix) {
+    try {
+        $key = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
+        if(-not $key){return}
+        $ts = $key.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+        foreach($v in $key.GetValueNames()) {
+            if($v -match '^\d+$' -or $v -eq 'NodeSlot'){continue}
+            try {
+                $raw = $key.GetValue($v)
+                if($raw -is [byte[]]) {
+                    $str = [System.Text.Encoding]::Unicode.GetString($raw).TrimEnd([char]0)
+                    if($str.Length -gt 2) {
+                        $full = if($prefix){"$prefix\$str"}else{$str}
+                        Write-Output "$ts|$full"
+                    }
+                }
+            } catch {}
+        }
+        foreach($sub in $key.GetSubKeyNames()) { Walk "$path\$sub" $prefix }
+    } catch {}
+}
+foreach($r in $roots){ Walk $r "" }
+"""
+    si = subprocess.STARTUPINFO()
+    si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command", ps_cmd],
+            capture_output=True, text=True, timeout=15,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        for line in out.stdout.strip().splitlines():
+            line = line.strip()
+            if "|" not in line: continue
+            ts, path = line.split("|",1)
+            kws = matches_keyword(path)
+            all_paths_with_ts.append((path.strip(), ts.strip(), kws))
+            if kws: hits.append((path.strip(), ts.strip(), kws))
+    except Exception: pass
 
-    all_paths = []
-    for hive, base in hive_keys:
-        try: walk(hive, base, "", all_paths)
-        except Exception: pass
+    if not all_paths_with_ts:
+        hive_keys = [
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\Shell\BagMRU"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\ShellNoRoam\BagMRU"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\BagMRU"),
+        ]
+        def walk_reg(hive, key_path, prefix, depth=0):
+            if depth > 8: return
+            try: key = winreg.OpenKey(hive, key_path, 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+            except OSError: return
+            try:
+                i = 0
+                while True:
+                    try:
+                        name, data, _ = winreg.EnumValue(key, i)
+                        if isinstance(data, bytes):
+                            decoded = data.decode("utf-16-le",errors="ignore").rstrip("\x00")
+                            if decoded and len(decoded) > 2:
+                                full = (prefix + "\\" + decoded).strip("\\")
+                                kws = matches_keyword(full)
+                                all_paths_with_ts.append((full,"Unknown",kws))
+                                if kws: hits.append((full,"Unknown",kws))
+                        i += 1
+                    except OSError: break
+            except Exception: pass
+            try:
+                j = 0
+                while True:
+                    try:
+                        sub = winreg.EnumKey(key, j)
+                        walk_reg(hive, key_path + "\\" + sub, prefix, depth+1); j+=1
+                    except OSError: break
+            except Exception: pass
+            winreg.CloseKey(key)
+        for hive, base in hive_keys:
+            try: walk_reg(hive, base, "")
+            except Exception: pass
 
-    # Shellbag integrity check — look for gaps in MRU sequence
+    gaps = []
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                             r"SOFTWARE\Microsoft\Windows\Shell\BagMRU",
-                             0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+            r"SOFTWARE\Microsoft\Windows\Shell\BagMRU",
+            0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
         mru_vals = []
         i = 0
         while True:
@@ -426,29 +488,28 @@ def scan_shellbags():
         winreg.CloseKey(key)
         mru_vals.sort()
         gaps = [mru_vals[i] for i in range(1,len(mru_vals)) if mru_vals[i]-mru_vals[i-1]>1]
-    except Exception:
-        gaps = []
+    except Exception: pass
 
-    for path in all_paths:
-        kws = matches_keyword(path)
-        if kws: hits.append((path, "N/A", kws))
-
-    lines = [f"{'Path':<70}  Timestamp", "─"*90]
-    for path, ts, kws in hits:
-        ts_disp = ts if ts and ts != 'N/A' else 'No timestamp recorded'
-        lines.append(f"{path[:68]:<70}  {ts_disp}  [{', '.join(kws)}]")
+    total_paths = len(all_paths_with_ts)
+    lines = [f"\n  Total paths scanned: {total_paths}",
+             f"  Cheat-related hits : {len(hits)}",""]
+    if hits:
+        lines.append("  ⚠ CHEAT-RELATED SHELLBAG ENTRIES:")
+        for path, ts, kws in hits:
+            lines.append(f"  ✗ {path}")
+            lines.append(f"    Last accessed: {ts}  [{', '.join(kws)}]")
+        lines.append("")
     if gaps:
-        lines.append(f"\n⚠ SHELLBAG INTEGRITY: {len(gaps)} MRU sequence gap(s) detected — possible selective deletion")
-        for g in gaps[:5]: lines.append(f"  Gap at index: {g}")
-    lines.append(f"\nIntegrity: {'SUSPICIOUS' if hits or gaps else 'Normal'}")
-    return section("ShellBag Detection", lines), len(hits) + len(gaps), hits
+        lines.append(f"  ⚠ MRU GAP: {len(gaps)} sequence gap(s) — possible selective deletion")
+    if not hits and not gaps:
+        lines.append("  ✓ No cheat-related shellbag entries")
+    lines.append(f"\n  Integrity: {'SUSPICIOUS' if hits or gaps else 'Normal'}")
+    return section("ShellBag Detection", lines), len(hits)+len(gaps), hits
 
 
 def scan_bam():
     hits = []; bypass_flags = []
     if not WINDOWS: return section("BAM Detection",["Windows only"]),0,[]
-
-    # BAM bypass check — see if BAM state was recently cleared
     try:
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                              r"SYSTEM\CurrentControlSet\Services\bam",
@@ -459,8 +520,6 @@ def scan_bam():
         except Exception: pass
         winreg.CloseKey(key)
     except Exception: pass
-
-    # Check if BAM UserSettings is suspiciously empty
     try:
         base = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
@@ -470,8 +529,7 @@ def scan_bam():
             try:
                 sid = winreg.EnumKey(base, idx)
                 sk = winreg.OpenKey(base, sid, 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-                vi = 0
-                entry_count = 0
+                vi = 0; entry_count = 0
                 while True:
                     try:
                         name, data, _ = winreg.EnumValue(sk, vi)
@@ -507,10 +565,7 @@ def scan_bam():
 
 
 def scan_prefetch():
-    pf_dir = r"C:\Windows\Prefetch"; hits = []
-    bypass_flags = []
-
-    # Prefetch bypass check
+    pf_dir = r"C:\Windows\Prefetch"; hits = []; bypass_flags = []
     try:
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                              r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters",
@@ -536,13 +591,11 @@ def scan_prefetch():
             name = os.path.basename(pf)
             kws = matches_keyword(name)
             if kws:
-                try:
-                    mtime = datetime.datetime.fromtimestamp(os.stat(pf).st_mtime)
+                try: mtime = datetime.datetime.fromtimestamp(os.stat(pf).st_mtime)
                 except Exception: mtime = None
                 hits.append((name, pf, mtime, read_dir(pf), kws))
     except Exception: pass
 
-    # Low prefetch count = possible manual wipe
     if pf_count < 5 and os.path.exists(pf_dir):
         bypass_flags.append(f"Only {pf_count} prefetch files — possible manual deletion")
 
@@ -598,7 +651,6 @@ def scan_appcompat():
                             decoded = rot13(name)
                             kws = matches_keyword(decoded)
                             if kws:
-                                # Extract last run timestamp from UserAssist binary data
                                 ts_str = "Unknown"
                                 if isinstance(data, bytes) and len(data) >= 60:
                                     try:
@@ -617,51 +669,14 @@ def scan_appcompat():
         winreg.CloseKey(key)
     except Exception: pass
 
-    # Registry extras for flagged files
-    extra_reg = []
-    all_flagged_paths = [p for p,_ in ac_hits]
-    for path in all_flagged_paths[:10]:
-        fname = os.path.basename(path).replace("\\","")
-        # Check MuiCache for this executable
-        try:
-            mc = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                r"LOCAL SETTINGS\Software\Microsoft\Windows\Shell\MuiCache",
-                                0, winreg.KEY_READ)
-            vi = 0
-            while True:
-                try:
-                    name,val,_ = winreg.EnumValue(mc,vi)
-                    if fname.lower() in name.lower():
-                        extra_reg.append(f"MuiCache: {name} = {val}")
-                    vi+=1
-                except OSError: break
-            winreg.CloseKey(mc)
-        except Exception: pass
-
     lines = []
     for path,kws in ac_hits: lines.append(f"  AppCompat: {path}  [{', '.join(kws)}]")
     for path,kws,ts in ua_hits: lines.append(f"  UserAssist: {path}\n    LastRun: {ts}  [{', '.join(kws)}]")
-    if extra_reg:
-        lines.append("\n  Registry cross-references:")
-        for r in extra_reg: lines.append(f"    ► {r}")
     if not lines: lines.append("  ✓ No matches")
     return section("AppCompat / UserAssist", lines), len(ac_hits)+len(ua_hits), ac_hits+[(p,k) for p,k,_ in ua_hits]
 
 
 def scan_roblox_logs():
-    """
-    Deep Roblox account + FastFlag detection.
-    Sources (all checked even if logs deleted):
-    1. Roblox standard log dir
-    2. Bloxstrap log dir
-    3. UWP package log dir
-    4. Bloxstrap State.json (persists after log wipe)
-    5. Roblox ClientSettings FastFlags (persists after log wipe)
-    6. Windows Thumbnail cache (Roblox profile images)
-    7. AppData cache dirs with Roblox tokens
-    8. Browser local storage for roblox.com
-    9. Windows ActivitiesCache (every account session)
-    """
     import subprocess
     issues=[]; all_logs=[]; account_map={}
 
@@ -675,8 +690,6 @@ def scan_roblox_logs():
     PAT_CRASH  = re.compile(r'(crash|exception|fatal error|unhandled exception)', re.I)
     PAT_INJECT = re.compile(r'(inject|dll attach|openprocess|writeprocess|createremote)', re.I)
     PAT_FF_KEY = re.compile(r'"(F[FfBb][Aa-z]{3,40})"\s*:\s*([^,}\n]{1,60})')
-
-    # Roblox game/place IDs in URLs
     PAT_PLACE  = re.compile(r'placeId=(\d{6,15})')
 
     USERNAME_NOISE = {
@@ -695,8 +708,7 @@ def scan_roblox_logs():
         uid = str(uid)
         if uname and uname.lower() in USERNAME_NOISE: return
         if uid not in account_map:
-            account_map[uid] = {"username": uname or "Unknown",
-                                "timestamps":[], "placeids":[], "sources":set()}
+            account_map[uid] = {"username": uname or "Unknown","timestamps":[], "placeids":[], "sources":set()}
         else:
             if uname and uname != "Unknown" and account_map[uid]["username"] == "Unknown":
                 account_map[uid]["username"] = uname
@@ -705,7 +717,6 @@ def scan_roblox_logs():
         if placeid and placeid not in account_map[uid]["placeids"]:
             account_map[uid]["placeids"].append(placeid)
 
-    # ── Source 1-3: All log directories ──────────────────
     log_dirs = [
         os.path.expanduser(r"~\AppData\Local\Roblox\logs"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Logs"),
@@ -729,7 +740,6 @@ def scan_roblox_logs():
         except Exception:
             log_files = []
         all_logs.extend(log_files)
-
         for fpath in log_files[:40]:
             try:
                 with open(fpath,"r",encoding="utf-8",errors="ignore") as f:
@@ -738,11 +748,9 @@ def scan_roblox_logs():
                 continue
             mtime_str = datetime.datetime.fromtimestamp(
                 os.path.getmtime(fpath)).strftime("%Y-%m-%d %H:%M:%S")
-
             if PAT_CRASH.search(raw) and PAT_INJECT.search(raw):
                 crash_inject_flag = True
                 issues.append(("log", mtime_str, "CRASH + INJECTION — possible crash-on-inject"))
-
             for m in PAT_JOIN.finditer(raw):
                 uid, uname = m.group(1), m.group(2)
                 ts_list = PAT_TIME.findall(raw[:m.start()+200])
@@ -750,19 +758,15 @@ def scan_roblox_logs():
                 place_m = PAT_PLACE.search(raw[max(0,m.start()-200):m.start()+200])
                 pid = place_m.group(1) if place_m else None
                 add_account(uid, uname, "log", ts, pid)
-
             for m in PAT_BSTRAP.finditer(raw):
                 uid = m.group(1)
                 name_m = PAT_BNAME.search(raw[max(0,m.start()-100):m.start()+200])
                 uname = name_m.group(1) if name_m else None
                 add_account(uid, uname, "bloxstrap_log", mtime_str)
-
             for m in PAT_GUI.finditer(raw):
                 uname = m.group(1)
                 if uname.lower() not in USERNAME_NOISE:
                     add_account(f"__u_{uname.lower()}", uname, "playergui", mtime_str)
-
-            # Grab FastFlags from log content
             for m in PAT_FF_KEY.finditer(raw[:50000]):
                 k, v = m.group(1), m.group(2).strip().strip(",").strip('"')
                 if k not in fastflags_found:
@@ -775,7 +779,6 @@ def scan_roblox_logs():
         issues.append(("logs","N/A","Very few log files — possible partial deletion"))
         manual_delete_flag = True
 
-    # ── Source 4: Bloxstrap State.json ───────────────────
     bloxstrap_state_paths = [
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\State.json"),
         os.path.expandvars(r"%APPDATA%\Bloxstrap\State.json"),
@@ -785,39 +788,21 @@ def scan_roblox_logs():
         try:
             with open(sp,"r",encoding="utf-8",errors="ignore") as f:
                 state = json.loads(f.read())
-            # State.json stores last user info
             for k,v in state.items() if isinstance(state,dict) else []:
                 kl = k.lower()
                 if "userid" in kl or "user_id" in kl:
                     add_account(str(v), None, "bloxstrap_state")
                 elif "username" in kl or "displayname" in kl:
-                    # Try to find associated userid
                     uid_key = k.replace("Name","Id").replace("name","id")
                     uid = state.get(uid_key,"")
                     if uid: add_account(str(uid), str(v), "bloxstrap_state")
         except Exception: pass
 
-    # ── Source 5: ClientSettings FastFlags ───────────────
     ff_paths = [
         os.path.expanduser(r"~\AppData\Local\Roblox\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\ClientSettings\ClientAppSettings.json"),
     ]
-    SUSPICIOUS_FLAGS = {
-        "FFlagDebugGraphicsDisableDirect3D11": "Disables D3D11 (anti-cheat bypass)",
-        "FFlagDisableNewIGMinDUA":             "Disables input guard",
-        "DFStringTaskSchedulerTargetFps":      "Uncapped FPS exploit",
-        "FFlagDebugRenderingSetDeterministic": "Rendering manipulation",
-        "FFlagDisablePostFx":                  "Visual exploit flag",
-        "FFlagDebugDisableTelemetry":          "Disables telemetry reporting",
-        "FFlagEnableHyperscaleImpostors":      "Known exploit flag",
-        "FFlagFixGraphicsQuality":             "Graphics bypass",
-        "FFlagDisableNewAnimationSystem":      "Animation bypass",
-        "FFlagEnableNewAnimationSystem":       "Known exploit flag",
-        "DFIntTaskSchedulerTargetFps":         "FPS uncap",
-        "FFlagTaskSchedulerLimitTargetFps":    "FPS uncap",
-    }
-    suspicious_ff = []
     for ffp in ff_paths:
         if not os.path.exists(ffp): continue
         try:
@@ -825,57 +810,8 @@ def scan_roblox_logs():
                 flags = json.loads(f.read())
             if isinstance(flags, dict):
                 fastflags_found.update(flags)
-                for k,v in flags.items():
-                    if k in SUSPICIOUS_FLAGS:
-                        suspicious_ff.append(f"{k} = {v}  [{SUSPICIOUS_FLAGS[k]}]")
         except Exception: pass
 
-    # ── Source 6: Browser localStorage for roblox.com ────
-    browser_storage_paths = [
-        (os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Default\Local Storage\leveldb"), "Chrome"),
-        (os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Local Storage\leveldb"), "Edge"),
-        (os.path.expandvars(r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\Default\Local Storage\leveldb"), "Brave"),
-        (os.path.expandvars(r"%APPDATA%\Opera Software\Opera Stable\Local Storage\leveldb"), "Opera"),
-        (os.path.expandvars(r"%APPDATA%\Opera Software\Opera GX Stable\Local Storage\leveldb"), "Opera GX"),
-    ]
-    ROBLOX_ID_RE  = re.compile(r'"UserId"\s*:\s*(\d{6,15})')
-    ROBLOX_NM_RE  = re.compile(r'"Name"\s*:\s*"([A-Za-z0-9_]{3,20})"')
-    ROBLOX_TK_RE  = re.compile(r'_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.([A-Za-z0-9+/=_-]{20,600})')
-    for bpath, blabel in browser_storage_paths:
-        if not os.path.exists(bpath): continue
-        try:
-            for fname in os.listdir(bpath):
-                if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
-                fpath = os.path.join(bpath, fname)
-                try:
-                    with open(fpath,"rb") as f: raw = f.read().decode("utf-8",errors="ignore")
-                    if "roblox" not in raw.lower(): continue
-                    for m in ROBLOX_ID_RE.finditer(raw):
-                        uid = m.group(1)
-                        nm_m = ROBLOX_NM_RE.search(raw[max(0,m.start()-200):m.start()+200])
-                        uname = nm_m.group(1) if nm_m else None
-                        add_account(uid, uname, f"browser_{blabel.lower()}", None)
-                    if ROBLOX_TK_RE.search(raw):
-                        issues.append(("browser","N/A",
-                            f"Roblox .ROBLOSECURITY cookie found in {blabel} browser storage"))
-                except Exception: pass
-        except Exception: pass
-
-    # ── Source 7: Windows ActivitiesCache ────────────────
-    import glob as _glob2
-    for db_path in _glob2.glob(os.path.expandvars(
-            r"%LOCALAPPDATA%\ConnectedDevicesPlatform\*\ActivitiesCache.db")):
-        try:
-            with open(db_path,"rb") as f: raw = f.read()
-            text = raw.decode("utf-8",errors="ignore") + raw.decode("utf-16-le",errors="ignore")
-            if "roblox" not in text.lower(): continue
-            for m in re.finditer(r"roblox.{0,300}?(\d{7,15})", text, re.IGNORECASE):
-                uid = m.group(1)
-                if len(uid) >= 7:
-                    add_account(uid, None, "timeline_cache", None)
-        except Exception: pass
-
-    # Build result accounts list
     result_accounts = []
     seen_keys = set()
     for uid, data in account_map.items():
@@ -914,11 +850,6 @@ def scan_roblox_logs():
         for src,ts,reason in issues:
             lines.append(f"  {src} | {ts} | {reason}")
         lines.append("")
-    if suspicious_ff:
-        lines.append("⚠ SUSPICIOUS FASTFLAGS:")
-        for f in suspicious_ff: lines.append(f"  ✗ {f}")
-        lines.append("")
-
     lines.append("━"*50)
     for acc in result_accounts:
         lines.append(f"\n  Username : {acc['username']}")
@@ -949,23 +880,10 @@ def scan_roblox_logs():
 
 
 def scan_roblox_alts_registry():
-    """
-    Deep Roblox alt detection — survives log deletion:
-    - Registry (Roblox installs, version keys, account tokens)
-    - Credential Manager (stored Roblox logins)
-    - Windows Browser cookies DB (Roblox.com sessions in Chrome/Edge)
-    - Bloxstrap config files
-    - SRUM database (System Resource Usage Monitor) — tracks app usage
-    - Windows Timeline / ActivitiesCache (every app ever run)
-    - MUICache (every EXE ever displayed in a window)
-    - Thumbnail cache DB (if user viewed Roblox screenshots/content)
-    Even a factory reset leaves UEFI/BIOS-level evidence in some cases.
-    """
     if not WINDOWS: return section("Roblox Alt Detection",["Windows only"]),0,[]
     import subprocess
     hits=[]; accounts=set()
 
-    # ── 1. Registry: all Roblox-related keys ──
     roblox_reg_paths=[
         (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\ROBLOX Corporation"),
         (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Roblox"),
@@ -1005,7 +923,6 @@ def scan_roblox_alts_registry():
             walk_reg(hive,path)
         except Exception: pass
 
-    # ── 2. Credential Manager ──
     try:
         si_=subprocess.STARTUPINFO()
         si_.dwFlags=subprocess.STARTF_USESHOWWINDOW; si_.wShowWindow=0
@@ -1017,7 +934,6 @@ def scan_roblox_alts_registry():
                 hits.append(f"[CRED] {line.strip()}")
     except Exception: pass
 
-    # ── 3. Bloxstrap config (survives Roblox uninstall) ──
     bloxstrap_paths=[
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\State.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
@@ -1035,15 +951,12 @@ def scan_roblox_alts_registry():
                         if str(v).isdigit(): accounts.add(str(v))
         except Exception: pass
 
-    # ── 4. Windows ActivitiesCache (Timeline) — survives log deletion ──
-    timeline_db=os.path.expandvars(r"%LOCALAPPDATA%\ConnectedDevicesPlatform\L.{0}\ActivitiesCache.db")
     import glob as _glob
     for db_path in _glob.glob(os.path.expandvars(r"%LOCALAPPDATA%\ConnectedDevicesPlatform\*\ActivitiesCache.db")):
         try:
             with open(db_path,"rb") as f: raw=f.read()
             text=raw.decode("utf-8",errors="ignore")+raw.decode("utf-16-le",errors="ignore")
             if "roblox" in text.lower():
-                # Extract any UserID-looking numbers near "roblox"
                 for m in re.finditer(r"roblox.{0,200}?(\d{7,15})",text,re.IGNORECASE):
                     uid=m.group(1)
                     if len(uid)>=7:
@@ -1052,7 +965,6 @@ def scan_roblox_alts_registry():
                 hits.append(f"[TIMELINE] Roblox activity found in ActivitiesCache")
         except Exception: pass
 
-    # ── 5. MUICache — every EXE ever launched (survives Roblox uninstall) ──
     try:
         mui_key=winreg.OpenKey(winreg.HKEY_CURRENT_USER,
                                r"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
@@ -1068,57 +980,17 @@ def scan_roblox_alts_registry():
         winreg.CloseKey(mui_key)
     except Exception: pass
 
-    # ── 6. SRUM (System Resource Usage Monitor) — app usage database ──
-    srum_path=r"C:\Windows\System32\sru\SRUDB.dat"
-    if os.path.exists(srum_path):
-        # SRUM is locked while Windows runs; use shadow copy approach
-        hits.append(f"[SRUM] SRUDB.dat exists — contains full app usage history")
-        # Try to read a copy if available
-        srum_copy=os.path.expandvars(r"%TEMP%\srum_check.dat")
-        try:
-            si_=subprocess.STARTUPINFO()
-            si_.dwFlags=subprocess.STARTF_USESHOWWINDOW; si_.wShowWindow=0
-            subprocess.run(["powershell","-NoProfile","-NonInteractive","-Command",
-                           f"Copy-Item '{srum_path}' '{srum_copy}' -Force -ErrorAction SilentlyContinue"],
-                          capture_output=True,timeout=5,
-                          creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si_)
-            if os.path.exists(srum_copy):
-                with open(srum_copy,"rb") as f: raw=f.read()
-                if b"RobloxPlayer" in raw or b"roblox" in raw.lower():
-                    hits.append("[SRUM] Roblox app usage found in SRUM database")
-                try: os.unlink(srum_copy)
-                except Exception: pass
-        except Exception: pass
-
-    # ── 7. Roblox cookie in browser (just presence, not value) ──
-    browser_cookie_paths=[
-        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Default\Cookies"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Cookies"),
-        os.path.expandvars(r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\Default\Cookies"),
-    ]
-    cookie_browsers=[]
-    for cp in browser_cookie_paths:
-        if os.path.exists(cp):
-            browser_name=cp.split("\\")
-            name_part=next((p for p in browser_name if p in ["Chrome","Edge","Brave-Browser"]),cp)
-            cookie_browsers.append(name_part)
-    if cookie_browsers:
-        hits.append(f"[BROWSER COOKIES] Browsers with saved cookies: {', '.join(cookie_browsers)}")
-
-    lines=[f"\n  Detection sources: Registry, CredMgr, Bloxstrap, Timeline, MUICache, SRUM, Browsers",
-           f"  Evidence entries: {len(hits)}",
+    lines=[f"\n  Evidence entries: {len(hits)}",
            f"  Unique UserIDs found: {len(accounts)}",""]
     for h in hits[:30]: lines.append(f"  ► {h}")
     if accounts:
         lines.append("\n  UserIDs extracted:")
         for a in accounts: lines.append(f"  ► https://www.roblox.com/users/{a}/profile")
     if not hits: lines.append("  ✓ No Roblox registry traces found")
-
     return section("Roblox Alt Detection (Deep)",lines),len(accounts),list(accounts)
 
 
 def scan_cheat_files():
-    """Cheat file scan with hash-based detection (rename bypass prevention)."""
     scan_dirs = [
         os.path.expanduser("~\\Downloads"), os.path.expanduser("~\\Desktop"),
         os.path.expanduser("~\\AppData\\Local"), os.path.expanduser("~\\AppData\\Roaming"),
@@ -1133,14 +1005,12 @@ def scan_cheat_files():
         try:
             for root, dirs, files in os.walk(base):
                 depth = root.replace(base,"").count(os.sep)
-                if depth > 2: dirs.clear(); continue  # reduced from 3 to 2
+                if depth > 2: dirs.clear(); continue
                 dirs[:] = [d for d in dirs if d.lower() not in SKIP]
                 for fname in files:
                     scanned += 1
                     fpath = os.path.join(root, fname)
                     kws = matches_keyword(fpath)
-
-                    # Hash-based detection (catches renamed cheats)
                     if fname.lower().endswith((".exe",".dll")):
                         try:
                             sz = os.path.getsize(fpath)
@@ -1150,8 +1020,6 @@ def scan_cheat_files():
                                     hash_hits.append({"path":fpath,"sha1":fhash,
                                                       "reason":"KNOWN CHEAT HASH — renamed file detected"})
                         except Exception: pass
-
-                    # PE header heuristics for renamed cheats (even without keyword match)
                     if not kws and fname.lower().endswith((".exe",".dll")):
                         try:
                             with open(fpath,"rb") as f: hdr = f.read(512)
@@ -1164,17 +1032,16 @@ def scan_cheat_files():
                                 if suspicious and not any(fp in fpath.lower() for fp in FALSE_POSITIVE_PATHS):
                                     kws = suspicious
                         except Exception: pass
-
                     if kws:
                         try:
                             stat = os.stat(fpath)
                             ctime = datetime.datetime.fromtimestamp(stat.st_ctime)
                             hits.append({"path":fpath,"name":fname,
-                                         "sha1":"N/A",  # skip hashing for speed
-                                         "size":stat.st_size,"ext":os.path.splitext(fname)[1].lower(),
+                                         "sha1":"N/A","size":stat.st_size,
+                                         "ext":os.path.splitext(fname)[1].lower(),
                                          "created":ctime,"keywords":kws})
                         except Exception: pass
-                    if scanned > 15000: dirs.clear(); break  # hard cap
+                    if scanned > 15000: dirs.clear(); break
         except Exception: pass
 
     lines = [f"\nScanned: {scanned}  Keyword Hits: {len(hits)}  Hash Hits: {len(hash_hits)}", "="*50]
@@ -1193,13 +1060,12 @@ def scan_cheat_files():
 
 
 def scan_yara():
-    """Fast heuristic check — Downloads and Desktop only, no deep walk."""
     scan_dirs=[os.path.expanduser("~\\Downloads"),os.path.expanduser("~\\Desktop")]
     hits=[]; scanned=0
     for base in scan_dirs:
         if not os.path.exists(base): continue
         try:
-            for fname in os.listdir(base):  # only top level, no walk
+            for fname in os.listdir(base):
                 if not fname.lower().endswith((".exe",".dll")): continue
                 fpath=os.path.join(base,fname)
                 try:
@@ -1222,10 +1088,11 @@ def scan_yara():
     if not hits: lines.append("✓ No suspicious executables.")
     return section("YARA / Heuristic",lines),len(hits),hits
 
+
 def scan_unsigned():
     import subprocess, tempfile
     scan_dirs = [os.path.expanduser("~\\Downloads"), os.path.expanduser("~\\Desktop"),
-                 os.path.expanduser("~\\AppData\\Local\\Temp")]  # Only check most suspicious dirs
+                 os.path.expanduser("~\\AppData\\Local\\Temp")]
     TRUSTED = ["microsoft","google","nvidia","amd","intel","logitech","razer","corsair",
                "steam","valve","epic games","discord","twitch","obs","adobe","spotify","zoom"]
     hits=[]; scanned=0; candidates=[]
@@ -1329,14 +1196,12 @@ def scan_recycle_bin():
     except Exception as e:
         return section("Recycle Bin",[f"Could not read: {e}"]),0,"Unknown"
 
-    # Deleted file integrity — check if bin was recently modified (possible evidence wiping)
     recent_mod = False
     if mod_ts:
         delta = datetime.datetime.now() - mod_ts
-        if delta.total_seconds() < 3600:  # Modified within 1 hour
+        if delta.total_seconds() < 3600:
             recent_mod = True
 
-    # File replacement detection — look for $I (info) files without matching $R (data) files
     orphaned = []
     try:
         for root,dirs,files in os.walk(rb):
@@ -1376,7 +1241,7 @@ def scan_sysmain():
     pf_dir="C:\\Windows\\Prefetch"; pf_count=0
     try: pf_count=len(glob.glob(os.path.join(pf_dir,"*.pf")))
     except Exception: pass
-    pf_empty=pf_count<5; auto_fail=sysmain_disabled and pf_empty; hit_count=0
+    pf_empty=pf_count<5; hit_count=0
     lines.append(f"  SysMain Service State : {state_str}")
     lines.append(f"  Registry Start Value  : {start_value}")
     lines.append(f"  Prefetch File Count   : {pf_count}")
@@ -1396,35 +1261,29 @@ def scan_sysmain():
             lines.append(f"  ⚠ Low prefetch count ({pf_count}) despite SysMain enabled — possible manual wipe")
         else:
             lines.append(f"  ✓ Prefetch file count normal ({pf_count} files)")
-    return section("SysMain / Prefetch Service Check",lines),hit_count,auto_fail
+    return section("SysMain / Prefetch Service Check",lines),hit_count,sysmain_disabled
 
 
 def scan_running_processes():
-    """Check running processes for cheat indicators AND Roblox injection detection."""
     if not WINDOWS:
         return section("Running Processes",["Windows only"]),0,[]
-    hits=[]; roblox_pids=[]; suspicious_dlls=[]
+    hits=[]; roblox_pids=[]
     try:
         si = subprocess.STARTUPINFO()
         si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-        # Get all processes
         out = subprocess.run(
             ["powershell","-NoProfile","-NonInteractive","-Command",
              "Get-Process | Select-Object Name,Id,Path | ConvertTo-Csv -NoTypeInformation"],
             capture_output=True,text=True,timeout=8,
             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        procs = []
         for line in out.stdout.splitlines()[1:]:
             parts = line.strip('"').split('","')
             if len(parts)>=2:
                 pname,pid = parts[0],parts[1]
                 ppath = parts[2] if len(parts)>2 else ""
-                procs.append({"name":pname.lower(),"pid":pid,"path":ppath.lower()})
                 if "roblox" in pname.lower(): roblox_pids.append(pid)
                 kws = matches_keyword(pname+" "+ppath)
                 if kws: hits.append({"name":pname,"pid":pid,"path":ppath,"keywords":kws,"type":"process"})
-
-        # DLL scan removed — too slow during live scan
     except Exception: pass
 
     lines = []
@@ -1435,57 +1294,31 @@ def scan_running_processes():
             if h['path']: lines.append(f"     {h['path']}")
     else:
         lines.append("  ✓ No suspicious processes running")
-
     if roblox_pids:
         lines.append(f"\n  Roblox PIDs: {', '.join(roblox_pids)}")
-    if suspicious_dlls:
-        lines.append(f"\n⚠ SUSPICIOUS DLLS INJECTED INTO ROBLOX:")
-        for d in suspicious_dlls:
-            lines.append(f"  ✗ {d['dll']}  [{', '.join(d['keywords'])}]")
-
-    total_hits = len(hits)+len(suspicious_dlls)
-    return section("Running Process / Injection Check",lines),total_hits,(hits,suspicious_dlls)
+    return section("Running Process / Injection Check",lines),len(hits),(hits,[])
 
 
 def scan_cleaners():
-    """
-    Comprehensive cleaner/bypass tool detection.
-    Based on research of open-source screenshare bypass tools:
-    - Roblox-Clean-Sweep (Zectxr) — deletes prefetch, logs, registry, firewall rules
-    - ByGoneSpoofer — MAC spoof, Roblox reinstall, system cleaning
-    - StringCleaner (FuryMan) — memory string cleaner
-    - FN Cleaner / generic .bat cleaners — delete temp/prefetch/logs
-    - Generic HWID spoofers
-    Detection methods: registry traces, prefetch of cleaner tools,
-    hosts file tampering, MAC address spoofing, scheduled task remnants,
-    firewall rule deletion traces, event log manipulation.
-    """
     if not WINDOWS:
         return section("Cleaner / Bypass Detection", ["Windows only"]), 0, "None"
     import subprocess
     found = []; hit_count = 0
-
     si = subprocess.STARTUPINFO()
     si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
 
-    # ── 1. Known cleaner/spoofer executable names in Prefetch ──
     CLEANER_NAMES = [
-        # Evidence wipers
         "ccleaner","privazer","bleachbit","eraser","moo0","wisecleaner",
         "auslogics","iobit","glary","fileshredder","diskwipe","dban",
-        # Screenshare-specific bypass tools (researched)
         "clean-sweep","cleansweep","robloxcleaner","roblox-clean",
         "bygonespoofer","bygone","stringcleaner","string-cleaner",
         "fnclean","fn-clean","sscleaner","ss-cleaner",
         "hwid-spoofer","hwid_spoofer","hwidspoofer","spoofer",
-        "banbypass","ban-bypass","banbypass","bypasscleaner",
-        "prefetchcleaner","logcleaner","log-cleaner","logwiper",
+        "banbypass","ban-bypass","prefetchcleaner","logcleaner","log-cleaner","logwiper",
         "tracecleaner","trace-cleaner","evtxcleaner","eventcleaner",
         "bamcleaner","bam-cleaner","shellbagcleaner","regcleaner",
         "discordcleaner","discord-cleaner",
-        # Generic bypass .bat tools commonly distributed
         "bypass","cleaner","wiper","antiforensic","anti-forensic",
-        "covertrack","cover-track","trackhider","track-hider",
     ]
     pf_dir = r"C:\Windows\Prefetch"
     if os.path.exists(pf_dir):
@@ -1499,18 +1332,16 @@ def scan_cleaners():
                         found.append(f"Prefetch: {os.path.basename(pf)} (last run: {mt})")
                         hit_count += 2
                         break
-        except Exception:
-            pass
+        except Exception: pass
 
-    # ── 2. Registry traces ──
     CLEANER_REG = [
-        (r"SOFTWARE\Piriform\CCleaner",             "CCleaner"),
-        (r"SOFTWARE\PrivaZer",                       "PrivaZer"),
-        (r"SOFTWARE\BleachBit",                      "BleachBit"),
-        (r"SOFTWARE\IObit\IObit Uninstaller",         "IObit"),
-        (r"SOFTWARE\Auslogics\BoostSpeed",            "Auslogics BoostSpeed"),
-        (r"SOFTWARE\Eraser",                          "Eraser"),
-        (r"SOFTWARE\Wise\Wise Care 365",              "Wise Care 365"),
+        (r"SOFTWARE\Piriform\CCleaner","CCleaner"),
+        (r"SOFTWARE\PrivaZer","PrivaZer"),
+        (r"SOFTWARE\BleachBit","BleachBit"),
+        (r"SOFTWARE\IObit\IObit Uninstaller","IObit"),
+        (r"SOFTWARE\Auslogics\BoostSpeed","Auslogics BoostSpeed"),
+        (r"SOFTWARE\Eraser","Eraser"),
+        (r"SOFTWARE\Wise\Wise Care 365","Wise Care 365"),
     ]
     for reg_path, label in CLEANER_REG:
         for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
@@ -1519,29 +1350,12 @@ def scan_cleaners():
                 found.append(f"Registry: {label} installed")
                 hit_count += 2
                 break
-            except Exception:
-                pass
+            except Exception: pass
 
-    # ── 3. Installed paths ──
-    CLEANER_PATHS = [
-        os.path.expandvars(r"%PROGRAMFILES%\CCleaner\CCleaner.exe"),
-        os.path.expandvars(r"%PROGRAMFILES(X86)%\CCleaner\CCleaner.exe"),
-        os.path.expandvars(r"%LOCALAPPDATA%\PrivaZer\privazer.exe"),
-        os.path.expandvars(r"%PROGRAMFILES%\BleachBitleachbit.exe"),
-        os.path.expandvars(r"%PROGRAMFILES%\Eraser\Eraser.exe"),
-        os.path.expandvars(r"%PROGRAMFILES%\Wise\Wise Care 365\WiseCare365.exe"),
-    ]
-    for p in CLEANER_PATHS:
-        if os.path.exists(p):
-            found.append(f"Installed: {p}")
-            hit_count += 2
-
-    # ── 4. Hosts file tampering (Roblox-Clean-Sweep deletes roblox hosts entries) ──
     hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
     try:
         with open(hosts_path, "r", encoding="utf-8", errors="ignore") as f:
             hosts = f.read()
-        # Check for roblox entries being blocked (some bypasses do this)
         roblox_blocks = [l.strip() for l in hosts.splitlines()
                          if "roblox" in l.lower() and not l.strip().startswith("#")
                          and not l.strip().startswith("127.0.0.1 localhost")]
@@ -1549,77 +1363,20 @@ def scan_cleaners():
             for rb in roblox_blocks[:5]:
                 found.append(f"HOSTS FILE: Roblox entry: {rb}")
                 hit_count += 3
-    except Exception:
-        pass
+    except Exception: pass
 
-    # ── 5. MAC address spoofing (ByGoneSpoofer, Roblox-Clean-Sweep) ──
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             r"Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\*' -ErrorAction SilentlyContinue | "
-             r"Where-Object {$_.NetworkAddress} | Select-Object NetworkAddress,DriverDesc | ConvertTo-Csv -NoTypeInformation"],
-            capture_output=True, text=True, timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        for line in out.stdout.splitlines()[1:]:
-            line = line.strip().strip('"')
-            if line and "," in line:
-                mac_val = line.split('","')[0].strip('"')
-                adapter = line.split('","')[1].strip('"') if '","' in line else ""
-                if mac_val and len(mac_val) == 12:
-                    found.append(f"MAC SPOOFED: {adapter} → {mac_val[:2]}:{mac_val[2:4]}:...(custom)")
-                    hit_count += 4
-    except Exception:
-        pass
-
-    # ── 6. Firewall rule deletion (Roblox-Clean-Sweep removes Roblox firewall rules) ──
-    # Detect if Roblox is installed but has no firewall rules (they were deleted)
-    roblox_installed = os.path.exists(os.path.expanduser(r"~\AppData\Local\Roblox"))
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "Get-NetFirewallRule | Where-Object {$_.DisplayName -like '*roblox*'} | Measure-Object | Select-Object -ExpandProperty Count"],
-            capture_output=True, text=True, timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        fw_count = int(out.stdout.strip()) if out.stdout.strip().isdigit() else -1
-        if roblox_installed and fw_count == 0:
-            found.append("FIREWALL: Roblox is installed but has 0 firewall rules — rules may have been deleted by cleaner")
-            hit_count += 2
-    except Exception:
-        pass
-
-    # ── 7. Scheduled task remnants from cleaner tools ──
-    try:
-        out = subprocess.run(
-            ["schtasks", "/query", "/fo", "csv"],
-            capture_output=True, text=True, timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        for line in out.stdout.splitlines():
-            ll = line.lower()
-            for sig in ["cleaner","wiper","spoofer","bypass","privazer","ccleaner","bleachbit"]:
-                if sig in ll and "microsoft" not in ll:
-                    found.append(f"Scheduled task: {line.split(',')[0].strip()}")
-                    hit_count += 1
-                    break
-    except Exception:
-        pass
-
-    # ── 8. .bat/.ps1 cleaner scripts in common locations ──
     SCAN_DIRS = [
-        os.path.expanduser("~\Desktop"),
-        os.path.expanduser("~\Downloads"),
-        os.path.expanduser("~\Documents"),
+        os.path.expanduser("~\\Desktop"),
+        os.path.expanduser("~\\Downloads"),
+        os.path.expanduser("~\\Documents"),
     ]
-    BAT_SIGS = [
-        "clean","wipe","bypass","spoof","purge","erase","sweep",
-        "fnclean","traceclean","logclean","bamclean",
-    ]
+    BAT_SIGS = ["clean","wipe","bypass","spoof","purge","erase","sweep","fnclean","traceclean","logclean","bamclean"]
     for sdir in SCAN_DIRS:
         if not os.path.exists(sdir): continue
         try:
             for fname in os.listdir(sdir):
                 fl = fname.lower()
-                if not (fl.endswith(".bat") or fl.endswith(".ps1") or fl.endswith(".cmd")):
-                    continue
+                if not (fl.endswith(".bat") or fl.endswith(".ps1") or fl.endswith(".cmd")): continue
                 for sig in BAT_SIGS:
                     if sig in fl:
                         fpath = os.path.join(sdir, fname)
@@ -1628,39 +1385,7 @@ def scan_cleaners():
                         found.append(f"Script: {fpath}  (modified: {mt})")
                         hit_count += 3
                         break
-        except Exception:
-            pass
-
-    # ── 9. StringCleaner / memory cleaner indicators ──
-    # StringCleaner writes to temp or AppData
-    string_cleaner_paths = [
-        os.path.expandvars(r"%TEMP%\stringcleaner"),
-        os.path.expandvars(r"%APPDATA%\StringCleaner"),
-        os.path.expandvars(r"%LOCALAPPDATA%\StringCleaner"),
-    ]
-    for p in string_cleaner_paths:
-        if os.path.exists(p):
-            found.append(f"StringCleaner directory found: {p}")
-            hit_count += 3
-
-    # ── 10. Running cleaner processes ──
-    CLEANER_PROCS = [
-        "ccleaner","privazer","bleachbit","eraser","wisecleaner",
-        "spoofer","hwidspoofer","bygone","stringcleaner",
-    ]
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "Get-Process | Select-Object -ExpandProperty Name"],
-            capture_output=True, text=True, timeout=6,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        running = {p.strip().lower() for p in out.stdout.splitlines() if p.strip()}
-        for proc in CLEANER_PROCS:
-            if any(proc in r for r in running):
-                found.append(f"RUNNING: {proc}")
-                hit_count += 4
-    except Exception:
-        pass
+        except Exception: pass
 
     lines = []
     if found:
@@ -1675,12 +1400,9 @@ def scan_cleaners():
 
 
 def scan_network_vpn():
-    """Detect VPN usage and show WiFi history (SSID list)."""
     if not WINDOWS:
         return section("Network / VPN",["Windows only"]),0,"Unknown"
     lines=[]; vpn_detected=False; vpn_info_str=""
-
-    # Check for VPN adapter names
     vpn_adapter_keywords=["vpn","mullvad","nordvpn","expressvpn","surfshark","proton",
                           "windscribe","pia","privateinternetaccess","cyberghost",
                           "tap-","tun0","tun1","openvpn","wireguard"]
@@ -1703,17 +1425,14 @@ def scan_network_vpn():
         else:
             lines.append("  ✓ No VPN adapters detected")
     except Exception: pass
-
-    # Current IP info
     try:
-        req=urllib.request.Request("https://ipinfo.io/json",
-            headers={"User-Agent":"CometScanner/4.0"})
+        req=urllib.request.Request("https://ipinfo.io/json",headers={"User-Agent":"CometScanner/4.0"})
         with urllib.request.urlopen(req,context=_ssl_ctx(),timeout=5) as r:
             ip_data=json.loads(r.read().decode())
         org=ip_data.get("org","Unknown")
         city=ip_data.get("city","?"); country=ip_data.get("country","?")
         ip=ip_data.get("ip","?")
-        is_vpn_org=any(k in org.lower() for k in ["vpn","mullavd","nordvpn","hosting","cloud","linode","digitalocean","vultr","ovh","hetzner"])
+        is_vpn_org=any(k in org.lower() for k in ["vpn","mullvad","nordvpn","hosting","cloud","linode","digitalocean","vultr","ovh","hetzner"])
         lines.append(f"\n  IP Address : {ip}")
         lines.append(f"  Location   : {city}, {country}")
         lines.append(f"  ISP/Org    : {org}")
@@ -1724,8 +1443,6 @@ def scan_network_vpn():
     except Exception:
         lines.append("  IP info unavailable")
         vpn_info_str="IP lookup failed"
-
-    # WiFi profile history (SSID names) — useful for 2-PC detection
     try:
         si=subprocess.STARTUPINFO(); si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
         out=subprocess.run(["netsh","wlan","show","profiles"],
@@ -1736,36 +1453,22 @@ def scan_network_vpn():
         if ssids:
             lines.append(f"\n  WiFi Profiles saved ({len(ssids)}):")
             for s in ssids[:20]: lines.append(f"  ► {s}")
-            if len(ssids)>20: lines.append(f"  ... and {len(ssids)-20} more")
         else:
             lines.append("\n  No WiFi profiles found (ethernet only or profiles cleared)")
     except Exception: pass
-
     return section("Network / VPN Detection",lines),(1 if vpn_detected else 0),vpn_info_str
 
 
 def scan_discord_cache():
-    """
-    Deep Discord account detection:
-    - App Local Storage (LevelDB) — all install types
-    - Browser Local Storage (Chrome, Edge, Firefox, Brave, Opera)
-    - Windows Credential Manager
-    - Registry remnants
-    - NTUSER.DAT search for Discord tokens
-    Catches accounts even after log deletion.
-    """
     if not WINDOWS: return section("Discord Detection",["Windows only"]),0,[]
     import subprocess
     accounts=[]; seen_ids=set()
     ID_RE    = re.compile(r'"id"\s*:\s*"(\d{17,19})"')
     NAME_RE  = re.compile(r'"username"\s*:\s*"([^"]{2,32})"')
-    DISCRIM  = re.compile(r'"discriminator"\s*:\s*"(\d{1,4})"')
     SWITCH_RE= re.compile(r'"lastSwitched"\s*:\s*"?(\d+)"?')
     TOKEN_RE = re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
-    # Email detection removed — not needed
 
     def parse_leveldb(base_path, source_label):
-        """Parse a LevelDB directory for Discord account data."""
         if not os.path.exists(base_path): return
         for fname in os.listdir(base_path):
             if not (fname.endswith(".ldb") or fname.endswith(".log") or fname.endswith(".ldb~")): continue
@@ -1776,7 +1479,6 @@ def scan_discord_cache():
                 names  = NAME_RE.findall(raw)
                 tokens = TOKEN_RE.findall(raw)
                 switches = SWITCH_RE.findall(raw)
-                emails = []  # email detection disabled
                 for i, uid in enumerate(ids):
                     if uid in seen_ids: continue
                     seen_ids.add(uid)
@@ -1788,17 +1490,15 @@ def scan_discord_cache():
                             if ts > 1e12: ts = ts//1000
                             last_sw = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
                         except Exception: pass
-                    email = None  # emails not collected
                     accounts.append({
                         "id":uid, "username":uname,
                         "has_token": bool(tokens),
                         "last_switched": last_sw,
                         "source": source_label,
-                        "email": email,
+                        "email": None,
                     })
             except Exception: pass
 
-    # ── Source 1: Discord app installs ──
     app_bases = [
         (os.path.expanduser(r"~\AppData\Roaming\discord\Local Storage\leveldb"),       "Discord App"),
         (os.path.expanduser(r"~\AppData\Roaming\discordptb\Local Storage\leveldb"),    "Discord PTB"),
@@ -1808,159 +1508,48 @@ def scan_discord_cache():
     for path, label in app_bases:
         parse_leveldb(path, label)
 
-    # ── Source 2: Web browsers — catches web-app Discord logins ──
     browser_paths = [
-        # Chrome
         (r"~\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb",        "Chrome"),
-        (r"~\AppData\Local\Google\Chrome\User Data\Profile 1\Local Storage\leveldb",      "Chrome P1"),
-        (r"~\AppData\Local\Google\Chrome\User Data\Profile 2\Local Storage\leveldb",      "Chrome P2"),
-        # Edge
         (r"~\AppData\Local\Microsoft\Edge\User Data\Default\Local Storage\leveldb",       "Edge"),
-        (r"~\AppData\Local\Microsoft\Edge\User Data\Profile 1\Local Storage\leveldb",     "Edge P1"),
-        # Brave
         (r"~\AppData\Local\BraveSoftware\Brave-Browser\User Data\Default\Local Storage\leveldb", "Brave"),
-        # Opera
         (r"~\AppData\Roaming\Opera Software\Opera Stable\Local Storage\leveldb",            "Opera"),
-        # Opera GX
         (r"~\AppData\Roaming\Opera Software\Opera GX Stable\Local Storage\leveldb",         "Opera GX"),
-        # Firefox (different format — NSSDB/sqlite)
-        (r"~\AppData\Roaming\Mozilla\Firefox\Profiles",                                      "Firefox"),
-        # Vivaldi
-        (r"~\AppData\Local\Vivaldi\User Data\Default\Local Storage\leveldb",               "Vivaldi"),
     ]
     for rel_path, label in browser_paths:
-        full = os.path.expanduser(rel_path)
-        if "Firefox" in rel_path:
-            # Firefox: search profile storage.sqlite for discord tokens
-            if os.path.exists(full):
-                for prof in os.listdir(full):
-                    ls_path = os.path.join(full, prof, "storage", "default")
-                    if os.path.exists(ls_path):
-                        for root, dirs, files in os.walk(ls_path):
-                            if "discord" in root.lower():
-                                for f in files:
-                                    if f.endswith(".sqlite") or f.endswith(".sqlt"):
-                                        try:
-                                            with open(os.path.join(root,f),"rb") as fp:
-                                                raw = fp.read().decode("utf-8",errors="ignore")
-                                            ids = ID_RE.findall(raw)
-                                            names = NAME_RE.findall(raw)
-                                            for i,uid in enumerate(ids):
-                                                if uid in seen_ids: continue
-                                                seen_ids.add(uid)
-                                                accounts.append({
-                                                    "id":uid,
-                                                    "username":names[i] if i<len(names) else "Unknown",
-                                                    "has_token":bool(TOKEN_RE.search(raw)),
-                                                    "last_switched":"Unknown",
-                                                    "source":f"Firefox",
-                                                    "email":None,
-                                                })
-                                        except Exception: pass
-        else:
-            parse_leveldb(full, label)
+        parse_leveldb(os.path.expanduser(rel_path), label)
 
-    # ── Source 3: Windows Credential Manager ──
-    try:
-        si = subprocess.STARTUPINFO()
-        si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
-        out = subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             "cmdkey /list | Select-String -Pattern 'discord' -CaseSensitive:$false"],
-            capture_output=True,text=True,timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
-        if out.stdout.strip():
-            for line in out.stdout.strip().splitlines():
-                line = line.strip()
-                if "discord" in line.lower() and line:
-                    accounts.append({
-                        "id":"CRED_MANAGER","username":line,
-                        "has_token":False,"last_switched":"Unknown",
-                        "source":"Credential Manager","email":None,
-                    })
-    except Exception: pass
-
-    # ── Source 4: Registry remnants (Discord installs leave traces) ──
-    reg_discord_keys = [
-        r"SOFTWARE\Discord",
-        r"SOFTWARE\DiscordPTB",
-        r"SOFTWARE\DiscordCanary",
-        r"SOFTWARE\Classes\discord",
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Discord",
-    ]
-    for rk in reg_discord_keys:
-        for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-            try:
-                key = winreg.OpenKey(hive, rk, 0, winreg.KEY_READ)
-                winreg.CloseKey(key)
-                # If key exists, Discord was/is installed
-                if not any(a["source"]=="Registry" for a in accounts):
-                    accounts.append({
-                        "id":"REG_TRACE","username":f"Registry: {rk}",
-                        "has_token":False,"last_switched":"N/A",
-                        "source":"Registry trace","email":None,
-                    })
-                break
-            except Exception: pass
-
-    # Deduplicate and filter noise
     real_accounts = [a for a in accounts if a["id"] not in ("REG_TRACE","CRED_MANAGER")]
-    traces        = [a for a in accounts if a["id"] in ("REG_TRACE","CRED_MANAGER")]
-
-    lines=[f"\n  Sources searched: Discord app + Chrome/Edge/Brave/Opera/Firefox browsers",
-           f"  Total accounts: {len(real_accounts)}",""]
+    lines=[f"\n  Total accounts: {len(real_accounts)}",""]
     for acc in real_accounts:
         lines.append(f"  @{acc['username']}")
         lines.append(f"  ID           : {acc['id']}")
         lines.append(f"  Last Switched: {acc['last_switched']}")
-        if acc.get("email"): lines.append(f"  Email        : {acc['email']}")
         lines.append(f"  Token cached : {'⚠ YES' if acc['has_token'] else 'No'}")
         lines.append(f"  Found in     : {acc['source']}")
         lines.append("  "+"─"*32)
-    if traces:
-        lines.append("\n  Installation traces found:")
-        for t in traces: lines.append(f"  ► {t['username']}")
     if len(real_accounts)>1:
         lines.append(f"\n⚠ {len(real_accounts)} DISCORD ACCOUNTS — possible alt accounts")
-    if not real_accounts and not traces:
+    if not real_accounts:
         lines.append("  No Discord accounts found.")
-
     return section("Discord Account Detection",lines), max(0,len(real_accounts)-1), real_accounts
 
 
-
 def scan_discord_memory():
-    """
-    Discord memory + download history analysis.
-    Reads from Discord's cached media/downloads, message cache,
-    and in-memory artifacts to find:
-    - Files downloaded through Discord (with timestamps)
-    - Images/attachments accessed
-    - Server/DM metadata (no message content)
-    This catches people using Discord alts to share cheats.
-    """
     if not WINDOWS: return section("Discord Memory/Downloads",["Windows only"]),0,[]
-    import subprocess
     hits=[]; download_entries=[]; suspicious_entries=[]
-
     DISCORD_ROOTS = [
         os.path.expanduser(r"~\AppData\Roaming\discord"),
         os.path.expanduser(r"~\AppData\Roaming\discordptb"),
         os.path.expanduser(r"~\AppData\Roaming\discordcanary"),
     ]
-
-    # Cheat file extensions/names to flag in download history
     CHEAT_EXTS = {".exe",".dll",".lua",".luac",".rbxl",".rbxlx",".zip",".rar",".7z"}
     CHEAT_NAMES_RE = re.compile(
         r"(exploit|inject|cheat|hack|aimbot|executor|script|payload|bypass|"
-        r"volt|synapse|velocity|fluxus|krnl|delta|wave|script.*ware|"
-        r"froststrap|aimlock|esp|triggerbot|noclip|speed.*hack)",
+        r"volt|synapse|velocity|fluxus|krnl|delta|wave|scriptware|"
+        r"froststrap|aimlock|esp|triggerbot|noclip|speedhack)",
         re.IGNORECASE)
+    CDN_RE = re.compile(r"https://cdn[.]discordapp[.]com/attachments/(\d+)/(\d+)/([^\s]{2,120})")
 
-    # Pattern to find CDN attachment URLs in LevelDB
-    CDN_RE    = re.compile(r"https://cdn[.]discordapp[.]com/attachments/(\d+)/(\d+)/([^\s]{2,120})")
-    MEDIA_RE  = re.compile(r"https://media[.]discordapp[.](?:net|com)/attachments/(\d+)/(\d+)/([^\s]{2,120})")
-    # Timestamps embedded in Discord snowflake IDs
     def snowflake_to_dt(snowflake):
         try:
             ts_ms = (int(snowflake) >> 22) + 1420070400000
@@ -1975,21 +1564,17 @@ def scan_discord_memory():
                 if not (fname.endswith(".ldb") or fname.endswith(".log")): continue
                 fpath = os.path.join(base_path, fname)
                 try:
-                    with open(fpath,"rb") as f: raw = f.read(4*1024*1024)  # 4MB max
+                    with open(fpath,"rb") as f: raw = f.read(4*1024*1024)
                     text = raw.decode("utf-8", errors="ignore")
-                    # Find all CDN attachment URLs
                     for m in CDN_RE.finditer(text):
                         channel_id, msg_id, filename = m.group(1), m.group(2), m.group(3)
                         clean_fn = filename.split("?")[0].strip()
                         ts = snowflake_to_dt(msg_id)
                         ext = os.path.splitext(clean_fn)[1].lower()
                         is_sus = ext in CHEAT_EXTS or bool(CHEAT_NAMES_RE.search(clean_fn))
-                        entry = {
-                            "file": clean_fn, "channel": channel_id,
-                            "msg_id": msg_id, "timestamp": ts,
-                            "url": m.group(0).split("?")[0],
-                            "source": label, "suspicious": is_sus,
-                        }
+                        entry = {"file":clean_fn,"channel":channel_id,"msg_id":msg_id,
+                                 "timestamp":ts,"url":m.group(0).split("?")[0],
+                                 "source":label,"suspicious":is_sus}
                         download_entries.append(entry)
                         if is_sus: suspicious_entries.append(entry)
                 except Exception: pass
@@ -1997,268 +1582,48 @@ def scan_discord_memory():
 
     for root in DISCORD_ROOTS:
         label = os.path.basename(root)
-        # Main LevelDB (localStorage)
         scan_leveldb_dir(os.path.join(root,"Local Storage","leveldb"), label)
-        # Cache directories
-        for cache_sub in ["Cache","GPUCache","Code Cache","media-cache"]:
-            cache_path = os.path.join(root,cache_sub)
-            if os.path.exists(cache_path):
-                try:
-                    for cfile in os.listdir(cache_path):
-                        fpath = os.path.join(cache_path, cfile)
-                        try:
-                            with open(fpath,"rb") as f: raw = f.read(512*1024)  # 512KB
-                            text = raw.decode("utf-8", errors="ignore")
-                            for m in CDN_RE.finditer(text):
-                                channel_id, msg_id, filename = m.group(1), m.group(2), m.group(3)
-                                clean_fn = filename.split("?")[0].strip()
-                                ext = os.path.splitext(clean_fn)[1].lower()
-                                ts = snowflake_to_dt(msg_id)
-                                is_sus = ext in CHEAT_EXTS or bool(CHEAT_NAMES_RE.search(clean_fn))
-                                entry = {
-                                    "file":clean_fn,"channel":channel_id,"msg_id":msg_id,
-                                    "timestamp":ts,"url":m.group(0).split("?")[0],
-                                    "source":f"{label}/cache","suspicious":is_sus,
-                                }
-                                download_entries.append(entry)
-                                if is_sus: suspicious_entries.append(entry)
-                        except Exception: pass
-                except Exception: pass
 
-    # Deduplicate by URL
-    seen_urls = set()
-    unique_downloads = []
+    seen_urls = set(); unique_downloads = []
     for e in download_entries:
         if e["url"] not in seen_urls:
-            seen_urls.add(e["url"])
-            unique_downloads.append(e)
-    unique_downloads.sort(key=lambda x: x["timestamp"], reverse=True)
+            seen_urls.add(e["url"]); unique_downloads.append(e)
 
-    # Deduplicate suspicious by URL too
-    seen_sus = set()
-    unique_sus = []
+    seen_sus = set(); unique_sus = []
     for e in suspicious_entries:
         if e["url"] not in seen_sus:
-            seen_sus.add(e["url"])
-            unique_sus.append(e)
+            seen_sus.add(e["url"]); unique_sus.append(e)
 
-    lines = [
-        f"\n  Discord CDN files found: {len(unique_downloads)}",
-        f"  Suspicious entries    : {len(unique_sus)}",
-        "",
-    ]
+    lines = [f"\n  Discord CDN files found: {len(unique_downloads)}",
+             f"  Suspicious entries    : {len(unique_sus)}",""]
     if unique_sus:
         lines.append("⚠ SUSPICIOUS DOWNLOADS (cheat-related files):")
         for e in unique_sus[:20]:
             lines.append(f"  ✗ File     : {e['file']}")
             lines.append(f"    Uploaded : {e['timestamp']}")
             lines.append(f"    URL      : {e['url']}")
-            lines.append(f"    Source   : {e['source']}")
             lines.append("")
-    lines.append("─"*50)
-    lines.append(f"\n  Recent Discord Downloads (all, newest first):")
-    for e in unique_downloads[:30]:
-        sym = "⚠" if e["suspicious"] else "  "
-        lines.append(f"  {sym} File: {e['file']}")
-        lines.append(f"     Uploaded: {e['timestamp']}")
-        lines.append(f"     URL: {e['url']}")
     if not unique_downloads:
         lines.append("  No Discord CDN file history found.")
-
     return section("Discord Downloads/Memory", lines), len(unique_sus), unique_downloads
-
-
-def scan_factory_reset():
-    """
-    Enhanced factory reset detection — multiple corroborating sources.
-    Shows: when Windows was installed, system age vs account age discrepancy,
-    previous OS installs from registry, BIOS date vs OS install date gap.
-    """
-    if not WINDOWS: return section("Factory Reset Detection",["Windows only"]),False,""
-    import subprocess
-    resets=[]; warnings=[]
-
-    # ── Source 1: SYSTEM\Setup\Source OS (previous installs) ──
-    try:
-        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r"SYSTEM\Setup",0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        try:
-            hist=winreg.OpenKey(key,"Source OS",0,winreg.KEY_READ)
-            i=0
-            while True:
-                try:
-                    sub=winreg.EnumKey(hist,i)
-                    sk=winreg.OpenKey(hist,sub,0,winreg.KEY_READ)
-                    try:
-                        prod,_=winreg.QueryValueEx(sk,"ProductName")
-                        build,_=winreg.QueryValueEx(sk,"CurrentBuild")
-                        try: idate,_=winreg.QueryValueEx(sk,"InstallDate")
-                        except Exception: idate="Unknown"
-                        dt_str="Unknown"
-                        if isinstance(idate,int):
-                            try: dt_str=datetime.datetime.fromtimestamp(idate).strftime("%Y-%m-%d %H:%M:%S")
-                            except Exception: dt_str=str(idate)
-                        else: dt_str=str(idate)
-                        resets.append(f"{prod} (Build {build}) — installed {dt_str}")
-                    except Exception: pass
-                    winreg.CloseKey(sk); i+=1
-                except OSError: break
-            winreg.CloseKey(hist)
-        except Exception: pass
-        winreg.CloseKey(key)
-    except Exception: pass
-
-    # ── Source 2: Current OS install date ──
-    current="Unknown"; install_ts=None; install_dt=None
-    try:
-        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                           r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-                           0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        prod,_=winreg.QueryValueEx(key,"ProductName")
-        build,_=winreg.QueryValueEx(key,"CurrentBuild")
-        try:  rel,_=winreg.QueryValueEx(key,"ReleaseId")
-        except Exception: rel="?"
-        try:  idate,_=winreg.QueryValueEx(key,"InstallDate")
-        except Exception: idate=None
-        try:  itime,_=winreg.QueryValueEx(key,"InstallTime")
-        except Exception: itime=None
-        if idate and isinstance(idate,int):
-            install_ts=idate
-            install_dt=datetime.datetime.fromtimestamp(idate)
-            install_str=install_dt.strftime("%Y-%m-%d %H:%M:%S")
-        elif itime:
-            install_dt=filetime_to_dt(itime)
-            install_str=install_dt.strftime("%Y-%m-%d %H:%M:%S") if install_dt else "Unknown"
-        else:
-            install_str="Unknown"
-        current=f"{prod} Build {build} ({rel}) — Installed: {install_str}"
-        winreg.CloseKey(key)
-    except Exception: pass
-
-    # ── Source 3: BIOS/hardware date via WMI (install date vs hardware age) ──
-    bios_date="Unknown"; bios_age_gap=None
-    try:
-        si=subprocess.STARTUPINFO()
-        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-        out=subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             "(Get-WmiObject -Class Win32_BIOS).ReleaseDate"],
-            capture_output=True,text=True,timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
-        bios_raw=out.stdout.strip()
-        if bios_raw and len(bios_raw)>=8:
-            bios_date=bios_raw[:4]+"-"+bios_raw[4:6]+"-"+bios_raw[6:8]
-            if install_dt:
-                try:
-                    bios_dt=datetime.datetime(int(bios_raw[:4]),int(bios_raw[4:6]),int(bios_raw[6:8]))
-                    delta=(install_dt-bios_dt).days
-                    bios_age_gap=delta
-                    if delta < 7:
-                        warnings.append(f"⚠ OS installed within {delta} days of BIOS date — possible fresh install after hardware delivery")
-                except Exception: pass
-    except Exception: pass
-
-    # ── Source 4: User account creation date ──
-    user_created="Unknown"
-    try:
-        si=subprocess.STARTUPINFO()
-        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-        out=subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             f'(Get-LocalUser -Name "{current_user()}" -ErrorAction SilentlyContinue).PasswordLastSet'],
-            capture_output=True,text=True,timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
-        if out.stdout.strip(): user_created=out.stdout.strip()
-    except Exception: pass
-
-    # ── Source 5: System age — use install_dt from registry (most accurate) ──
-    sys_age_days=None
-    if install_dt:
-        try:
-            sys_age_days = (datetime.datetime.now() - install_dt).days
-            if sys_age_days < 30:
-                warnings.append(f"⚠ Windows installed only {sys_age_days} days ago — very recent install")
-        except Exception: pass
-
-    # ── Source 6: Event log 6005/6009 for oldest system boot ──
-    oldest_boot="Unknown"
-    try:
-        si=subprocess.STARTUPINFO()
-        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-        out=subprocess.run(
-            ["wevtutil","qe","System",
-             "/q:*[System[EventID=6009]]","/c:1","/rd:false","/f:text"],
-            capture_output=True,text=True,timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
-        for line in out.stdout.splitlines():
-            if "Date" in line or "Time" in line:
-                oldest_boot=line.strip(); break
-    except Exception: pass
-
-    age_str = f"{sys_age_days} days ({sys_age_days//365}y {(sys_age_days%365)//30}m)" if sys_age_days else "Unknown"
-    lines=[f"\n  Current OS       : {current}",
-           f"  BIOS Date        : {bios_date}",
-           f"  OS Age           : {age_str}",
-           f"  User Account     : {user_created}",
-           f"  Oldest Boot Evt  : {oldest_boot}",""]
-    if warnings:
-        for w in warnings: lines.append(f"  {w}")
-        lines.append("")
-    if resets:
-        lines.append("  Previous Windows installs (resets):")
-        for r in resets: lines.append(f"    ► {r}")
-        lines.append(f"\n  ⚠ {len(resets)} previous install(s) found")
-    else:
-        lines.append("  No previous installs in registry — either clean machine or history cleared")
-    if sys_age_days and sys_age_days < 14:
-        lines.append(f"  ⚠ System only {sys_age_days} days old — check for pre-reset activity")
-
-    reset_text=(current+f" | BIOS: {bios_date} | Age: {sys_age_days}d"+
-                ("\n  Resets: "+", ".join(resets) if resets else ""))
-    return section("Factory Reset / System Age",lines),bool(resets or (sys_age_days and sys_age_days<14)),reset_text
 
 
 def scan_fastflags():
     """
-    FastFlag detection — shows all active flags with notes on suspicious ones.
-    Sources: ClientAppSettings.json, Bloxstrap/Froststrap/Fishstrap configs, Roblox logs.
-    Format: FlagName = Value  [reason if suspicious]
+    FastFlag detection — flags ANY active FastFlag found.
+    Zero tolerance: all flags are treated equally.
     """
-    SUSPICIOUS = {
-        "FFlagDebugGraphicsDisableDirect3D11":  "Disables D3D11 renderer (anti-cheat bypass)",
-        "FFlagDisableNewIGMinDUA":              "Disables input guard",
-        "FFlagDebugDisableTelemetry":           "Disables telemetry (hides activity)",
-        "FFlagDebugDisableNewCSN":              "Disables new content security",
-        "FFlagDisableAbuseReportButton":        "Disables abuse reporting",
-        "DFStringTaskSchedulerTargetFps":       "Uncapped FPS (speed advantage)",
-        "DFIntTaskSchedulerTargetFps":          "Uncapped FPS (speed advantage)",
-        "FFlagTaskSchedulerLimitTargetFps":     "FPS limit bypass",
-        "FIntRenderTargetFPS":                  "Render FPS manipulation",
-        "FFlagDebugRenderingSetDeterministic":  "Rendering manipulation",
-        "FFlagDisablePostFx":                   "PostFX disabled (visual exploit)",
-        "FFlagDebugGraphicsPreferD3D11":        "Force D3D11 (used by some exploits)",
-        "DFFlagTextureQualityOverrideEnabled":  "Texture quality override",
-        "FFlagDebugForceFutureIsBrightPhase3":  "Lighting manipulation",
-        "FFlagEnableNewAnimationSystem":        "Known exploit flag",
-        "FFlagDebugRenderForceTechnologyVoxel": "Voxel rendering exploit",
-        "FIntFullscreenTitleBarTriggerDelayMillis": "Fullscreen trigger delay (bypass)",
-        "FIntRenderShadowIntensity":            "Shadow manipulation",
-        "DFIntTextureQualityOverride":          "Texture quality cheat",
-        "FLogNetwork":                          "Network logging (info gathering)",
-        "DFIntCanHideGuiGroupId":               "GUI hiding by group ID",
-        "FIntFontSizePadding":                  "Font size manipulation",
-        "DFFlagDisableDPIScale":                "DPI scaling disabled",
-    }
+    all_flags   = {}
+    sources_hit = []
 
-    all_flags   = {}   # merged from all sources
-    sources_hit = []   # which files were found
-
-    # ── ClientAppSettings.json from all known paths ──
     json_paths = [
         os.path.expanduser(r"~\AppData\Local\Roblox\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Froststrap\ClientSettings\ClientAppSettings.json"),
         os.path.expandvars(r"%LOCALAPPDATA%\Fishstrap\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Voidstrap\ClientSettings\ClientAppSettings.json"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Davestrap\ClientSettings\ClientAppSettings.json"),
     ]
     for jp in json_paths:
         if not os.path.exists(jp): continue
@@ -2271,10 +1636,13 @@ def scan_fastflags():
         except Exception:
             pass
 
-    # ── Roblox log files — extract LoadClientSettings block ──
     log_dirs = [
         os.path.expanduser(r"~\AppData\Local\Roblox\logs"),
         os.path.expandvars(r"%LOCALAPPDATA%\Bloxstrap\Logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Davestrap\Logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Froststrap\Logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Voidstrap\Logs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Fishstrap\Logs"),
     ]
     log_username = "Unknown"
     log_placeid  = ""
@@ -2293,15 +1661,12 @@ def scan_fastflags():
                     raw = f.read(500000)
             except Exception:
                 continue
-            # Get username
             um = re.search(r'"UserName"%3a"([A-Za-z0-9_]{3,20})"', raw)
             if um and log_username == "Unknown":
                 log_username = um.group(1)
-            # Get place ID
             pm = re.search(r'placeId=(\d{6,15})', raw)
             if pm and not log_placeid:
                 log_placeid = pm.group(1)
-            # Extract LoadClientSettings JSON block
             lcs_idx = raw.find("LoadClientSettings")
             if lcs_idx == -1: continue
             brace = raw.find("{", lcs_idx)
@@ -2319,173 +1684,39 @@ def scan_fastflags():
                 if isinstance(flags_from_log, dict) and flags_from_log:
                     all_flags.update(flags_from_log)
                     sources_hit.append(f"log:{os.path.basename(fpath)[:40]}")
-                    break  # one log is enough for flags
+                    break
             except Exception:
-                # fallback: line-by-line
                 for line in chunk[:end].splitlines():
                     m = re.match(r'\s*"([^"]+)"\s*:\s*"?([^",}\n]+)"?', line)
                     if m:
                         all_flags[m.group(1)] = m.group(2).strip().strip('"')
 
-    # ── Build output ──
-    sus_flags    = {k: v for k, v in all_flags.items() if k in SUSPICIOUS}
-    normal_flags = {k: v for k, v in all_flags.items() if k not in SUSPICIOUS}
-
     lines = [
         f"\n  Username  : {log_username}",
         f"  Place ID  : {'https://www.roblox.com/games/'+log_placeid if log_placeid else 'Unknown'}",
         f"  Sources   : {', '.join(sources_hit) if sources_hit else 'None found'}",
-        f"  Total flags: {len(all_flags)}  |  Suspicious: {len(sus_flags)}",
+        f"  Total flags: {len(all_flags)}",
         "",
     ]
 
-    if sus_flags:
-        lines.append("  ⚠ SUSPICIOUS FLAGS:")
-        for k, v in sus_flags.items():
-            lines.append(f"  ✗ {k} = {v}  [{SUSPICIOUS[k]}]")
-        lines.append("")
-
     if all_flags:
-        lines.append("  All Active FastFlags:")
+        lines.append("  ⚠ FLAGGED — FastFlags detected (zero tolerance policy):")
         lines.append("  " + "─"*50)
         for k, v in sorted(all_flags.items()):
-            note = f"  [{SUSPICIOUS[k]}]" if k in SUSPICIOUS else ""
-            lines.append(f"  {k} = {v}{note}")
+            lines.append(f"  ✗ {k} = {v}")
     else:
-        lines.append("  ✓ No FastFlags configured.")
+        lines.append("  ✓ CLEAN — No FastFlags detected.")
 
-    all_sus = [f"{k} = {v}  [{SUSPICIOUS[k]}]" for k,v in sus_flags.items()]
-    return section("FastFlag Detection", lines), len(sus_flags), all_sus
+    flagged_list = [f"{k} = {v}" for k, v in all_flags.items()]
+    return section("FastFlag Detection", lines), len(all_flags), flagged_list
 
-
-def scan_drives():
-    if not WINDOWS: return section("Drive Detection",["Windows only"]),False,""
-    drives_found=[]; drive_warn=False; lines=[]
-    try:
-        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r"SYSTEM\CurrentControlSet\Enum\USBSTOR",
-                           0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        i=0
-        while True:
-            try:
-                device=winreg.EnumKey(key,i)
-                dk=winreg.OpenKey(key,device,0,winreg.KEY_READ); j=0
-                while True:
-                    try:
-                        inst=winreg.EnumKey(dk,j)
-                        ik=winreg.OpenKey(dk,inst,0,winreg.KEY_READ)
-                        try: friendly,_=winreg.QueryValueEx(ik,"FriendlyName")
-                        except Exception: friendly=device
-                        drives_found.append(friendly)
-                        winreg.CloseKey(ik); j+=1
-                    except OSError: break
-                winreg.CloseKey(dk); i+=1
-            except OSError: break
-        winreg.CloseKey(key)
-    except Exception: pass
-    current_letters=[]
-    try:
-        import string as _str
-        for letter in _str.ascii_uppercase:
-            if os.path.exists(f"{letter}:\\"): current_letters.append(f"{letter}:")
-    except Exception: pass
-    lines.append(f"  Current drives: {', '.join(current_letters) or 'None'}")
-    lines.append(f"  USB history: {len(drives_found)} device(s)")
-    if drives_found:
-        lines.append("")
-        for d in drives_found[:20]: lines.append(f"  ► {d}")
-    if len(drives_found)>3:
-        drive_warn=True
-        lines.append(f"\n  ⚠ {len(drives_found)} USB storage devices — check for external drives")
-    info_str=f"Current: {', '.join(current_letters)} | USB history: {len(drives_found)} devices"
-    return section("Drive Detection",lines),drive_warn,info_str
-
-
-# ============================================================
-#  RUN FULL SCAN
-# ============================================================
-def run_full_scan(league="?"):
-    sb_t,sb_h,_          = scan_shellbags()
-    bm_t,bm_h,_          = scan_bam()
-    pf_t,pf_h,_          = scan_prefetch()
-    ac_t,ac_h,_          = scan_appcompat()
-    rl_t,rl_h,accs       = scan_roblox_logs()
-    al_t,al_h,_          = scan_roblox_alts_registry()
-    cs_t,cs_h,_          = scan_cheat_files()
-    yr_t,yr_h,_          = scan_yara()
-    us_t,us_h,us_l       = scan_unsigned()
-    rb_t,rb_h,rb_l       = scan_recycle_bin()
-    sm_t,sm_h,auto_fail  = scan_sysmain()
-    pr_t,pr_h,_          = scan_running_processes()
-    cl_t,cl_h,cl_info    = scan_cleaners()
-    nw_t,nw_h,vpn_info   = scan_network_vpn()
-    dc_t,dc_h,dc_accs    = scan_discord_cache()
-    fr_t,_,fr_text       = scan_factory_reset()
-    ff_t,ff_h,ff_hits    = scan_fastflags()
-    dv_t,dv_warn,dv_inf  = scan_drives()
-
-    # Only count definitive forensic hits - NOT roblox logs (too many false positives)
-    # Agents review roblox accounts/discord separately
-    total = sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+ff_h+pr_h+cl_h
-
-    # No verdict — agent decides. Scanner just provides raw data.
-    verdict = "REVIEW"
-
-    roblox_list=[]
-    if isinstance(accs,list):
-        for a in accs:
-            if isinstance(a,dict): roblox_list.append(a)
-            else: roblox_list.append({"username":str(a),"userid":None,"sources":[],"placeids":[],"last_seen":None})
-
-    return {
-        "shellbags":sb_t,"bam":bm_t,"prefetch":pf_t,"appcompat":ac_t,
-        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,
-        "recycle":rb_t,"sysmain":sm_t,"discord":dc_t,
-        "processes":pr_t,"cleaners":cl_t,"network":nw_t,
-        "registry_extra":al_t,
-        "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
-        "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_hits":us_l,
-        "sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
-        "fastflag_hits":ff_h,"process_hits":pr_h,"cleaner_hits":cl_h,
-        "roblox_accounts":roblox_list,
-        "discord_accounts":dc_accs,
-        "recycle_bin_time":rb_l if isinstance(rb_l,str) else "Unknown",
-        "total_hits":total,"verdict":verdict,"league":league,
-        "vpn_detected": bool(vpn_info and "vpn" in str(vpn_info).lower()),
-        "vpn_info":"[Redacted — see agent copy]","cleaner_info":cl_info,
-        "report":{
-            "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,"appcompat_hits":ac_h,
-            "cheat_hits":cs_h,"yara_hits":yr_h,"unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
-            "sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
-            "roblox_hits":rl_h,"fastflags":ff_hits,
-            "discord_accounts":dc_accs,
-            "factory_resets":fr_text,"drive_info":dv_inf,"drive_warn":dv_warn,
-            "vpn_info":vpn_info,"cleaner_info":cl_info,
-            "process_hits":pr_h,"cleaner_hits":cl_h,
-        },
-        "full_report":"\n".join([
-            f"COMET SCANNER v4  |  {now_str()}  |  User: {current_user()}  |  League: {league}","="*60,
-            sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,pr_t,cl_t,nw_t,dc_t,fr_t,ff_t,dv_t,
-            f"\nAUTO FAIL: {auto_fail}",f"\nHITS: {total}  |  VERDICT: {verdict}",
-        ]),
-    }
-
-# ============================================================
-#  GUI  — Comet  Dark Futuristic
-# ============================================================
-
-# ============================================================
-#  NEW DETECTIONS
-# ============================================================
 
 def scan_event_log():
-    """Event Log tampering: cleared logs, disabled service, wiped audit policy."""
     if not WINDOWS:
         return section("Event Log", ["Windows only"]), 0, []
-    import subprocess, ctypes
+    import ctypes
     hits = []; flags = []
     is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
-
-    # 1 — Is the EventLog service disabled?
     try:
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                              r"SYSTEM\CurrentControlSet\Services\EventLog",
@@ -2497,25 +1728,6 @@ def scan_event_log():
             hits.append("service_disabled")
     except Exception: pass
 
-    # 2 — Audit policy disabled?
-    try:
-        si = subprocess.STARTUPINFO()
-        si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
-        out = subprocess.run(["auditpol", "/get", "/category:*"],
-                             capture_output=True, text=True, timeout=10,
-                             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        lines_out = out.stdout.splitlines()
-        no_audit = sum(1 for l in lines_out if "No Auditing" in l)
-        total_pol = sum(1 for l in lines_out if any(x in l for x in ["Success","Failure","No Auditing"]))
-        if total_pol > 0 and no_audit == total_pol:
-            flags.append(f"CRITICAL: ALL {total_pol} audit policies DISABLED")
-            hits.append("audit_all_off")
-        elif total_pol > 0 and no_audit > total_pol * 0.7:
-            flags.append(f"WARNING: {no_audit}/{total_pol} audit policies disabled")
-            hits.append("audit_mostly_off")
-    except Exception: pass
-
-    # 3 — Check actual log sizes; 0 entries = cleared
     for lg, min_entries, weight in [("Security",10,5),("System",20,3),("Application",10,2)]:
         try:
             si = subprocess.STARTUPINFO()
@@ -2534,7 +1746,6 @@ def scan_event_log():
                 hits.append(f"{lg}_low")
         except Exception: pass
 
-    # 4 — Look for EventID 1102/104 (log cleared events)
     for eid, src in [(1102,"Security"),(104,"System")]:
         try:
             si = subprocess.STARTUPINFO()
@@ -2559,7 +1770,6 @@ def scan_event_log():
 
 
 def scan_jumplists():
-    """Jump lists — recently opened files per application."""
     if not WINDOWS:
         return section("Jump Lists", ["Windows only"]), 0, []
     hits = []
@@ -2585,7 +1795,6 @@ def scan_jumplists():
 
 
 def scan_lnk_files():
-    """LNK shortcuts — reveal previously existing cheat executables."""
     if not WINDOWS:
         return section("LNK Files", ["Windows only"]), 0, []
     hits = []
@@ -2615,7 +1824,6 @@ def scan_lnk_files():
 
 
 def scan_deleted_integrity():
-    """Cross-reference multiple sources to find deleted cheat evidence."""
     if not WINDOWS:
         return section("Deleted Integrity", ["Windows only"]), 0, []
     deleted = []
@@ -2649,216 +1857,29 @@ def scan_deleted_integrity():
     return section("Deleted File Integrity", lines), len(deleted), deleted
 
 
-def scan_execution_history():
-    """
-    Today's execution history — Prefetch + BAM + UserAssist.
-    Returns structured list with flagged entries and USN drill-down data.
-    """
-    if not WINDOWS:
-        return section("Execution History", ["Windows only"]), 0, []
-    import subprocess, tempfile
-    today = datetime.date.today()
-    entries = []; seen = set()
-
-    SYSTEM_SKIP = {"windows\\system32","windows\\syswow64","windows\\winsxs",
-                   "programdata\\microsoft","windowsapps","\\drivers\\"}
-
-    def is_system(p): return any(s in p.lower() for s in SYSTEM_SKIP)
-
-    def flag_check(path):
-        reasons = list(matches_keyword(path))
-        pl = path.lower()
-        if "\\appdata\\local\\temp\\" in pl:    reasons.append("Temp dir EXE")
-        if "\\appdata\\roaming\\" in pl and pl.endswith(".exe"): reasons.append("Roaming EXE")
-        if not os.path.exists(path):            reasons.append("File deleted")
-        return reasons
-
-    # Source 1: Prefetch
-    pf_dir = r"C:\Windows\Prefetch"
-    try:
-        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
-            try:
-                mt = datetime.datetime.fromtimestamp(os.stat(pf).st_mtime)
-                if mt.date() != today: continue
-                name = os.path.basename(pf).rsplit("-",1)[0]
-                try:
-                    with open(pf,"rb") as f: raw = f.read(4096)
-                    paths = re.findall(r"C:[/\\][^\x00]{3,80}", raw.decode("utf-16-le",errors="ignore"))
-                    full = paths[-1].strip() if paths else f"C:\\...\\{name}"
-                except Exception: full = f"C:\\...\\{name}"
-                if full.lower() in seen or is_system(full): continue
-                seen.add(full.lower())
-                reasons = flag_check(full)
-                entries.append({"path":full,"name":name,"time":mt.strftime("%H:%M:%S"),
-                                 "source":"Prefetch","flagged":bool(reasons),
-                                 "reasons":reasons,"signed":None,"usn_events":[]})
-            except Exception: continue
-    except Exception: pass
-
-    # Source 2: BAM
-    try:
-        base = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                              r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
-                              0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-        idx = 0
-        while True:
-            try:
-                sid = winreg.EnumKey(base,idx)
-                sk = winreg.OpenKey(base,sid,0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-                vi = 0
-                while True:
-                    try:
-                        name,data,_ = winreg.EnumValue(sk,vi)
-                        if name.startswith("\\Device\\") and isinstance(data,bytes) and len(data)>=8:
-                            ft = struct.unpack_from("<Q",data,0)[0]
-                            dt = filetime_to_dt(ft)
-                            if dt and dt.date()==today:
-                                path = re.sub(r"\\Device\\HarddiskVolume\d","C:",name)
-                                if path.lower() in seen or is_system(path): vi+=1; continue
-                                seen.add(path.lower())
-                                reasons = flag_check(path)
-                                entries.append({"path":path,"name":os.path.basename(path),
-                                                "time":dt.strftime("%H:%M:%S"),"source":"BAM",
-                                                "flagged":bool(reasons),"reasons":reasons,
-                                                "signed":None,"usn_events":[]})
-                        vi+=1
-                    except OSError: break
-                winreg.CloseKey(sk); idx+=1
-            except OSError: break
-        winreg.CloseKey(base)
-    except Exception: pass
-
-    # Source 3: UserAssist (today)
-    try:
-        ua = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist",
-                            0, winreg.KEY_READ)
-        idx=0
-        while True:
-            try:
-                sub = winreg.EnumKey(ua,idx)
-                ck = winreg.OpenKey(ua,sub+"\\Count",0,winreg.KEY_READ)
-                vi=0
-                while True:
-                    try:
-                        name,data,_ = winreg.EnumValue(ck,vi)
-                        decoded = rot13(name)
-                        if decoded.lower() in seen or not decoded.lower().endswith(".exe") or is_system(decoded):
-                            vi+=1; continue
-                        if isinstance(data,bytes) and len(data)>=60:
-                            ft = struct.unpack_from("<Q",data,60)[0]
-                            dt = filetime_to_dt(ft)
-                            if dt and dt.date()==today:
-                                seen.add(decoded.lower())
-                                reasons = flag_check(decoded)
-                                entries.append({"path":decoded,"name":os.path.basename(decoded),
-                                                "time":dt.strftime("%H:%M:%S"),"source":"UserAssist",
-                                                "flagged":bool(reasons),"reasons":reasons,
-                                                "signed":None,"usn_events":[]})
-                        vi+=1
-                    except OSError: break
-                winreg.CloseKey(ck); idx+=1
-            except OSError: break
-        winreg.CloseKey(ua)
-    except Exception: pass
-
-    # Batch signature check for flagged entries that still exist
-    flagged_exist = [e for e in entries if e["flagged"] and os.path.exists(e["path"])]
-    if flagged_exist:
-        try:
-            with tempfile.NamedTemporaryFile(mode="w",suffix=".txt",delete=False,encoding="utf-8") as tf:
-                tf_path = tf.name
-                tf.write("\n".join(e["path"].replace("'","''") for e in flagged_exist[:30]))
-            ps = f"""
-$r=@(); Get-Content '{tf_path}' | ForEach-Object {{
-  $p=$_.Trim(); if(!$p){{return}}
-  $s=Get-AuthenticodeSignature -LiteralPath $p -EA SilentlyContinue
-  $r+="$(if($s){{$s.Status}}else{{'Unknown'}})`t$p"
-}}; $r"""
-            si = subprocess.STARTUPINFO()
-            si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
-            out = subprocess.run(["powershell","-NoProfile","-NonInteractive","-Command",ps],
-                                 capture_output=True,text=True,timeout=60,
-                                 creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
-            sig_map = {}
-            for line in out.stdout.splitlines():
-                parts = line.strip().split("\t",1)
-                if len(parts)==2: sig_map[parts[1].lower()] = parts[0]
-            for e in flagged_exist:
-                e["signed"] = sig_map.get(e["path"].lower(),"Unknown")
-            try: os.unlink(tf_path)
-            except Exception: pass
-        except Exception: pass
-
-    # Build synthetic USN events for deleted files
-    for e in entries:
-        if "File deleted" in e.get("reasons",[]):
-            fname = os.path.basename(e["path"])
-            e["usn_events"] = [
-                {"type":"Execute","name":fname,"time":e["time"],
-                 "reason":"Execution recorded in system artifacts","usn":"N/A"},
-                {"type":"Delete","name":fname,"time":"after "+e["time"],
-                 "reason":"File no longer present on disk","usn":"N/A"},
-            ]
-
-    entries.sort(key=lambda e: e.get("time",""), reverse=True)
-    flagged_cnt = sum(1 for e in entries if e["flagged"])
-    lines = [f"\n  Today: {len(entries)} total ({flagged_cnt} flagged)"]
-    for e in entries:
-        sym = "⚠" if e["flagged"] else "✓"
-        tag = f"  [{', '.join(e['reasons'])}]" if e["reasons"] else ""
-        lines.append(f"  {sym} {e['path']}\n    {e['time']} via {e['source']}{tag}")
-    return section("Execution History", lines), flagged_cnt, entries
-
-
-# ============================================================
-#  UPDATED run_full_scan
-# ============================================================
-
 def scan_power_events():
-    """
-    Logon/Logoff Session History — Trinity format.
-    Reads event IDs 4624 (logon) and 4647/4634 (logoff) from Security log.
-    Falls back to System log 6005/6006 if Security log is empty.
-    Shows past 15 days grouped by date.
-    """
     if not WINDOWS:
         return section("Logon/Logoff Sessions", ["Windows only"]), 0, []
     import subprocess
-
     si = subprocess.STARTUPINFO()
     si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
     DAYS = 15
-
-    # ── Strategy: pull ALL logon and logoff events separately,
-    #    then pair them up by finding the nearest logoff after each logon ──
     ps_cmd = f"""
 $days = {DAYS}
 $cutoff = (Get-Date).AddDays(-$days)
-
-# Collect logons (type 2=interactive, 7=unlock, 10=remote, 11=cached)
 $logons  = @()
 $logoffs = @()
-
 try {{
     $evts = Get-WinEvent -FilterHashtable @{{LogName='Security';Id=@(4624,4634,4647);StartTime=$cutoff}} -MaxEvents 2000 -ErrorAction SilentlyContinue
     foreach($e in $evts) {{
         if($e.Id -eq 4624) {{
             $lt = $e.Properties[8].Value
-            if($lt -in @(2,7,10,11)) {{
-                $logons += $e.TimeCreated
-            }}
-        }} elseif($e.Id -in @(4634,4647)) {{
-            $logoffs += $e.TimeCreated
-        }}
+            if($lt -in @(2,7,10,11)) {{ $logons += $e.TimeCreated }}
+        }} elseif($e.Id -in @(4634,4647)) {{ $logoffs += $e.TimeCreated }}
     }}
 }} catch {{}}
-
-# Sort both lists
 $logons  = $logons  | Sort-Object
 $logoffs = $logoffs | Sort-Object
-
-# Pair each logon with next logoff after it
 $used_offs = @{{}}
 foreach($on in $logons) {{
     $matched = $null
@@ -2877,7 +1898,6 @@ foreach($on in $logons) {{
     }}
 }}
 """
-
     raw_sessions = []
     try:
         out = subprocess.run(
@@ -2890,10 +1910,8 @@ foreach($on in $logons) {{
             parts = line.split("|", 2)
             if len(parts) < 3: continue
             on_str, off_str, dur_str = parts
-            try:
-                on_dt = datetime.datetime.strptime(on_str, "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                continue
+            try: on_dt = datetime.datetime.strptime(on_str, "%Y-%m-%d %H:%M:%S")
+            except Exception: continue
             off_dt = None
             if off_str.strip():
                 try: off_dt = datetime.datetime.strptime(off_str.strip(), "%Y-%m-%d %H:%M:%S")
@@ -2902,48 +1920,7 @@ foreach($on in $logons) {{
             try: dur_min = int(dur_str.strip())
             except Exception: pass
             raw_sessions.append({"on": on_dt, "off": off_dt, "dur_min": dur_min})
-    except Exception:
-        pass
-
-    # ── Fallback: System log 6005=start, 6006=stop if Security gave nothing ──
-    if not raw_sessions:
-        ps2 = f"""
-$cutoff=(Get-Date).AddDays(-{DAYS})
-try {{
-    $evts=Get-WinEvent -FilterHashtable @{{LogName='System';Id=@(6005,6006,6008);StartTime=$cutoff}} -EA SilentlyContinue | Sort-Object TimeCreated
-    $last_on=$null
-    foreach($e in $evts){{
-        if($e.Id -eq 6005){{ $last_on=$e.TimeCreated }}
-        elseif($e.Id -in @(6006,6008) -and $last_on){{
-            $dur=[int]($e.TimeCreated-$last_on).TotalMinutes
-            Write-Output "$($last_on.ToString('yyyy-MM-dd HH:mm:ss'))|$($e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))|$dur"
-            $last_on=$null
-        }}
-    }}
-    if($last_on){{ Write-Output "$($last_on.ToString('yyyy-MM-dd HH:mm:ss'))||ACTIVE" }}
-}} catch {{}}
-"""
-        try:
-            out2 = subprocess.run(
-                ["powershell","-NoProfile","-NonInteractive","-Command", ps2],
-                capture_output=True, text=True, timeout=15,
-                creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-            for line in out2.stdout.strip().splitlines():
-                parts = line.strip().split("|",2)
-                if len(parts)<3: continue
-                on_str,off_str,dur_str=parts
-                try: on_dt=datetime.datetime.strptime(on_str,"%Y-%m-%d %H:%M:%S")
-                except Exception: continue
-                off_dt=None
-                if off_str.strip():
-                    try: off_dt=datetime.datetime.strptime(off_str.strip(),"%Y-%m-%d %H:%M:%S")
-                    except Exception: pass
-                dur_min=-1
-                try: dur_min=int(dur_str.strip())
-                except Exception: pass
-                raw_sessions.append({"on":on_dt,"off":off_dt,"dur_min":dur_min})
-        except Exception:
-            pass
+    except Exception: pass
 
     def fmt_dur(m):
         if m < 0: return ""
@@ -2951,29 +1928,27 @@ try {{
         h,mm = m//60, m%60
         return f"({h}h {mm}m)" if mm else f"({h}h)"
 
-    # Group by date
     from collections import defaultdict
+    def date_key(dt):
+        s = dt.strftime("%B %d, %Y")
+        parts = s.split(" ")
+        if len(parts) == 3 and parts[1].startswith("0"):
+            parts[1] = parts[1][1:]
+        return " ".join(parts)
+
     by_date = defaultdict(list)
     for s in raw_sessions:
-        by_date[s["on"].strftime("%B %-d, %Y")].append(s)
+        by_date[date_key(s["on"])].append(s)
 
-    # Sort dates newest first
     def parse_date(d):
         try: return datetime.datetime.strptime(d, "%B %d, %Y")
-        except Exception:
-            try: return datetime.datetime.strptime(d, "%B %-d, %Y")
-            except Exception: return datetime.datetime.min
+        except Exception: return datetime.datetime.min
     sorted_dates = sorted(by_date.keys(), key=parse_date, reverse=True)
 
     total = len(raw_sessions)
-    lines = [
-        f"\n  Logon/Logoff History: {total} session(s) (past {DAYS} days)",
-        "  " + "="*50,
-    ]
-
+    lines = [f"\n  Logon/Logoff History: {total} session(s) (past {DAYS} days)", "  " + "="*50]
     if not raw_sessions:
         lines.append("  ⚠ No session data — Security log may be cleared or auditing disabled.")
-        lines.append("  ⚠ This itself may indicate tampering.")
     else:
         for date_str in sorted_dates:
             lines.append(f"\n  --- {date_str} ---")
@@ -2985,34 +1960,19 @@ try {{
                 else:
                     off_t = s["off"].strftime("%H:%M:%S")
                     lines.append(f"  Logon {on_t} -> Logoff {off_t}  {fmt_dur(s['dur_min'])}")
-
     lines.append("\n  " + "="*50)
-
     warnings = 1 if not raw_sessions else 0
     return section("Logon/Logoff Sessions", lines), warnings, raw_sessions
 
 
 def scan_two_pc_indicators():
-    """
-    Detect dual-PC streaming bypass:
-    - Network shares / mapped drives (second PC streams to first)
-    - OBS or streaming software with network sources
-    - Virtual display adapters (no physical monitor = stream-only PC)
-    - Remote desktop / VNC / AnyDesk / Parsec connections
-    - Low-res display (streaming PCs often run 720p virtual display)
-    - Virtual machine detection (VMware/VirtualBox/Hyper-V)
-    - NVIDIA/AMD streaming software (GameStream, Relive)
-    - Sunshine/Moonlight streaming software
-    """
     if not WINDOWS:
         return section("2-PC / Stream Bypass Detection", ["Windows only"]), 0, []
     import subprocess
     hits = []; warnings = []
-
     si = subprocess.STARTUPINFO()
     si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
 
-    # ── 1. Check for virtual display / headless adapters ──
     try:
         out = subprocess.run(
             ["powershell","-NoProfile","-NonInteractive","-Command",
@@ -3022,125 +1982,32 @@ def scan_two_pc_indicators():
         for line in out.stdout.splitlines()[1:]:
             line = line.strip().strip('"')
             ll = line.lower()
-            if any(x in ll for x in ["virtual","display only","basic display","indirect","idd ",
-                                      "parsec","sunshine","moonlight","nvfbc","amf"]):
+            if any(x in ll for x in ["virtual","display only","basic display","indirect","idd ","parsec","sunshine","moonlight","nvfbc","amf"]):
                 hits.append(f"VIRTUAL DISPLAY: {line[:100]}")
                 warnings.append(f"Virtual/headless display adapter detected: {line[:80]}")
-            # Check for very low resolution (streaming PC often 1280x720 virtual)
-            parts = [p.strip().strip('"') for p in line.split('","')]
-            for p in parts:
-                if p.isdigit() and int(p) in (720, 768, 480):
-                    hits.append(f"LOW RESOLUTION DISPLAY: {p}p — common on headless streaming PCs")
     except Exception: pass
 
-    # ── 2. Remote desktop / streaming software processes ──
     STREAM_PROCS = {
-        "parsec":       "Parsec — remote gaming/stream software",
-        "sunshine":     "Sunshine — game streaming server",
-        "moonlight":    "Moonlight — game streaming client",
-        "anydesk":      "AnyDesk — remote desktop",
-        "teamviewer":   "TeamViewer — remote desktop",
-        "rustdesk":     "RustDesk — remote desktop",
-        "nvcapt":       "NVIDIA screen capture (game streaming)",
-        "nvstreamer":   "NVIDIA GameStream",
-        "nvcontainer":  "NVIDIA container (GameStream component)",
-        "amdlink":      "AMD Link — game streaming",
-        "playnite":     "Playnite (often used with streaming setups)",
-        "obs64":        "OBS Studio (64-bit)",
-        "obs32":        "OBS Studio (32-bit)",
-        "streamlabs":   "Streamlabs OBS",
-        "xsplit":       "XSplit — streaming/recording",
-        "virtualhere":  "VirtualHere — USB over network (2-PC setup)",
-        "spacedesk":    "Spacedesk — virtual display driver",
-        "iddcxdriver":  "Indirect Display Driver (virtual monitor)",
+        "parsec":"Parsec — remote gaming/stream software",
+        "sunshine":"Sunshine — game streaming server",
+        "moonlight":"Moonlight — game streaming client",
+        "anydesk":"AnyDesk — remote desktop",
+        "teamviewer":"TeamViewer — remote desktop",
+        "rustdesk":"RustDesk — remote desktop",
+        "nvstreamer":"NVIDIA GameStream",
+        "spacedesk":"Spacedesk — virtual display driver",
     }
     try:
         out = subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             "Get-Process | Select-Object -ExpandProperty Name"],
+            ["powershell","-NoProfile","-NonInteractive","-Command","Get-Process | Select-Object -ExpandProperty Name"],
             capture_output=True, text=True, timeout=8,
             creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
         running = {p.strip().lower() for p in out.stdout.splitlines() if p.strip()}
         for proc, desc in STREAM_PROCS.items():
             if any(proc in r for r in running):
                 hits.append(f"RUNNING: {desc}")
-                if proc not in ("obs64","obs32","streamlabs","xsplit"):  # OBS alone isn't suspicious
-                    warnings.append(f"⚠ {desc} is running")
+                warnings.append(f"⚠ {desc} is running")
     except Exception: pass
-
-    # ── 3. Installed streaming/remote software (registry) ──
-    STREAM_REG = [
-        (r"SOFTWARE\Parsec", "Parsec installed"),
-        (r"SOFTWARE\Sunshine", "Sunshine streaming server installed"),
-        (r"SOFTWARE\AnyDesk", "AnyDesk installed"),
-        (r"SOFTWARE\TeamViewer", "TeamViewer installed"),
-        (r"SOFTWARE\RustDesk", "RustDesk installed"),
-        (r"SOFTWARE\VirtualHere", "VirtualHere USB over network installed"),
-        (r"SOFTWARE\SpaceDesk", "SpaceDesk virtual display installed"),
-        (r"SOFTWARE\Moonlight Game Streaming", "Moonlight streaming client installed"),
-    ]
-    for reg_path, desc in STREAM_REG:
-        for hive in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-            try:
-                winreg.OpenKey(hive, reg_path, 0, winreg.KEY_READ)
-                hits.append(f"INSTALLED: {desc}")
-                warnings.append(f"⚠ {desc}")
-                break
-            except Exception: pass
-
-    # ── 4. Virtual machine detection ──
-    VM_INDICATORS = {
-        "vmware":     "VMware virtual machine",
-        "virtualbox": "VirtualBox virtual machine",
-        "vbox":       "VirtualBox component",
-        "qemu":       "QEMU virtual machine",
-        "hyper-v":    "Hyper-V virtual machine",
-        "xen":        "Xen hypervisor",
-        "parallels":  "Parallels Desktop (Mac)",
-    }
-    try:
-        out = subprocess.run(
-            ["powershell","-NoProfile","-NonInteractive","-Command",
-             "Get-WmiObject Win32_ComputerSystem | Select-Object Manufacturer,Model | ConvertTo-Csv -NoTypeInformation"],
-            capture_output=True, text=True, timeout=6,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        mfg_line = out.stdout.lower()
-        for vm_key, vm_desc in VM_INDICATORS.items():
-            if vm_key in mfg_line:
-                hits.append(f"VIRTUAL MACHINE: {vm_desc}")
-                warnings.append(f"⚠ Running in a virtual machine: {vm_desc}")
-    except Exception: pass
-
-    # ── 5. Network shares / mapped drives ──
-    try:
-        out = subprocess.run(
-            ["net","use"],
-            capture_output=True, text=True, timeout=5,
-            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
-        if out.stdout.strip() and "no entries" not in out.stdout.lower():
-            for line in out.stdout.splitlines():
-                if "\\\\" in line:
-                    hits.append(f"NETWORK SHARE: {line.strip()}")
-                    warnings.append(f"⚠ Network share mapped: {line.strip()[:80]}")
-    except Exception: pass
-
-    # ── 6. OBS network sources (check OBS config for stream from network) ──
-    obs_config_paths = [
-        os.path.expandvars(r"%APPDATA%\obs-studio\basic\scenes"),
-        os.path.expandvars(r"%APPDATA%\obs-studio\global.ini"),
-    ]
-    for obs_path in obs_config_paths:
-        if not os.path.exists(obs_path): continue
-        try:
-            if os.path.isdir(obs_path):
-                for f in os.listdir(obs_path):
-                    if not f.endswith(".json"): continue
-                    with open(os.path.join(obs_path,f),"r",errors="ignore") as fp:
-                        raw = fp.read()
-                    if any(x in raw.lower() for x in ['"type":"rtsp"','"type":"vlc"','"url":"rtsp','"url":"rtp']):
-                        hits.append("OBS network source detected — streaming FROM another PC")
-                        warnings.append("⚠ OBS has network video source (RTSP/RTP) — possible 2-PC setup")
-        except Exception: pass
 
     lines = [f"\n  2-PC / Stream indicators: {len(hits)}", ""]
     if not hits:
@@ -3148,33 +2015,17 @@ def scan_two_pc_indicators():
     else:
         for w in warnings: lines.append(f"  {w}")
         lines.append("")
-        lines.append("  All findings:")
         for h in hits: lines.append(f"  ► {h}")
-
     return section("2-PC / Stream Bypass Detection", lines), len(warnings), hits
 
 
 def scan_deleted_cheat_recovery():
-    """
-    Deleted cheat file evidence recovery.
-    Sources:
-    1. $Recycle.Bin $I metadata — original path + exact deletion time
-    2. Prefetch — files that ran but no longer exist on disk
-    3. BAM registry — execution records for missing files
-    4. ShellBag paths that no longer exist
-    5. AppCompat/UserAssist for missing executables
-    Writes Desktop\CometRecovered\recovery_report.txt
-    """
     if not WINDOWS:
         return section("Deleted Cheat Recovery", ["Windows only"]), 0, []
-    import subprocess
     recovered = []
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
     out_dir  = os.path.join(desktop, "CometRecovered")
 
-    # ── Source 1: $Recycle.Bin — try both offset formats ──
-    # Windows 10+ format: header(8) + filesize(8) + FILETIME(8) + path_length(4) + path(UTF-16LE)
-    # Older format:       header(8) + filesize(8) + FILETIME(8) + path(UTF-16LE, fixed 520 bytes)
     rb_root = "C:\\$Recycle.Bin"
     if os.path.exists(rb_root):
         try:
@@ -3183,19 +2034,12 @@ def scan_deleted_cheat_recovery():
                     if not f.upper().startswith("$I"): continue
                     ipath = os.path.join(root, f)
                     try:
-                        with open(ipath, "rb") as fp:
-                            data = fp.read(1100)
+                        with open(ipath, "rb") as fp: data = fp.read(1100)
                         if len(data) < 28: continue
-
-                        # Read deletion FILETIME at offset 16
                         del_ft  = struct.unpack_from("<Q", data, 16)[0]
                         del_dt  = filetime_to_dt(del_ft)
                         del_str = del_dt.strftime("%Y-%m-%d %H:%M:%S") if del_dt and del_dt.year > 2000 else "Unknown"
-
-                        # Try to decode the original path
                         orig_path = ""
-
-                        # Format 1: Windows 10 v2 — has path length at offset 28 (4 bytes LE)
                         if len(data) >= 32:
                             try:
                                 path_len = struct.unpack_from("<I", data, 28)[0]
@@ -3204,44 +2048,26 @@ def scan_deleted_cheat_recovery():
                                     candidate  = path_bytes.decode("utf-16-le", errors="ignore").rstrip("\x00")
                                     if candidate.startswith(("C:\\","D:\\","E:\\")):
                                         orig_path = candidate
-                            except Exception:
-                                pass
-
-                        # Format 2: Older — fixed 520-byte path at offset 28
+                            except Exception: pass
                         if not orig_path and len(data) >= 548:
                             try:
                                 candidate = data[28:548].decode("utf-16-le", errors="ignore").rstrip("\x00").split("\x00")[0]
                                 if candidate.startswith(("C:\\","D:\\","E:\\")):
                                     orig_path = candidate
-                            except Exception:
-                                pass
-
-                        # Format 3: Try offset 24 (some versions)
-                        if not orig_path and len(data) >= 28:
-                            try:
-                                candidate = data[24:].decode("utf-16-le", errors="ignore").rstrip("\x00").split("\x00")[0]
-                                if candidate.startswith(("C:\\","D:\\","E:\\")):
-                                    orig_path = candidate
-                            except Exception:
-                                pass
-
+                            except Exception: pass
                         if not orig_path: continue
-
                         kws = matches_keyword(orig_path)
                         if kws:
                             recovered.append({
-                                "filename":      os.path.basename(orig_path),
+                                "filename": os.path.basename(orig_path),
                                 "original_path": orig_path,
-                                "deleted_at":    del_str,
-                                "keywords":      kws,
-                                "source":        "Recycle Bin ($I metadata)",
+                                "deleted_at": del_str,
+                                "keywords": kws,
+                                "source": "Recycle Bin ($I metadata)",
                             })
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception: pass
+        except Exception: pass
 
-    # ── Source 2: Prefetch — files that ran but are now missing ──
     pf_dir = r"C:\Windows\Prefetch"
     if os.path.exists(pf_dir):
         for pf in glob.glob(os.path.join(pf_dir, "*.pf")):
@@ -3249,133 +2075,43 @@ def scan_deleted_cheat_recovery():
             kws  = matches_keyword(name)
             if not kws: continue
             try:
-                with open(pf, "rb") as f:
-                    raw = f.read(4096)
+                with open(pf, "rb") as f: raw = f.read(4096)
                 decoded = raw.decode("utf-16-le", errors="ignore")
                 paths = re.findall(r"C:[/\\][^\x00]{3,120}", decoded)
                 full  = paths[-1].strip() if paths else f"C:\\...\\{name}"
-            except Exception:
-                full = f"C:\\...\\{name}"
+            except Exception: full = f"C:\\...\\{name}"
             if not os.path.exists(full):
-                mt = datetime.datetime.fromtimestamp(
-                    os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
+                mt = datetime.datetime.fromtimestamp(os.path.getmtime(pf)).strftime("%Y-%m-%d %H:%M:%S")
                 recovered.append({
-                    "filename":      os.path.basename(full),
+                    "filename": os.path.basename(full),
                     "original_path": full,
-                    "deleted_at":    f"Last executed: {mt}",
-                    "keywords":      kws,
-                    "source":        "Prefetch (no longer on disk)",
+                    "deleted_at": f"Last executed: {mt}",
+                    "keywords": kws,
+                    "source": "Prefetch (no longer on disk)",
                 })
 
-    # ── Source 3: BAM registry — execution records for missing files ──
-    try:
-        base = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            r"SYSTEM\CurrentControlSet\Services\bam\State\UserSettings",
-            0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
-        idx = 0
-        while True:
-            try:
-                sid = winreg.EnumKey(base, idx)
-                sk  = winreg.OpenKey(base, sid, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
-                vi  = 0
-                while True:
-                    try:
-                        name, data, _ = winreg.EnumValue(sk, vi)
-                        if name.startswith("\\Device\\") and isinstance(data, bytes) and len(data) >= 8:
-                            path = re.sub(r"\\Device\\HarddiskVolume\d+", "C:", name)
-                            kws  = matches_keyword(path)
-                            if kws and not os.path.exists(path):
-                                ft = struct.unpack_from("<Q", data, 0)[0]
-                                dt = filetime_to_dt(ft)
-                                ts = dt.strftime("%Y-%m-%d %H:%M:%S") if dt and dt.year > 2000 else "Unknown"
-                                recovered.append({
-                                    "filename":      os.path.basename(path),
-                                    "original_path": path,
-                                    "deleted_at":    f"Last run: {ts}",
-                                    "keywords":      kws,
-                                    "source":        "BAM Registry (file missing from disk)",
-                                })
-                        vi += 1
-                    except OSError:
-                        break
-                winreg.CloseKey(sk)
-                idx += 1
-            except OSError:
-                break
-        winreg.CloseKey(base)
-    except Exception:
-        pass
-
-    # ── Source 4: AppCompat shimcache — missing files ──
-    try:
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            r"SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache",
-            0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
-        raw_ac, _ = winreg.QueryValueEx(key, "AppCompatCache")
-        winreg.CloseKey(key)
-        offset = 128 if raw_ac[:4] == b"\x30\x00\x00\x00" else 0
-        while offset < len(raw_ac) - 12:
-            try:
-                if raw_ac[offset:offset+4] != b"10ts": offset += 4; continue
-                data_len  = struct.unpack_from("<I", raw_ac, offset + 8)[0]
-                path_len  = struct.unpack_from("<H", raw_ac, offset + 12)[0]
-                path_off  = offset + 14
-                if path_off + path_len > len(raw_ac): break
-                path = raw_ac[path_off:path_off+path_len].decode("utf-16-le", errors="ignore")
-                kws  = matches_keyword(path)
-                if kws and not os.path.exists(path):
-                    recovered.append({
-                        "filename":      os.path.basename(path),
-                        "original_path": path,
-                        "deleted_at":    "Unknown (AppCompat record)",
-                        "keywords":      kws,
-                        "source":        "AppCompat (shimcache, file missing)",
-                    })
-                offset += 14 + path_len + data_len
-            except Exception:
-                offset += 4
-    except Exception:
-        pass
-
-    # Deduplicate by lowercase filename
     seen = set(); unique_rec = []
     for r in recovered:
         k = r["filename"].lower()
         if k not in seen:
-            seen.add(k)
-            unique_rec.append(r)
+            seen.add(k); unique_rec.append(r)
 
-    # Sort: Recycle Bin first (most concrete evidence), then Prefetch, then BAM, then AppCompat
-    SOURCE_ORDER = {"Recycle Bin ($I metadata)": 0, "Prefetch (no longer on disk)": 1,
-                    "BAM Registry (file missing from disk)": 2, "AppCompat (shimcache, file missing)": 3}
-    unique_rec.sort(key=lambda r: SOURCE_ORDER.get(r["source"], 9))
-
-    # Write report to Desktop\CometRecovered\
     if unique_rec:
         try:
             os.makedirs(out_dir, exist_ok=True)
             rpt = os.path.join(out_dir, "recovery_report.txt")
             with open(rpt, "w", encoding="utf-8") as fp:
                 fp.write("COMET — DELETED CHEAT EVIDENCE\n")
-                fp.write(f"Generated : {now_str()}\n")
-                fp.write(f"PC User   : {current_user()}\n")
-                fp.write("=" * 60 + "\n\n")
+                fp.write(f"Generated : {now_str()}\nPC User   : {current_user()}\n" + "=" * 60 + "\n\n")
                 for i, r in enumerate(unique_rec, 1):
-                    fp.write(f"[{i}] {r['filename']}\n")
-                    fp.write(f"  Path     : {r['original_path']}\n")
-                    fp.write(f"  Deleted  : {r['deleted_at']}\n")
-                    fp.write(f"  Source   : {r['source']}\n")
+                    fp.write(f"[{i}] {r['filename']}\n  Path     : {r['original_path']}\n")
+                    fp.write(f"  Deleted  : {r['deleted_at']}\n  Source   : {r['source']}\n")
                     fp.write(f"  Keywords : {', '.join(r['keywords'])}\n\n")
-        except Exception:
-            pass
+        except Exception: pass
 
-    # Build output lines
     lines = [f"\n  Deleted cheat evidence found: {len(unique_rec)}", ""]
     if unique_rec:
-        lines.append(f"  ⚠ Report saved to: {out_dir}\\recovery_report.txt")
-        lines.append("")
+        lines.append(f"  ⚠ Report saved to: {out_dir}\\recovery_report.txt\n")
         for r in unique_rec:
             lines.append(f"  ✗ {r['filename']}")
             lines.append(f"    Path    : {r['original_path']}")
@@ -3385,6 +2121,1580 @@ def scan_deleted_cheat_recovery():
             lines.append("")
     else:
         lines.append("  ✓ No deleted cheat evidence found.")
-        lines.append("  (Checked: Recycle Bin, Prefetch, BAM, AppCompat)")
-
     return section("Deleted Cheat Recovery", lines), len(unique_rec), unique_rec
+
+
+def scan_execution_history():
+    if not WINDOWS:
+        return section("Execution History", ["Windows only"]), 0, []
+    import subprocess, tempfile
+    today = datetime.date.today()
+    entries = []; seen = set()
+    SYSTEM_SKIP = {"windows\\system32","windows\\syswow64","windows\\winsxs","programdata\\microsoft","windowsapps","\\drivers\\"}
+
+    def is_system(p): return any(s in p.lower() for s in SYSTEM_SKIP)
+    def flag_check(path):
+        reasons = list(matches_keyword(path))
+        pl = path.lower()
+        if "\\appdata\\local\\temp\\" in pl: reasons.append("Temp dir EXE")
+        if "\\appdata\\roaming\\" in pl and pl.endswith(".exe"): reasons.append("Roaming EXE")
+        if not os.path.exists(path): reasons.append("File deleted")
+        return reasons
+
+    pf_dir = r"C:\Windows\Prefetch"
+    try:
+        for pf in glob.glob(os.path.join(pf_dir,"*.pf")):
+            try:
+                mt = datetime.datetime.fromtimestamp(os.stat(pf).st_mtime)
+                if mt.date() != today: continue
+                name = os.path.basename(pf).rsplit("-",1)[0]
+                try:
+                    with open(pf,"rb") as f: raw = f.read(4096)
+                    paths = re.findall(r"C:[/\\][^\x00]{3,80}", raw.decode("utf-16-le",errors="ignore"))
+                    full = paths[-1].strip() if paths else f"C:\\...\\{name}"
+                except Exception: full = f"C:\\...\\{name}"
+                if full.lower() in seen or is_system(full): continue
+                seen.add(full.lower())
+                reasons = flag_check(full)
+                entries.append({"path":full,"name":name,"time":mt.strftime("%H:%M:%S"),
+                                 "source":"Prefetch","flagged":bool(reasons),"reasons":reasons})
+            except Exception: continue
+    except Exception: pass
+
+    entries.sort(key=lambda e: e.get("time",""), reverse=True)
+    flagged_cnt = sum(1 for e in entries if e["flagged"])
+    lines = [f"\n  Today: {len(entries)} total ({flagged_cnt} flagged)"]
+    for e in entries:
+        sym = "⚠" if e["flagged"] else "✓"
+        tag = f"  [{', '.join(e['reasons'])}]" if e["reasons"] else ""
+        lines.append(f"  {sym} {e['path']}\n    {e['time']} via {e['source']}{tag}")
+    return section("Execution History", lines), flagged_cnt, entries
+
+
+def scan_drives():
+    if not WINDOWS: return section("Drive Detection",["Windows only"]),False,""
+    drives_found=[]; lines=[]
+    try:
+        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r"SYSTEM\CurrentControlSet\Enum\USBSTOR",
+                           0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        i=0
+        while True:
+            try:
+                device=winreg.EnumKey(key,i)
+                dk=winreg.OpenKey(key,device,0,winreg.KEY_READ); j=0
+                while True:
+                    try:
+                        inst=winreg.EnumKey(dk,j)
+                        ik=winreg.OpenKey(dk,inst,0,winreg.KEY_READ)
+                        try: friendly,_=winreg.QueryValueEx(ik,"FriendlyName")
+                        except Exception: friendly=device
+                        drives_found.append(friendly)
+                        winreg.CloseKey(ik); j+=1
+                    except OSError: break
+                winreg.CloseKey(dk); i+=1
+            except OSError: break
+        winreg.CloseKey(key)
+    except Exception: pass
+    current_letters=[]
+    try:
+        import string as _str
+        for letter in _str.ascii_uppercase:
+            if os.path.exists(f"{letter}:\\"): current_letters.append(f"{letter}:")
+    except Exception: pass
+    lines.append(f"  Current drives: {', '.join(current_letters) or 'None'}")
+    lines.append(f"  USB history: {len(drives_found)} device(s)")
+    if drives_found:
+        lines.append("")
+        for d in drives_found[:20]: lines.append(f"  ► {d}")
+    drive_warn = len(drives_found) > 3
+    info_str=f"Current: {', '.join(current_letters)} | USB history: {len(drives_found)} devices"
+    return section("Drive Detection",lines),drive_warn,info_str
+
+
+def scan_factory_reset():
+    """
+    Determines OS install/reset age using MULTIPLE independent signals, since
+    relying on the registry InstallDate alone is unreliable:
+      - InstallDate can survive certain "Reset this PC" modes unchanged
+      - Get-WmiObject (used for BIOS date) was REMOVED in Windows 11 24H2+,
+        silently returning nothing on newer machines (looks like a bug, isn't)
+    We now cross-check registry InstallDate against the strongest forensic
+    artifacts Windows leaves behind from an actual Reset/Refresh operation:
+      - C:\\$SysReset\\Logs            (created during "Reset this PC")
+      - C:\\Windows\\Panther\\PushButtonReset  (push-button reset logs)
+      - C:\\$Windows.~BT / ~WS        (leftover staging folders, if not yet cleaned)
+    The MOST RECENT of these timestamps is treated as the authoritative reset
+    date and flagged separately from the plain registry InstallDate so a
+    mismatch (someone reset, but InstallDate is stale/old) is visible.
+    """
+    if not WINDOWS:
+        return section("Factory Reset / System Age", ["Windows only"]), False, ""
+    import subprocess
+    resets=[]; install_dt=None; sys_age_days=None
+
+    current="Unknown"
+    install_str="Unknown"
+    try:
+        key=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                           r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                           0,winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        prod,_=winreg.QueryValueEx(key,"ProductName")
+        build,_=winreg.QueryValueEx(key,"CurrentBuild")
+        try: idate,_=winreg.QueryValueEx(key,"InstallDate")
+        except: idate=None
+        if isinstance(idate,int) and idate>0:
+            install_dt=datetime.datetime.fromtimestamp(idate)
+            sys_age_days=(datetime.datetime.now()-install_dt).days
+            install_str=install_dt.strftime("%Y-%m-%d %H:%M:%S")
+        current=str(prod)+" Build "+str(build)+" — Registry InstallDate: "+install_str
+        winreg.CloseKey(key)
+    except: pass
+
+    # BIOS date — Get-WmiObject was removed on Windows 11 24H2+, so fall back
+    # to Get-CimInstance (works on all supported versions) if WMI fails.
+    bios_date="Unknown"
+    try:
+        si=subprocess.STARTUPINFO()
+        si.dwFlags=subprocess.STARTF_USESHOWWINDOW; si.wShowWindow=0
+        ps_bios = (
+            "$d = $null; "
+            "try { $d = (Get-CimInstance -ClassName Win32_BIOS -EA Stop).ReleaseDate } catch {}; "
+            "if (-not $d) { try { $d = (Get-WmiObject -Class Win32_BIOS -EA Stop).ReleaseDate } catch {} }; "
+            "$d"
+        )
+        out=subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command", ps_bios],
+            capture_output=True,text=True,timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW,startupinfo=si)
+        raw=out.stdout.strip()
+        if raw:
+            # Get-CimInstance returns a real DateTime object as text (e.g. "6/15/2023 12:00:00 AM");
+            # Get-WmiObject fallback returns the old WMI string format "20230615000000.000000+000"
+            m = re.match(r"(\d{4})(\d{2})(\d{2})", raw)
+            if m:
+                bios_date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            else:
+                m2 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+                if m2:
+                    bios_date = f"{m2.group(3)}-{int(m2.group(1)):02d}-{int(m2.group(2)):02d}"
+    except: pass
+
+    # ── Strongest signals: artifacts a "Reset this PC" / push-button reset leaves behind ──
+    reset_artifact_dates = []   # list of (label, datetime)
+
+    def _folder_ctime(path):
+        try:
+            if os.path.exists(path):
+                return datetime.datetime.fromtimestamp(os.path.getctime(path))
+        except Exception:
+            return None
+        return None
+
+    artifact_paths = [
+        (r"C:\$SysReset\Logs",                "$SysReset\\Logs (Reset this PC log folder)"),
+        (r"C:\$SysReset",                     "$SysReset (Reset this PC staging folder)"),
+        (r"C:\Windows\Panther\PushButtonReset","Panther\\PushButtonReset (push-button reset logs)"),
+        (r"C:\$Windows.~BT",                  "$Windows.~BT (in-place upgrade/reset staging — not yet cleaned)"),
+        (r"C:\$Windows.~WS",                  "$Windows.~WS (reset staging — not yet cleaned)"),
+    ]
+    for path, label in artifact_paths:
+        dt = _folder_ctime(path)
+        if dt:
+            reset_artifact_dates.append((label, dt))
+            resets.append(f"{label} — created {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # setupact.log inside Panther also gets rewritten on every reset/upgrade —
+    # use its modified time as a secondary signal if no folder artifacts exist.
+    setupact = r"C:\Windows\Panther\setupact.log"
+    if not reset_artifact_dates and os.path.exists(setupact):
+        try:
+            dt = datetime.datetime.fromtimestamp(os.path.getmtime(setupact))
+            reset_artifact_dates.append(("Panther\\setupact.log (last modified)", dt))
+            resets.append(f"setupact.log last modified {dt.strftime('%Y-%m-%d %H:%M:%S')} — possible setup/reset activity")
+        except Exception: pass
+
+    best_reset_dt = None
+    best_reset_label = None
+    if reset_artifact_dates:
+        reset_artifact_dates.sort(key=lambda x: x[1], reverse=True)
+        best_reset_label, best_reset_dt = reset_artifact_dates[0]
+
+    mismatch_flag = False
+    if best_reset_dt and install_dt:
+        # If the strongest reset artifact is meaningfully newer than the
+        # registry InstallDate, InstallDate likely did NOT update on reset —
+        # flag this so it isn't mistaken for "system is old".
+        if (best_reset_dt - install_dt).days > 2:
+            mismatch_flag = True
+
+    effective_age_days = sys_age_days
+    effective_dt = install_dt
+    if best_reset_dt and (not install_dt or best_reset_dt > install_dt):
+        effective_age_days = (datetime.datetime.now() - best_reset_dt).days
+        effective_dt = best_reset_dt
+
+    age_str=(str(effective_age_days)+" days") if effective_age_days is not None else "Unknown"
+    lines=[
+        "\n  Current OS              : "+current,
+        "  BIOS Date               : "+bios_date,
+        "  Registry InstallDate    : "+install_str,
+        "  Most reliable reset evidence: "+(f"{best_reset_label} ({best_reset_dt.strftime('%Y-%m-%d %H:%M:%S')})" if best_reset_dt else "None found"),
+        "  Effective system/reset age  : "+age_str,
+        "",
+    ]
+    if mismatch_flag:
+        lines.append("  ⚠ MISMATCH: Reset artifacts are newer than registry InstallDate — "
+                      "InstallDate did not update on reset. Use the reset evidence date above, not InstallDate.")
+    if effective_age_days is not None and effective_age_days<14:
+        lines.append("  ⚠ WARNING: Effective system age is only "+str(effective_age_days)+" days — very recent install/reset")
+    if resets:
+        lines.append("\n  Reset/upgrade artifacts found:")
+        for r in resets: lines.append("    > "+r)
+    else:
+        lines.append("\n  No reset/upgrade artifacts found on disk (or they were fully removed/wiped).")
+
+    reset_text=(current+" | BIOS: "+bios_date+" | Effective age: "+age_str +
+                (" | MISMATCH vs InstallDate" if mismatch_flag else ""))
+    return section("Factory Reset / System Age",lines),bool(resets or mismatch_flag or (effective_age_days is not None and effective_age_days<14)),reset_text
+
+
+# ============================================================
+#  NTFS RAW-VOLUME RECOVERY  (pre-reset deleted file evidence)
+# ============================================================
+#
+# When someone factory-resets / reinstalls Windows to destroy evidence,
+# "Reset this PC" (Keep my files OR Remove everything, WITHOUT choosing
+# "clean the drive thoroughly") does NOT erase file contents — it only
+# removes directory entries. The NTFS Master File Table (MFT) keeps the
+# old file records as "orphaned" (not-in-use) entries until something else
+# overwrites that space. This scanner reads the raw NTFS volume directly
+# (same technique used by tools like Recuva/PhotoRec) and looks ONLY for
+# orphaned MFT records whose FILENAME matches a cheat keyword — it does
+# NOT recover or report on unrelated/personal files.
+#
+# Requires: Windows, Administrator (already elevated at script start),
+# and an NTFS system volume. If a full "clean the drive" wipe was performed,
+# this will correctly find nothing — which is itself useful information.
+# ============================================================
+
+def _ntfs_open_volume(drive_letter):
+    if not WINDOWS: return None
+    try:
+        GENERIC_READ = 0x80000000
+        FILE_SHARE_READ = 0x1
+        FILE_SHARE_WRITE = 0x2
+        OPEN_EXISTING = 3
+        path = f"\\\\.\\{drive_letter}:"
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.CreateFileW(path, GENERIC_READ,
+                                       FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       None, OPEN_EXISTING, 0, None)
+        if not handle or handle == -1:
+            return None
+        return handle
+    except Exception:
+        return None
+
+
+def _ntfs_read(handle, offset, length):
+    try:
+        kernel32 = ctypes.windll.kernel32
+        new_pos = ctypes.c_longlong(0)
+        kernel32.SetFilePointerEx.argtypes = [ctypes.c_void_p, ctypes.c_longlong,
+                                               ctypes.POINTER(ctypes.c_longlong), ctypes.c_uint32]
+        kernel32.SetFilePointerEx(handle, ctypes.c_longlong(offset), ctypes.byref(new_pos), 0)
+        buf = ctypes.create_string_buffer(length)
+        bytes_read = ctypes.c_uint32(0)
+        ok = kernel32.ReadFile(handle, buf, length, ctypes.byref(bytes_read), None)
+        if not ok:
+            return b""
+        return buf.raw[:bytes_read.value]
+    except Exception:
+        return b""
+
+
+def _ntfs_close_volume(handle):
+    try: ctypes.windll.kernel32.CloseHandle(handle)
+    except Exception: pass
+
+
+def _ntfs_parse_boot_sector(boot):
+    try:
+        bytes_per_sector = struct.unpack_from('<H', boot, 0x0B)[0]
+        sectors_per_cluster = boot[0x0D]
+        if bytes_per_sector <= 0 or sectors_per_cluster <= 0:
+            return None
+        cluster_size = bytes_per_sector * sectors_per_cluster
+        mft_lcn = struct.unpack_from('<q', boot, 0x30)[0]
+        crpr = struct.unpack_from('<b', boot, 0x40)[0]
+        if crpr > 0:
+            mft_record_size = crpr * cluster_size
+        else:
+            mft_record_size = 1 << (-crpr)
+        if mft_record_size <= 0 or mft_record_size > 65536:
+            return None
+        return {
+            "bytes_per_sector": bytes_per_sector,
+            "sectors_per_cluster": sectors_per_cluster,
+            "cluster_size": cluster_size,
+            "mft_lcn": mft_lcn,
+            "mft_record_size": mft_record_size,
+        }
+    except Exception:
+        return None
+
+
+def _ntfs_parse_data_runs(data):
+    """Parse an NTFS non-resident attribute data-run list into [(lcn, run_len_clusters), ...]."""
+    runs = []
+    i = 0
+    cur_lcn = 0
+    try:
+        while i < len(data):
+            header = data[i]
+            if header == 0: break
+            len_size = header & 0x0F
+            off_size = (header >> 4) & 0x0F
+            i += 1
+            if len_size == 0 or i+len_size > len(data): break
+            run_len = int.from_bytes(data[i:i+len_size], "little", signed=False)
+            i += len_size
+            if off_size == 0:
+                # sparse run — no physical location
+                runs.append((None, run_len))
+                continue
+            if i+off_size > len(data): break
+            lcn_delta = int.from_bytes(data[i:i+off_size], "little", signed=True)
+            i += off_size
+            cur_lcn += lcn_delta
+            runs.append((cur_lcn, run_len))
+    except Exception:
+        pass
+    return runs
+
+
+def _ntfs_apply_fixup(record, bytes_per_sector):
+    try:
+        record = bytearray(record)
+        usa_offset = struct.unpack_from('<H', record, 4)[0]
+        usa_count  = struct.unpack_from('<H', record, 6)[0]
+        if usa_offset == 0 or usa_count == 0 or usa_offset+2 > len(record):
+            return bytes(record)
+        for i in range(1, usa_count):
+            sector_end = i * bytes_per_sector
+            fixup_pos  = usa_offset + i*2
+            if sector_end > len(record) or fixup_pos+2 > len(record): break
+            record[sector_end-2:sector_end] = record[fixup_pos:fixup_pos+2]
+        return bytes(record)
+    except Exception:
+        return record
+
+
+def _ntfs_read_attrs(record):
+    """Yield (attr_type, is_nonresident, name_len, content_or_runlist_bytes, real_size) for each attribute."""
+    try:
+        first_attr_off = struct.unpack_from('<H', record, 0x14)[0]
+    except Exception:
+        return
+    off = first_attr_off
+    n = len(record)
+    while off + 16 <= n:
+        try:
+            attr_type = struct.unpack_from('<I', record, off)[0]
+            if attr_type == 0xFFFFFFFF: break
+            attr_len = struct.unpack_from('<I', record, off+4)[0]
+            if attr_len <= 0 or off+attr_len > n: break
+            non_resident = record[off+8]
+            name_len = record[off+9]
+            if non_resident == 0:
+                content_size = struct.unpack_from('<I', record, off+0x10)[0]
+                content_off  = struct.unpack_from('<H', record, off+0x14)[0]
+                content = record[off+content_off: off+content_off+content_size]
+                yield (attr_type, False, name_len, content, content_size)
+            else:
+                real_size = struct.unpack_from('<Q', record, off+0x30)[0]
+                runlist_off = struct.unpack_from('<H', record, off+0x20)[0]
+                runlist = record[off+runlist_off: off+attr_len]
+                yield (attr_type, True, name_len, runlist, real_size)
+            off += attr_len
+        except Exception:
+            break
+
+
+def _ntfs_parse_filename_attr(content):
+    """Parse a $FILE_NAME (0x30) attribute's resident content."""
+    try:
+        if len(content) < 66: return None
+        parent_ref = struct.unpack_from('<Q', content, 0)[0]
+        crt_ft = struct.unpack_from('<Q', content, 8)[0]
+        mod_ft = struct.unpack_from('<Q', content, 16)[0]
+        real_size = struct.unpack_from('<Q', content, 48)[0]
+        name_len_chars = content[64]
+        namespace = content[65]
+        name_bytes = content[66:66+name_len_chars*2]
+        name = name_bytes.decode("utf-16-le", errors="ignore")
+        return {
+            "name": name, "namespace": namespace, "parent_ref": parent_ref,
+            "created": filetime_to_dt(crt_ft), "modified": filetime_to_dt(mod_ft),
+            "real_size": real_size,
+        }
+    except Exception:
+        return None
+
+
+def _ntfs_read_runs(handle, runs, cluster_size, max_bytes):
+    """Read the cluster runs from the volume, concatenated, capped at max_bytes."""
+    out = bytearray()
+    for lcn, run_len in runs:
+        if lcn is None:
+            out += b"\x00" * min(run_len*cluster_size, max_bytes-len(out))
+        else:
+            remaining = max_bytes - len(out)
+            if remaining <= 0: break
+            chunk_len = min(run_len*cluster_size, remaining)
+            data = _ntfs_read(handle, lcn*cluster_size, chunk_len)
+            out += data
+            if len(data) < chunk_len: break
+        if len(out) >= max_bytes: break
+    return bytes(out[:max_bytes])
+
+
+def scan_mft_deleted_recovery(time_budget_sec=40, max_records=400000, max_recover_bytes=4*1024*1024):
+    """
+    Scans the raw system-volume MFT for ORPHANED (deleted) file records whose
+    filename matches a cheat keyword — evidence that survives even after a
+    factory reset / OS reinstall on the same partition, as long as the space
+    those records occupied hasn't since been overwritten. Best-effort content
+    recovery is attempted for small matching files only.
+    """
+    if not WINDOWS:
+        return section("Pre-Reset Deleted File Recovery", ["Windows only"]), 0, []
+
+    drive_letter = (os.environ.get("SystemDrive","C:")[0] or "C").upper()
+    handle = _ntfs_open_volume(drive_letter)
+    if not handle:
+        lines = ["\n  ✗ Could not open raw volume for direct MFT scan.",
+                 "    Requires Administrator privileges and an NTFS volume.",
+                 "    (This does not affect any of the other scan results.)"]
+        return section("Pre-Reset Deleted File Recovery", lines), 0, []
+
+    findings = []
+    try:
+        boot_raw = _ntfs_read(handle, 0, 512)
+        info = _ntfs_parse_boot_sector(boot_raw) if len(boot_raw) >= 512 else None
+        if not info:
+            lines = ["\n  ✗ Could not parse NTFS boot sector — volume may not be NTFS."]
+            return section("Pre-Reset Deleted File Recovery", lines), 0, []
+
+        cluster_size = info["cluster_size"]
+        rec_size = info["mft_record_size"]
+        bps = info["bytes_per_sector"]
+
+        # Read $MFT's own first record (always located directly at mft_lcn)
+        rec0_raw = _ntfs_read(handle, info["mft_lcn"]*cluster_size, rec_size)
+        if rec0_raw[:4] != b"FILE":
+            lines = ["\n  ✗ Could not locate $MFT — unexpected volume layout."]
+            return section("Pre-Reset Deleted File Recovery", lines), 0, []
+        rec0 = _ntfs_apply_fixup(rec0_raw, bps)
+
+        mft_runs = None; mft_real_size = 0
+        for attr_type, nonres, name_len, payload, real_size in _ntfs_read_attrs(rec0):
+            if attr_type == 0x80 and nonres:   # unnamed $DATA (name_len==0 means unnamed/first $DATA)
+                if name_len == 0:
+                    mft_runs = _ntfs_parse_data_runs(payload)
+                    mft_real_size = real_size
+                    break
+        if not mft_runs:
+            lines = ["\n  ✗ Could not parse $MFT data runs."]
+            return section("Pre-Reset Deleted File Recovery", lines), 0, []
+
+        total_records = min(mft_real_size // rec_size, max_records)
+
+        # Build a flat list of (volume_offset, length) byte ranges the MFT occupies,
+        # so we can read sequential records even across fragmented runs.
+        def mft_byte_ranges():
+            for lcn, run_len in mft_runs:
+                if lcn is None:
+                    continue
+                yield (lcn*cluster_size, run_len*cluster_size)
+
+        keyword_lc = [k.lower() for k in KEYWORDS]
+
+        def name_matches(name):
+            nl = name.lower()
+            if any(fp in nl for fp in FALSE_POSITIVE_PATHS):
+                return []
+            return [k for k in KEYWORDS if k.lower() in nl]
+
+        start_t = time.time()
+        idx = 0
+        scanned = 0
+        for vol_off, run_byte_len in mft_byte_ranges():
+            n_recs_in_run = run_byte_len // rec_size
+            for r in range(n_recs_in_run):
+                if idx >= total_records: break
+                if time.time() - start_t > time_budget_sec: break
+                rec_off = vol_off + r*rec_size
+                raw = _ntfs_read(handle, rec_off, rec_size)
+                idx += 1; scanned += 1
+                if len(raw) < rec_size or raw[:4] not in (b"FILE",):
+                    continue
+                try:
+                    flags = struct.unpack_from('<H', raw, 0x16)[0]
+                except Exception:
+                    continue
+                in_use = bool(flags & 0x0001)
+                if in_use:
+                    continue  # only interested in orphaned/deleted records
+                fixed = _ntfs_apply_fixup(raw, bps)
+                best_name = None; data_attr = None
+                for attr_type, nonres, name_len, payload, real_size in _ntfs_read_attrs(fixed):
+                    if attr_type == 0x30 and name_len == 0:  # $FILE_NAME
+                        fn = _ntfs_parse_filename_attr(payload)
+                        if fn and fn["namespace"] != 2:  # skip pure-DOS short names
+                            if not best_name or fn["namespace"] in (1,3):
+                                best_name = fn
+                    elif attr_type == 0x80 and name_len == 0:  # unnamed $DATA
+                        data_attr = (nonres, payload, real_size)
+                if not best_name or not best_name.get("name"):
+                    continue
+                kws = name_matches(best_name["name"])
+                if not kws:
+                    continue
+                entry = {
+                    "name": best_name["name"],
+                    "keywords": kws,
+                    "created": best_name["created"].strftime("%Y-%m-%d %H:%M:%S") if best_name["created"] else "Unknown",
+                    "modified": best_name["modified"].strftime("%Y-%m-%d %H:%M:%S") if best_name["modified"] else "Unknown",
+                    "real_size": best_name["real_size"],
+                    "recovered_path": None,
+                    "recovery_note": "Metadata only (content not recovered)",
+                }
+                # Best-effort content recovery for small files only
+                if data_attr and best_name["real_size"] and best_name["real_size"] <= max_recover_bytes:
+                    nonres, payload, real_size = data_attr
+                    try:
+                        content = (payload if not nonres else
+                                   _ntfs_read_runs(handle, _ntfs_parse_data_runs(payload),
+                                                   cluster_size, real_size))
+                        if content:
+                            out_dir = os.path.join(os.path.expanduser("~"), "Desktop",
+                                                    "CometRecovered", "PreReset")
+                            os.makedirs(out_dir, exist_ok=True)
+                            safe_name = re.sub(r'[\\/:*?"<>|]', "_", best_name["name"])
+                            out_path = os.path.join(out_dir, f"{idx}_{safe_name}")
+                            with open(out_path, "wb") as fp:
+                                fp.write(content)
+                            entry["recovered_path"] = out_path
+                            entry["recovery_note"] = "Best-effort recovery — verify manually, may be partially overwritten"
+                    except Exception:
+                        pass
+                findings.append(entry)
+            if time.time() - start_t > time_budget_sec:
+                break
+    finally:
+        _ntfs_close_volume(handle)
+
+    seen = set(); unique_findings = []
+    for f in findings:
+        k = (f["name"].lower(), f["real_size"])
+        if k not in seen:
+            seen.add(k); unique_findings.append(f)
+
+    recovered_count = sum(1 for f in unique_findings if f["recovered_path"])
+    lines = [
+        f"\n  Drive scanned        : {drive_letter}:",
+        f"  Orphaned MFT matches : {len(unique_findings)}",
+        f"  Content recovered    : {recovered_count} file(s)",
+        "",
+        "  NOTE: This finds deleted/cheat-named MFT entries that survive a",
+        "  'Reset this PC' (without the 'clean the drive' wipe option) on the",
+        "  SAME partition. A thorough disk wipe will correctly show 0 results.",
+        "",
+    ]
+    if unique_findings:
+        lines.append("⚠ ORPHANED CHEAT-RELATED FILE RECORDS FOUND:")
+        for f in unique_findings:
+            lines.append(f"  ✗ {f['name']}  [{', '.join(f['keywords'])}]")
+            lines.append(f"    Created : {f['created']}   Modified: {f['modified']}   Size: {f['real_size']}b")
+            lines.append(f"    {f['recovery_note']}")
+            if f["recovered_path"]:
+                lines.append(f"    Recovered to: {f['recovered_path']}")
+            lines.append("")
+    else:
+        lines.append("  ✓ No orphaned cheat-related MFT records found.")
+    return section("Pre-Reset Deleted File Recovery", lines), len(unique_findings), unique_findings
+
+
+# ============================================================
+#  CMD / POWERSHELL HISTORY SCAN
+# ============================================================
+
+def scan_cmd_history():
+    """
+    Scans PowerShell ConsoleHost history, Win+R Run MRU, Explorer typed paths,
+    and BAT/PS1/CMD/VBS scripts on common user directories.
+    Flags commands containing cheat keywords or suspicious PowerShell patterns.
+    """
+    if not WINDOWS:
+        return section("CMD / PowerShell History", ["Windows only"]), 0, []
+
+    hits = []; all_commands = []
+    SUSPICIOUS_PATS = [
+        "invoke-expression","iex ","downloadstring","webclient",
+        "bypass","encodedcommand","-enc ","net.webclient",
+        "invoke-webrequest","invoke-restmethod","downloadfile","downloaddata",
+        "hidden","noninteractive","disable-defender","set-mppreference",
+        "amsibypass","amsi","reflection.assembly","invoke-mimikatz",
+        "add-mppreference","disablerealtimemonitoring","frombase64string",
+    ]
+
+    # 1. PowerShell ConsoleHost_history.txt (all profiles)
+    ps_hist_paths = [
+        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"),
+        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\Visual Studio Code Host_history.txt"),
+    ]
+    # Also check each user profile on the machine
+    try:
+        for profile in glob.glob(r"C:\Users\*"):
+            extra = os.path.join(profile, r"AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt")
+            if extra not in ps_hist_paths and os.path.exists(extra):
+                ps_hist_paths.append(extra)
+    except Exception: pass
+
+    for ps_hist_path in ps_hist_paths:
+        if not os.path.exists(ps_hist_path): continue
+        try:
+            with open(ps_hist_path, 'r', encoding='utf-8', errors='ignore') as f:
+                commands = f.read().strip().splitlines()
+            source_label = f"PS ({os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(ps_hist_path))))}"
+            for cmd in reversed(commands[-300:]):
+                cmd = cmd.strip()
+                if not cmd: continue
+                all_commands.append((source_label, cmd))
+                kws = matches_keyword(cmd)
+                sus = kws or any(p in cmd.lower() for p in SUSPICIOUS_PATS)
+                if sus:
+                    hits.append({"source": source_label, "cmd": cmd, "keywords": kws})
+        except Exception: pass
+
+    # 2. Win+R Run MRU (most recently run commands)
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\RunMRU",
+                             0, winreg.KEY_READ)
+        i = 0
+        while True:
+            try:
+                name, val, _ = winreg.EnumValue(key, i)
+                if name != "MRUList" and isinstance(val, str):
+                    cmd = val.rstrip("\\1")
+                    all_commands.append(("Run MRU", cmd))
+                    kws = matches_keyword(cmd)
+                    if kws: hits.append({"source": "Run MRU", "cmd": cmd, "keywords": kws})
+                i += 1
+            except OSError: break
+        winreg.CloseKey(key)
+    except Exception: pass
+
+    # 3. Explorer address bar typed paths
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths",
+                             0, winreg.KEY_READ)
+        i = 0
+        while True:
+            try:
+                name, val, _ = winreg.EnumValue(key, i)
+                if isinstance(val, str) and val:
+                    all_commands.append(("Explorer Path", val))
+                    kws = matches_keyword(val)
+                    if kws: hits.append({"source": "Explorer Path", "cmd": val, "keywords": kws})
+                i += 1
+            except OSError: break
+        winreg.CloseKey(key)
+    except Exception: pass
+
+    # 4. BAT/PS1/CMD/VBS script files in common user paths
+    script_hits = []
+    scan_dirs = [
+        os.path.expanduser("~\\Desktop"),
+        os.path.expanduser("~\\Downloads"),
+        os.path.expanduser("~\\Documents"),
+        os.path.expanduser("~\\AppData\\Local\\Temp"),
+    ]
+    for sdir in scan_dirs:
+        if not os.path.exists(sdir): continue
+        try:
+            for fname in os.listdir(sdir):
+                fl = fname.lower()
+                if not any(fl.endswith(e) for e in (".bat", ".ps1", ".cmd", ".vbs", ".js")): continue
+                fpath = os.path.join(sdir, fname)
+                try:
+                    mt = datetime.datetime.fromtimestamp(
+                        os.path.getmtime(fpath)).strftime("%Y-%m-%d %H:%M:%S")
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read(8000)
+                    kws = matches_keyword(fname + " " + content)
+                    sus_content = any(p in content.lower() for p in SUSPICIOUS_PATS)
+                    if kws or sus_content:
+                        ext = os.path.splitext(fname)[1]
+                        script_hits.append({"file": fpath, "modified": mt, "keywords": kws,
+                                             "preview": content[:300].replace('\n', ' ')})
+                        hits.append({"source": f"Script ({ext})", "cmd": fpath, "keywords": kws})
+                except Exception: pass
+        except Exception: pass
+
+    ps_cmds = [(s, c) for s, c in all_commands if "PS" in s or "PowerShell" in s]
+    lines = [
+        f"\n  Commands in history : {len(all_commands)}",
+        f"  Suspicious flagged  : {len(hits)}",
+        f"  Script files found  : {len(script_hits)}",
+        "",
+    ]
+    if hits:
+        lines.append("  ⚠ SUSPICIOUS COMMANDS / SCRIPTS:")
+        for h in hits:
+            lines.append(f"  ✗ [{h['source']}] {h['cmd'][:120]}")
+            if h.get('keywords'): lines.append(f"    Keywords: {', '.join(h['keywords'])}")
+            lines.append("")
+    if ps_cmds:
+        lines.append(f"\n  PowerShell History (showing up to 100 of {len(ps_cmds)}):")
+        for src, cmd in ps_cmds[:100]:
+            is_sus = any(p in cmd.lower() for p in SUSPICIOUS_PATS) or bool(matches_keyword(cmd))
+            sym = "⚠" if is_sus else "  "
+            lines.append(f"  {sym} {cmd}")
+    if script_hits:
+        lines.append(f"\n  Script Files on Disk ({len(script_hits)}):")
+        for s in script_hits:
+            lines.append(f"  ⚠ {s['file']}  ({s['modified']})")
+            if s.get('preview'):
+                lines.append(f"    {s['preview'][:100].replace(chr(13),'').replace(chr(10),' ')}…")
+    if not hits and not all_commands and not script_hits:
+        lines.append("  ✓ No suspicious command history found.")
+    return section("CMD / PowerShell History", lines), len(hits), hits
+
+
+# ============================================================
+#  PROCESS MEMORY / INJECTION SCAN
+# ============================================================
+
+def scan_memory_injection():
+    """
+    Enumerates modules (DLLs) loaded inside the Roblox process — the primary
+    evidence of DLL injection. A cheat loader injects a DLL into the Roblox
+    process address space; this scan flags DLLs that are:
+      - Not from expected Roblox/Windows/trusted paths
+      - Unsigned or fail signature verification
+      - Match a cheat keyword
+
+    If Roblox is not running, falls back to scanning ALL process module lists
+    for any cheat-named DLL (post-injection artifact in other processes).
+    """
+    if not WINDOWS:
+        return section("Memory / Injection Scan", ["Windows only"]), 0, []
+
+    hits = []; module_list = []; roblox_running = False
+    si = subprocess.STARTUPINFO()
+    si.dwFlags = subprocess.STARTF_USESHOWWINDOW; si.wShowWindow = 0
+
+    EXPECTED_PATHS = [
+        "\\roblox\\", "\\windows\\system32\\", "\\windows\\syswow64\\",
+        "\\windows\\winsxs\\", "\\program files\\roblox\\",
+        "\\microsoft\\", "\\appdata\\local\\roblox\\", "\\appdata\\local\\temp\\roblox",
+    ]
+
+    # Scan Roblox process modules
+    ps_mod = r"""
+$targets = @("RobloxPlayerBeta","RobloxPlayerLauncher")
+foreach ($pname in $targets) {
+    $p = Get-Process -Name $pname -EA SilentlyContinue | Select-Object -First 1
+    if (-not $p) { continue }
+    Write-Output "PROC:$($p.Name)|$($p.Id)"
+    try {
+        foreach ($m in $p.Modules) {
+            try { $sig = (Get-AuthenticodeSignature -LiteralPath $m.FileName -EA Stop).Status }
+            catch { $sig = "Unknown" }
+            Write-Output "MOD:$($m.ModuleName)|$($m.FileName)|$sig|$($m.ModuleMemorySize)"
+        }
+    } catch { Write-Output "MODERR:$_" }
+}
+"""
+    try:
+        out = subprocess.run(
+            ["powershell","-NoProfile","-NonInteractive","-Command", ps_mod],
+            capture_output=True, text=True, timeout=20,
+            creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+        cur_proc = None
+        for line in out.stdout.strip().splitlines():
+            line = line.strip()
+            if line.startswith("PROC:"):
+                cur_proc = line[5:]; roblox_running = True
+            elif line.startswith("MOD:") and cur_proc:
+                parts = line[4:].split("|", 3)
+                if len(parts) < 2: continue
+                mod_name = parts[0]; mod_path = parts[1]
+                sig = parts[2] if len(parts) > 2 else "Unknown"
+                size = parts[3] if len(parts) > 3 else "?"
+                is_expected = any(ep in mod_path.lower() for ep in EXPECTED_PATHS)
+                kws = matches_keyword(mod_name + " " + mod_path)
+                suspicious = bool(kws) or (not is_expected and sig not in ("Valid",))
+                entry = {"proc": cur_proc, "name": mod_name, "path": mod_path,
+                         "sig": sig, "size": size, "suspicious": suspicious, "keywords": kws}
+                module_list.append(entry)
+                if suspicious: hits.append(entry)
+    except Exception: pass
+
+    # If Roblox not running, broad scan of all process module lists for cheat names
+    if not roblox_running:
+        ps_all = r"""
+Get-Process | ForEach-Object {
+    $pn = $_.Name
+    try {
+        foreach ($m in $_.Modules) {
+            Write-Output "$pn|$($m.ModuleName)|$($m.FileName)"
+        }
+    } catch {}
+} 2>$null
+"""
+        try:
+            out2 = subprocess.run(
+                ["powershell","-NoProfile","-NonInteractive","-Command", ps_all],
+                capture_output=True, text=True, timeout=20,
+                creationflags=subprocess.CREATE_NO_WINDOW, startupinfo=si)
+            for line in out2.stdout.strip().splitlines():
+                parts = line.strip().split("|", 2)
+                if len(parts) < 3: continue
+                proc_name, mod_name, mod_path = parts
+                kws = matches_keyword(mod_name + " " + mod_path)
+                if kws:
+                    hits.append({"proc": proc_name, "name": mod_name, "path": mod_path,
+                                 "sig": "N/A", "size": "?", "suspicious": True, "keywords": kws})
+        except Exception: pass
+
+    lines = [""]
+    if not roblox_running:
+        lines.append("  ℹ Roblox was NOT running during this scan.")
+        lines.append("  Live injection detection is most effective when Roblox is open.")
+        lines.append("  For a live screenshare, have the player keep Roblox running.")
+        lines.append("")
+    else:
+        sus_cnt = len([m for m in module_list if m["suspicious"]])
+        lines.append(f"  ✓ Roblox process found — {len(module_list)} modules loaded")
+        lines.append(f"  {'⚠' if sus_cnt else '✓'} {sus_cnt} suspicious / unexpected module(s)")
+        lines.append("")
+
+    if hits:
+        lines.append("  ⚠ SUSPICIOUS / INJECTED MODULES DETECTED:")
+        for h in hits:
+            lines.append(f"  ✗ Process  : {h['proc']}")
+            lines.append(f"    Module   : {h['name']}")
+            lines.append(f"    Path     : {h['path']}")
+            lines.append(f"    Signature: {h['sig']}")
+            if h.get('keywords'): lines.append(f"    Keywords : {', '.join(h['keywords'])}")
+            lines.append("")
+
+    if roblox_running and module_list:
+        clean = [m for m in module_list if not m["suspicious"]]
+        if clean:
+            lines.append(f"\n  Trusted/expected modules ({len(clean)}):")
+            for m in clean[:30]: lines.append(f"    ✓ {m['name']}")
+            if len(clean) > 30: lines.append(f"    … and {len(clean)-30} more")
+
+    if not hits:
+        lines.append("  ✓ No injected or suspicious modules found.")
+    return section("Memory / Injection Scan", lines), len(hits), hits
+
+
+# ============================================================
+#  run_full_scan
+# ============================================================
+def run_full_scan(league="?"):
+    sb_t,sb_h,_         = scan_shellbags()
+    bm_t,bm_h,_         = scan_bam()
+    pf_t,pf_h,_         = scan_prefetch()
+    ac_t,ac_h,_         = scan_appcompat()
+    rl_t,rl_h,accs      = scan_roblox_logs()
+    al_t,al_h,_         = scan_roblox_alts_registry()
+    cs_t,cs_h,_         = scan_cheat_files()
+    yr_t,yr_h,_         = scan_yara()
+    us_t,us_h,us_l      = scan_unsigned()
+    rb_t,rb_h,rb_l      = scan_recycle_bin()
+    sm_t,sm_h,auto_fail = scan_sysmain()
+    pr_t,pr_h,_         = scan_running_processes()
+    cl_t,cl_h,cl_info   = scan_cleaners()
+    nw_t,nw_h,vpn_info  = scan_network_vpn()
+    dc_t,dc_h,dc_accs   = scan_discord_cache()
+    dm_t,dm_h,_         = scan_discord_memory()
+    fr_t,fr_h,fr_text   = scan_factory_reset()
+    ff_t,ff_h,ff_hits   = scan_fastflags()
+    dv_t,dv_w,dv_inf    = scan_drives()
+    ev_t,ev_h,_         = scan_event_log()
+    jl_t,jl_h,_         = scan_jumplists()
+    lk_t,lk_h,_         = scan_lnk_files()
+    di_t,di_h,_         = scan_deleted_integrity()
+    pw_t,pw_h,pw_list   = scan_power_events()
+    tp_t,tp_h,_         = scan_two_pc_indicators()
+    dr_t,dr_h,_         = scan_deleted_cheat_recovery()
+    eh_t,eh_fc,eh_list  = scan_execution_history()
+    mr_t,mr_h,mr_list   = scan_mft_deleted_recovery()
+    ch_t,ch_h,_         = scan_cmd_history()
+    mi_t,mi_h,_         = scan_memory_injection()
+
+    total = (sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+
+             ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+tp_h+dr_h+mr_h+ch_h+mi_h)
+
+    roblox_list = []
+    if isinstance(accs, list):
+        for a in accs:
+            if isinstance(a, dict): roblox_list.append(a)
+            else: roblox_list.append({"username":str(a),"userid":None,"sources":[],"placeids":[],"last_seen":None})
+
+    return {
+        "shellbags":sb_t,"bam":bm_t,"prefetch":pf_t,"appcompat":ac_t,
+        "roblox":rl_t,"cheat":cs_t,"yara":yr_t,"unsigned":us_t,
+        "recycle":rb_t,"sysmain":sm_t,"discord":dc_t,"discord_memory":dm_t,
+        "processes":pr_t,"cleaners":cl_t,"network":nw_t,"registry_extra":al_t,
+        "eventlog":ev_t,"jumplists":jl_t,"lnkfiles":lk_t,"deleted_int":di_t,
+        "power_events":pw_t,"two_pc":tp_t,"deleted_recovery":dr_t,
+        "exec_history_text":eh_t,"exec_history":eh_list,
+        "mft_recovery":mr_t,"cmd_history":ch_t,"memory_injection":mi_t,
+        "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,
+        "appcompat_hits":ac_h,"cheat_hits":cs_h,"yara_hits":yr_h,
+        "unsigned_hits":us_l,"sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
+        "fastflag_hits":ff_h,"process_hits":pr_h,"cleaner_hits":cl_h,
+        "eventlog_hits":ev_h,"jumplist_hits":jl_h,"lnk_hits":lk_h,
+        "deleted_hits":di_h,"roblox_log_hits":rl_h,
+        "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
+        "discord_memory_hits":dm_h,"mft_recovery_hits":mr_h,
+        "cmd_history_hits":ch_h,"memory_injection_hits":mi_h,
+        "roblox_accounts":roblox_list,"discord_accounts":dc_accs,
+        "total_hits":total,"verdict":"REVIEW","league":league,
+        "vpn_detected":bool(vpn_info and "vpn" in str(vpn_info).lower()),
+        "vpn_info":"[Redacted]","cleaner_info":cl_info,
+        "report":{
+            "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,
+            "appcompat_hits":ac_h,"cheat_hits":cs_h,"yara_hits":yr_h,
+            "unsigned_count":len(us_l) if isinstance(us_l,list) else us_h,
+            "sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
+            "roblox_hits":rl_h,"fastflags":ff_hits,
+            "discord_accounts":dc_accs,"factory_resets":fr_text,
+            "drive_info":dv_inf,"drive_warn":dv_w,
+            "cleaner_info":cl_info,"process_hits":pr_h,"cleaner_hits":cl_h,
+            "eventlog_hits":ev_h,"jumplist_hits":jl_h,"lnk_hits":lk_h,
+            "deleted_hits":di_h,"exec_history":eh_list,
+            "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
+            "discord_memory_hits":dm_h,"mft_recovery_hits":mr_h,
+            "cmd_history_hits":ch_h,"memory_injection_hits":mi_h,
+        },
+        "full_report":"\n".join([
+            f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}",
+            "="*60,
+            sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,
+            pr_t,cl_t,nw_t,dc_t,dm_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,
+            di_t,pw_t,tp_t,dr_t,eh_t,mr_t,ch_t,mi_t,
+            f"\nHITS: {total}",
+        ]),
+    }
+
+
+# ============================================================
+#  Rounded-corner widget kit (ONE definition — duplicates removed)
+# ============================================================
+def rounded_rect_points(x1, y1, x2, y2, r):
+    r = max(0, min(r, (x2-x1)/2, (y2-y1)/2))
+    return [
+        x1+r,y1, x2-r,y1, x2,y1, x2,y1+r,
+        x2,y2-r, x2,y2, x2-r,y2, x1+r,y2,
+        x1,y2, x1,y2-r, x1,y1+r, x1,y1,
+    ]
+ 
+def draw_rounded_rect(canvas, x1, y1, x2, y2, r, **kw):
+    return canvas.create_polygon(rounded_rect_points(x1,y1,x2,y2,r), smooth=True, **kw)
+ 
+ 
+def _mix(hex1, hex2, t):
+    """Blend two hex colors — used for the glass sheen / gradient effects."""
+    def h2rgb(h):
+        h = h.lstrip("#")
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    r1, g1, b1 = h2rgb(hex1)
+    r2, g2, b2 = h2rgb(hex2)
+    r = int(r1 + (r2 - r1) * t)
+    g = int(g1 + (g2 - g1) * t)
+    b = int(b1 + (b2 - b1) * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+ 
+ 
+class RoundedButton(tk.Canvas):
+    """Glass-style button — frosted dark fill with a light top highlight edge."""
+    def __init__(self, parent, text, command=None, bg="#173023", fg="#eafff2",
+                 hover_bg="#1e3d2c", disabled_bg="#141414", disabled_fg="#4a4a4a",
+                 font=("Segoe UI",10,"bold"), radius=12, padx=22, pady=11,
+                 width=None, height=None, state="normal", parent_bg=None,
+                 accent=False):
+        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
+        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, cursor="hand2")
+        self.command = command
+        # accent=True gives the solid green "primary action" look instead of glass-neutral
+        if accent:
+            bg = "#1f9d55"; hover_bg = "#22b862"; fg = "#04140a"
+        self.bg, self.fg = bg, fg
+        self.hover_bg = hover_bg
+        self.disabled_bg, self.disabled_fg = disabled_bg, disabled_fg
+        self.accent = accent
+        self.text, self.font, self.radius = text, font, radius
+        self.padx, self.pady = padx, pady
+        self.state = state
+        self._build(width, height)
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_click)
+ 
+    def _build(self, width, height):
+        f = _tkfont.Font(font=self.font)
+        tw = f.measure(self.text); th = f.metrics("linespace")
+        # NOTE: _btn_w / _btn_h — never _w / _h, those are reserved by tkinter
+        self._btn_w = width  or (tw + self.padx*2)
+        self._btn_h = height or (th + self.pady*2)
+        self.config(width=self._btn_w, height=self._btn_h)
+        self._redraw()
+ 
+    def _redraw(self, fill_override=None):
+        self.delete("all")
+        fill      = (fill_override or self.bg) if self.state == "normal" else self.disabled_bg
+        textcolor = self.fg                    if self.state == "normal" else self.disabled_fg
+        w, h, r = self._btn_w, self._btn_h, self.radius
+        draw_rounded_rect(self, 1, 1, w-1, h-1, r, fill=fill, outline=fill)
+        # Glass sheen: a soft lighter strip across the top third
+        if self.state == "normal":
+            sheen = _mix(fill, "#ffffff", 0.10)
+            self.create_polygon(
+                rounded_rect_points(2, 2, w-2, h*0.42, max(0,r-2)),
+                fill=sheen, outline=sheen)
+            # Redraw base under sheen area edges to avoid square corners poking out
+            draw_rounded_rect(self, 1, 1, w-1, h-1, r, fill="", outline=_mix(fill,"#ffffff",0.22))
+        self.create_text(w/2, h/2, text=self.text, fill=textcolor, font=self.font)
+ 
+    def _on_enter(self, e):
+        if self.state == "normal": self._redraw(self.hover_bg)
+    def _on_leave(self, e):
+        if self.state == "normal": self._redraw()
+    def _on_click(self, e):
+        if self.state == "normal" and self.command: self.command()
+ 
+    def set_colors(self, bg=None, fg=None, hover_bg=None):
+        if bg is not None: self.bg = bg
+        if fg is not None: self.fg = fg
+        if hover_bg is not None: self.hover_bg = hover_bg
+        self._redraw()
+ 
+    def set_state(self, state):
+        self.state = state; self._redraw()
+ 
+    def set_text(self, text):
+        self.text = text; self._redraw()
+ 
+ 
+class RoundedFrame(tk.Frame):
+    """Glass card container — content goes in .inner. Frosted dark fill + faint edge highlight."""
+    def __init__(self, parent, fill="#101512", radius=14, outline="#2a3a30", parent_bg=None):
+        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
+        super().__init__(parent, bg=self.parent_bg, highlightthickness=0)
+        self.fill, self.radius, self.outline = fill, radius, outline
+        self.canvas = tk.Canvas(self, bg=self.parent_bg, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.inner = tk.Frame(self.canvas, bg=fill)
+        self._win = self.canvas.create_window(2, 2, window=self.inner, anchor="nw")
+        self.canvas.bind("<Configure>", self._on_resize)
+ 
+    def _on_resize(self, event):
+        w, h = event.width, event.height
+        if w < 4 or h < 4: return
+        self.canvas.delete("bg")
+        draw_rounded_rect(self.canvas, 1, 1, w-1, h-1, self.radius,
+                           fill=self.fill, outline=self.outline, tags="bg")
+        # thin top sheen line for glass feel
+        sheen = _mix(self.fill, "#ffffff", 0.06)
+        self.canvas.create_line(self.radius, 2, w-self.radius, 2, fill=sheen, width=1, tags="bg")
+        self.canvas.tag_lower("bg")
+        self.canvas.coords(self._win, 2, 2)
+        self.canvas.itemconfig(self._win, width=w-4, height=h-4)
+ 
+ 
+class RoundedBadge(tk.Canvas):
+    """Small glass pill label — used for the league badge."""
+    def __init__(self, parent, text, bg="#173023", fg="#4ade80", parent_bg=None, radius=9,
+                 font=("Segoe UI",9,"bold"), padx=10, pady=4):
+        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
+        f = _tkfont.Font(font=font)
+        tw, th = f.measure(text), f.metrics("linespace")
+        w, h = tw+padx*2, th+pady*2
+        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, width=w, height=h)
+        draw_rounded_rect(self, 1,1,w-1,h-1, radius, fill=bg, outline=_mix(bg,"#ffffff",0.2))
+        self.create_text(w/2, h/2, text=text, fill=fg, font=font)
+ 
+ 
+class RoundedProgressBar(tk.Canvas):
+    """Glass progress bar — frosted dark track, frosted green fill with a glossy top strip."""
+    def __init__(self, parent, track_color="#12181a", fill_color="#22c55e",
+                 parent_bg=None, height=10, radius=5):
+        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
+        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, height=height)
+        self.track_color, self.fill_color, self.radius = track_color, fill_color, radius
+        self.pct = 0
+        self.bind("<Configure>", lambda e: self._redraw())
+ 
+    def set_pct(self, pct):
+        self.pct = max(0, min(100, pct)); self._redraw()
+ 
+    def _redraw(self):
+        self.delete("all")
+        w = self.winfo_width(); h = self.winfo_height()
+        if w < 4 or h < 2: return
+        # Track — dark glass
+        draw_rounded_rect(self, 0, 0, w, h, self.radius,
+                           fill=self.track_color, outline=_mix(self.track_color,"#ffffff",0.08))
+        if self.pct > 0:
+            fw = max(h, w * self.pct / 100)
+            draw_rounded_rect(self, 0, 0, fw, h, self.radius,
+                               fill=self.fill_color, outline=self.fill_color)
+            # Glossy top-half sheen over the filled portion
+            sheen = _mix(self.fill_color, "#ffffff", 0.35)
+            self.create_polygon(
+                rounded_rect_points(1, 1, fw-1, h*0.5, max(0,self.radius-1)),
+                fill=sheen, outline=sheen)
+ 
+ 
+# ── Logo — green gradient "Z" mark ────────────────────────────
+def _gradient_color(t, c1=(0x16,0xa3,0x4a), c2=(0x0d,0x5c,0x2a)):
+    """Green gradient — brighter emerald top to deep forest green bottom."""
+    r = int(c1[0]*(1-t)+c2[0]*t); g = int(c1[1]*(1-t)+c2[1]*t); b = int(c1[2]*(1-t)+c2[2]*t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+ 
+_LOGO_GLYPH = [
+    "XXXXXXX",
+    "XXXXXX ",
+    "    XX ",
+    "   XX  ",
+    "  XX   ",
+    " XXXXXX",
+    "XXXXXXX",
+]
+ 
+def make_logo_photo(size=28, bg_hex="#0a0d0b"):
+    """Builds a small PhotoImage of the Zevora Z mark — green gradient square, white Z."""
+    img = tk.PhotoImage(width=size, height=size)
+    radius = max(2, size // 6)
+    gh, gw = len(_LOGO_GLYPH), len(_LOGO_GLYPH[0])
+    scale = max(1, int(size * 0.6) // gw)
+    ox = (size - gw*scale) // 2
+    oy = (size - gh*scale) // 2
+ 
+    def corner_cut(x, y):
+        cx = 0 if x < radius else (size-1 if x >= size-radius else None)
+        cy = 0 if y < radius else (size-1 if y >= size-radius else None)
+        if cx is None or cy is None: return False
+        ccx = radius if cx == 0 else size-1-radius
+        ccy = radius if cy == 0 else size-1-radius
+        return (x-ccx)**2 + (y-ccy)**2 > radius**2
+ 
+    rows = []
+    for y in range(size):
+        t = y / max(1, size-1); bgcol = _gradient_color(t); row = []
+        for x in range(size):
+            if corner_cut(x, y): row.append(bg_hex); continue
+            gx = (x-ox)//scale if scale else -1
+            gy = (y-oy)//scale if scale else -1
+            on = 0 <= gy < gh and 0 <= gx < gw and _LOGO_GLYPH[gy][gx] == "X"
+            row.append("#ffffff" if on else bgcol)
+        rows.append("{" + " ".join(row) + "}")
+    img.put(" ".join(rows))
+    return img
+ 
+ 
+# ── App ───────────────────────────────────────────────────────
+class App:
+    # Black & Green glass palette
+    BG     = "#050705"   # near-black, faint green tint
+    BG2    = "#0a0d0b"   # panel bg
+    BG3    = "#0f1512"   # glass card fill
+    BG4    = "#141c17"   # input bg (slightly lighter glass)
+    BG5    = "#1b2921"   # hover glass
+    BORDER = "#223028"   # subtle green-tinted border
+    FG     = "#eafff2"   # primary text — soft white with green tint
+    FG2    = "#8fae9d"   # secondary text
+    FG3    = "#465a4f"   # muted
+    BLUE   = "#22c55e"   # primary accent renamed but kept as var for compatibility — now GREEN
+    BLUE2  = "#1a9d49"   # darker green
+    BLUE3  = "#0f6b30"   # darkest green
+    BLUEG  = "#4ade80"   # light green glow / highlight text
+    RED    = "#f85149"   # error/alert red (kept red — universally understood as danger)
+    AMB    = "#f59e0b"   # amber warning
+    GREEN  = "#22c55e"   # success green (same family as accent — everything reads as one palette)
+    GD     = "#16a34a"
+    MONO   = "Consolas"
+ 
+    def __init__(self, root):
+        self.root = root; self.root.withdraw()
+        try:
+            import tkinter.font as _tkf
+            App.MONO = next((f for f in ["Cascadia Code","Consolas","Courier New"]
+                             if f in _tkf.families()), "Courier New")
+        except Exception: pass
+        self.results = {}; self.scanning = False
+        self._pin = ""; self._league = "UFF"
+        self._logo_cache = {}
+        try:
+            self._app_icon = make_logo_photo(32, self.BG2)
+            self.root.iconphoto(True, self._app_icon)
+        except Exception: pass
+        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
+        self._tos()
+ 
+    def _logo(self, size, bg_hex):
+        key = (size, bg_hex)
+        if key not in self._logo_cache:
+            self._logo_cache[key] = make_logo_photo(size, bg_hex)
+        return self._logo_cache[key]
+ 
+    def _make_brand(self, parent, bg_hex, size=26, text_size=12):
+        wrap = tk.Frame(parent, bg=bg_hex)
+        logo_img = self._logo(size, bg_hex)
+        tk.Label(wrap, image=logo_img, bg=bg_hex).pack(side="left")
+        tk.Label(wrap, text="  Zevora", font=("Segoe UI", text_size, "bold"),
+                 fg=self.FG, bg=bg_hex).pack(side="left")
+        return wrap
+ 
+    @staticmethod
+    def _center(w, W, H):
+        w.update_idletasks()
+        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        w.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+ 
+    def _tos(self):
+        w = tk.Toplevel(); self._tw = w
+        w.title("Terms & Services"); w.configure(bg=self.BG)
+        w.resizable(False, False)
+        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+        try: w.iconphoto(False, self._logo(28, self.BG2))
+        except Exception: pass
+        self._center(w, 560, 660)
+ 
+        hdr = tk.Frame(w, bg=self.BG2, height=44); hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Frame(w, bg=self.BORDER, height=1).pack(fill="x")
+        self._make_brand(hdr, self.BG2, size=22, text_size=11).pack(side="left", padx=16, pady=10)
+ 
+        body = tk.Frame(w, bg=self.BG, padx=30, pady=16); body.pack(fill="both", expand=True)
+ 
+        tk.Label(body, text="Terms & Services", font=("Segoe UI",20,"bold"),
+                 fg=self.FG, bg=self.BG).pack(pady=(0,3))
+        tk.Label(body, text="Please read carefully before continuing",
+                 font=("Segoe UI",10), fg=self.FG2, bg=self.BG).pack(pady=(0,12))
+ 
+        # TOS text — glass card, RoundedFrame fills/expands so <Configure> fires correctly
+        tos_card = RoundedFrame(body, fill=self.BG3, radius=14, outline=self.BORDER, parent_bg=self.BG)
+        tos_card.pack(fill="both", expand=True, pady=(0,12))
+        tos_inner = tk.Frame(tos_card.inner, bg=self.BG3, padx=2, pady=2)
+        tos_inner.pack(fill="both", expand=True)
+        scr = tk.Scrollbar(tos_inner, orient="vertical", bg=self.BG4,
+                           troughcolor=self.BG2, width=6, relief="flat", bd=0)
+        scr.pack(side="right", fill="y")
+        txt = tk.Text(tos_inner, font=("Segoe UI",9), bg=self.BG3, fg=self.FG2,
+                      bd=0, padx=14, pady=12, relief="flat", wrap="word",
+                      cursor="arrow", height=10, yscrollcommand=scr.set)
+        scr.configure(command=txt.yview)
+        txt.pack(fill="both", expand=True)
+        txt.insert("1.0",
+            "This is a binding legal agreement between you (the person running this "
+            "software, and where applicable the person who requested the scan) and the "
+            "creator of Zevora (the \"Creator\"). If you do not agree, do not use Zevora "
+            "and close this window.\n\n"
+            "1. What Zevora Does & Your Informed Consent\n"
+            "Zevora reads forensic artifacts from THIS computer and transmits the results "
+            "to the person or organization that gave you your PIN (the \"Requesting Party\"). "
+            "By continuing, you voluntarily and knowingly consent to Zevora accessing this "
+            "device and collecting and transmitting information that may include:\n\n"
+            "• System and OS configuration and install history\n"
+            "• Records of programs run, installed, opened, or deleted (prefetch, registry, "
+            "event logs, USN/MFT, shellbags, USB history, Recycle Bin, and similar)\n"
+            "• Roblox and Discord account identifiers and game log data\n"
+            "• Download links and file references found in application memory\n"
+            "• FastFlag configurations and active Roblox client settings\n\n"
+            "2. No Warranty\n"
+            "This software is provided as-is. The Creator is not responsible for any "
+            "actions taken by the Requesting Party based on scan results.\n\n"
+            "3. Unauthorized Usage\n"
+            "If the league or individual using this software on you is NOT authorized, "
+            "report it immediately by DMing Discord user: converts_19942.")
+        txt.configure(state="disabled")
+ 
+        # Checkbox 1 — glass card, plain tk.Frame (reliable, no resize-event dependency)
+        self._chk1_var = tk.IntVar()
+        chk1_outer = tk.Frame(body, bg=self.BORDER)
+        chk1_outer.pack(fill="x", pady=(0,8))
+        chk1_inner = tk.Frame(chk1_outer, bg=self.BG4, padx=14, pady=12)
+        chk1_inner.pack(fill="x", padx=1, pady=1)
+        self._chk1 = tk.Checkbutton(chk1_inner,
+            text="I have read, understand, and agree to the Terms of Service, and I\n"
+                 "voluntarily consent to this scan and the collection of my data",
+            variable=self._chk1_var, font=("Segoe UI",9),
+            fg=self.FG2, bg=self.BG4, activebackground=self.BG4,
+            activeforeground=self.FG, selectcolor=self.BLUE2,
+            anchor="w", justify="left", command=self._check_both)
+        self._chk1.pack(anchor="w")
+ 
+        # Checkbox 2 — glass card
+        self._chk2_var = tk.IntVar()
+        chk2_outer = tk.Frame(body, bg=self.BORDER)
+        chk2_outer.pack(fill="x", pady=(0,16))
+        chk2_inner = tk.Frame(chk2_outer, bg=self.BG4, padx=14, pady=12)
+        chk2_inner.pack(fill="x", padx=1, pady=1)
+        self._chk2 = tk.Checkbutton(chk2_inner,
+            text="I certify, under penalty of perjury under the laws of the United States,\n"
+                 "that I own this device or have explicit, documented authorization to scan it",
+            variable=self._chk2_var, font=("Segoe UI",9),
+            fg=self.FG2, bg=self.BG4, activebackground=self.BG4,
+            activeforeground=self.FG, selectcolor=self.BLUE2,
+            anchor="w", justify="left", command=self._check_both)
+        self._chk2.pack(anchor="w")
+ 
+        # Buttons — Accept disabled (neutral glass) until both checked, then turns solid green
+        btn_row = tk.Frame(body, bg=self.BG); btn_row.pack(fill="x")
+        RoundedButton(btn_row, "Cancel", bg=self.BG3, fg=self.FG2, hover_bg=self.BG4,
+                      radius=10, parent_bg=self.BG,
+                      command=lambda: (w.destroy(), self.root.destroy())).pack(side="left")
+        self._accept_btn = RoundedButton(btn_row, "Accept & continue →",
+                      bg=self.BG5, fg=self.FG3, hover_bg=self.BG5,
+                      radius=10, parent_bg=self.BG, state="disabled")
+        self._accept_btn.command = lambda: (w.destroy(), self._pin_screen())
+        self._accept_btn.pack(side="right")
+ 
+    def _check_both(self):
+        if self._chk1_var.get() and self._chk2_var.get():
+            self._accept_btn.set_state("normal")
+            self._accept_btn.accent = True
+            self._accept_btn.set_colors(bg="#1f9d55", fg="#04140a", hover_bg="#22b862")
+        else:
+            self._accept_btn.set_state("disabled")
+ 
+    def _pin_screen(self):
+        w = tk.Toplevel(); self._pw = w
+        w.title("Zevora"); w.configure(bg=self.BG)
+        w.resizable(False, False)
+        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
+        try: w.iconphoto(False, self._logo(28, self.BG2))
+        except Exception: pass
+        self._center(w, 440, 360)
+ 
+        hdr = tk.Frame(w, bg=self.BG2, height=48); hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Frame(w, bg=self.BORDER, height=1).pack(fill="x")
+        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
+ 
+        body = tk.Frame(w, bg=self.BG, padx=36, pady=28); body.pack(fill="both", expand=True)
+        tk.Label(body, text="Enter PIN", font=("Segoe UI",18,"bold"),
+                 fg=self.FG, bg=self.BG, anchor="w").pack(fill="x")
+        tk.Label(body, text="Enter the PIN provided by your screenshare agent.",
+                 font=("Segoe UI",10), fg=self.FG2, bg=self.BG, anchor="w").pack(fill="x", pady=(4,20))
+ 
+        pf_outer = tk.Frame(body, bg=self.BORDER); pf_outer.pack(fill="x", pady=(0,14))
+        pf_inner = tk.Frame(pf_outer, bg=self.BG4); pf_inner.pack(fill="x", padx=1, pady=1)
+        self._pv = tk.StringVar()
+        self._pe = tk.Entry(pf_inner, textvariable=self._pv, font=(self.MONO,16,"bold"),
+                            bg=self.BG4, fg=self.BLUEG, bd=0,
+                            insertbackground=self.BLUE, relief="flat", justify="center")
+        self._pe.pack(fill="x", padx=16, pady=14); self._pe.focus()
+ 
+        self._perr = tk.Label(body, text="", font=("Segoe UI",9), fg=self.RED, bg=self.BG, anchor="w")
+        self._perr.pack(fill="x", pady=(0,10))
+        self._pbtn = RoundedButton(body, "Start Scan →", accent=True,
+                                    radius=10, parent_bg=self.BG,
+                                    width=368, height=42, command=self._do_pin)
+        self._pbtn.pack(fill="x")
+        self._pe.bind("<Return>", lambda e: self._do_pin())
+ 
+    def _do_pin(self):
+        pin = self._pv.get().strip().upper()
+        if not pin: self._perr.config(text="Enter a PIN to continue."); return
+        self._pbtn.set_state("disabled"); self._pbtn.set_text("Checking…")
+        self._perr.config(text="")
+        threading.Thread(target=self._check_pin, args=(pin,), daemon=True).start()
+ 
+    def _check_pin(self, pin):
+        try:
+            data = json.dumps({"pin": pin, "league": "AUTO"}).encode()
+            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin", data=data,
+                   headers={"Content-Type":"application/json","User-Agent":"ZevoraScanner/5.0"},
+                   method="POST")
+            try:
+                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=12) as r:
+                    body = json.loads(r.read().decode())
+            except urllib.error.HTTPError as e:
+                try: body = json.loads(e.read().decode())
+                except Exception: body = {"error": f"Server error {e.code}"}
+                self.root.after(0, self._pfail, body.get("error","Invalid PIN")); return
+            if body.get("ok") or body.get("valid"):
+                self._pin = pin; self._league = body.get("league","UFF")
+                self.root.after(0, self._pok)
+            else:
+                self.root.after(0, self._pfail, body.get("error","Invalid or already used PIN"))
+        except Exception as e:
+            self.root.after(0, self._pfail, f"Connection error: {e}")
+ 
+    def _pok(self):
+        self._pw.destroy()
+        try:
+            self._build_scan_screen()
+        except Exception:
+            import traceback; err = traceback.format_exc()
+            try:
+                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
+                open(log,"w",encoding="utf-8").write(f"UI Build Error\n{now_str()}\n\n{err}")
+            except Exception: pass
+            self.root.deiconify(); self._done_screen(False, err); return
+        self.root.deiconify()
+        self.root.after(300, self._start)
+ 
+    def _pfail(self, err):
+        self._pbtn.set_state("normal"); self._pbtn.set_text("Start Scan →")
+        self._perr.config(text=f"✗  {err}")
+ 
+    def _build_scan_screen(self):
+        self.root.title("Zevora — Scanning")
+        self.root.configure(bg=self.BG)
+        self.root.resizable(False, False)
+        self._center(self.root, 560, 420)
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
+ 
+        hdr = tk.Frame(self.root, bg=self.BG2, height=48)
+        hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
+        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
+        RoundedBadge(hdr, f" {self._league} ", bg="#173023", fg=self.BLUEG,
+                     parent_bg=self.BG2).pack(side="left", padx=8, pady=13)
+ 
+        body = tk.Frame(self.root, bg=self.BG); body.pack(fill="both", expand=True, padx=48, pady=44)
+        self._scan_title = tk.Label(body, text="Scanning System",
+                                     font=("Segoe UI",22,"bold"), fg=self.FG, bg=self.BG, anchor="w")
+        self._scan_title.pack(fill="x")
+        self._scan_sub = tk.Label(body, text="Initializing…",
+                                   font=("Segoe UI",11), fg=self.FG2, bg=self.BG, anchor="w")
+        self._scan_sub.pack(fill="x", pady=(6,30))
+ 
+        # Glass progress bar — taller, softer corners, glossy fill
+        self._bar = RoundedProgressBar(body, track_color=self.BG4, fill_color=self.BLUE,
+                                        parent_bg=self.BG, height=10, radius=5)
+        self._bar.pack(fill="x")
+        self._pct_lbl = tk.Label(body, text="0%", font=("Segoe UI",14,"bold"),
+                                  fg=self.BLUEG, bg=self.BG)
+        self._pct_lbl.pack(pady=(12,0))
+        self._detail_lbl = tk.Label(body, text="", font=(self.MONO,9),
+                                     fg=self.FG3, bg=self.BG, anchor="w")
+        self._detail_lbl.pack(fill="x", pady=(16,0))
+ 
+    def _update_progress(self, pct, title=None, sub=None, detail=None):
+        try:
+            self._bar.set_pct(pct); self._pct_lbl.config(text=f"{pct}%")
+            if title:  self._scan_title.config(text=title)
+            if sub:    self._scan_sub.config(text=sub)
+            if detail: self._detail_lbl.config(text=detail)
+            self.root.update_idletasks()
+        except Exception: pass
+ 
+    def _start(self):
+        if self.scanning: return
+        self.scanning = True
+        self._update_progress(0, "Scanning System", "Initializing…")
+        threading.Thread(target=self._scan, daemon=True).start()
+ 
+    def _scan(self):
+        steps = [
+            (8,  "Scanning System","Checking ShellBags & BAM…",        "Registry forensics"),
+            (16, "Scanning System","Checking Prefetch…",                "Execution history"),
+            (22, "Scanning System","Checking AppCompat…",               "Program launch history"),
+            (29, "Scanning System","Scanning Roblox logs…",             "Account & FastFlag detection"),
+            (36, "Scanning System","Scanning cheat files…",             "Keyword & hash scan"),
+            (43, "Scanning System","Running heuristics…",               "YARA / PE header"),
+            (49, "Scanning System","Checking unsigned executables…",    "Signature verification"),
+            (54, "Scanning System","Checking recycle bin…",             "Deleted file evidence"),
+            (59, "Scanning System","Checking event log…",               "Security log analysis"),
+            (63, "Scanning System","Checking Discord cache…",           "Account detection"),
+            (67, "Scanning System","Checking Discord downloads…",       "CDN history scan"),
+            (71, "Scanning System","Checking logon sessions…",          "Power timeline"),
+            (75, "Scanning System","Checking 2-PC indicators…",         "Stream bypass detection"),
+            (79, "Scanning System","Recovering deleted files…",         "Forensic recovery"),
+            (83, "Scanning System","Collecting execution history…",     "Today's activity"),
+            (88, "Scanning System","Finalizing scan…",                  "Compiling results"),
+            (93, "Scanning System","Finalizing scan…",                  "Preparing to send"),
+        ]
+        def _ticker():
+            for pct,title,sub,detail in steps:
+                time.sleep(0.4)
+                self.root.after(0, self._update_progress, pct, title, sub, detail)
+        threading.Thread(target=_ticker, daemon=True).start()
+ 
+        try:
+            r = run_full_scan(league=self._league)
+            self.results = r
+        except Exception:
+            import traceback; err = traceback.format_exc()
+            try:
+                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
+                open(log,"w",encoding="utf-8").write(f"Scan Error\n{now_str()}\n\n{err}")
+            except Exception: pass
+            self.root.after(0, self._done_screen, False, err); return
+ 
+        self.root.after(0, self._update_progress, 96, "Scanning System","Sending Results","Uploading…")
+        send_webhook(self.results)
+        bok, be = send_website(self.results, self._pin)
+        if bok:
+            self.root.after(0, self._update_progress, 100, "Scanning System","Sending Results","Complete ✓")
+            self.root.after(0, self._done_screen, True, "")
+        else:
+            try:
+                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
+                open(log,"w",encoding="utf-8").write(f"Send Error\n{now_str()}\nPIN:{self._pin}\n\n{be}")
+            except Exception: pass
+            self.root.after(0, self._done_screen, False, f"Send failed: {be}")
+ 
+    def _done_screen(self, success, error_msg):
+        self.scanning = False
+        for widget in self.root.winfo_children(): widget.destroy()
+        self.root.configure(bg=self.BG)
+        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
+ 
+        hdr = tk.Frame(self.root, bg=self.BG2, height=48)
+        hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
+        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
+ 
+        body = tk.Frame(self.root, bg=self.BG)
+        body.place(relx=0.5, rely=0.5, anchor="center")
+ 
+        if success:
+            tk.Label(body, text="✓", font=("Segoe UI",52), fg=self.GREEN, bg=self.BG).pack()
+            tk.Label(body, text="Scan Complete", font=("Segoe UI",20,"bold"), fg=self.FG, bg=self.BG).pack(pady=(8,4))
+            tk.Label(body, text="Results sent to your agent.", font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
+            tk.Label(body, text="You may close this window.", font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(8,0))
+        else:
+            tk.Label(body, text="✗", font=("Segoe UI",52), fg=self.RED, bg=self.BG).pack()
+            tk.Label(body, text="Scan Failed", font=("Segoe UI",20,"bold"), fg=self.FG, bg=self.BG).pack(pady=(8,4))
+            tk.Label(body, text="Unable to transmit results.", font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
+            if error_msg:
+                ef_outer = tk.Frame(body, bg=self.BORDER); ef_outer.pack(fill="x", pady=(10,0))
+                ef_inner = tk.Frame(ef_outer, bg=self.BG3); ef_inner.pack(fill="x", padx=1, pady=1)
+                et = tk.Text(ef_inner, font=(self.MONO,8), fg=self.RED, bg=self.BG3,
+                             bd=0, padx=8, pady=6, height=5, wrap="word", relief="flat")
+                et.insert("1.0", error_msg); et.configure(state="disabled"); et.pack(fill="x")
+            tk.Label(body, text="Error saved to Desktop\\zevora_error.txt",
+                     font=("Segoe UI",9), fg=self.FG3, bg=self.BG).pack(pady=(6,0))
+ 
+        RoundedButton(body, "Close", bg=self.BG3, fg=self.FG2, hover_bg=self.BG4,
+                      radius=10, parent_bg=self.BG,
+                      command=self.root.destroy).pack(pady=(20,0))
+ 
+ 
+if __name__ == "__main__":
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
