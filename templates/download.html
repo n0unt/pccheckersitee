@@ -4,78 +4,150 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Zevora — Download</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0b;--s1:#111113;--s2:#18181b;--s3:#27272a;
+  --bg:#0a0a0d;--s1:#111116;--s2:#18181d;--s3:#1e1e24;--s4:#27272e;
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --fg:#fafafa;--fg2:#a1a1aa;--fg3:#52525b;
-  --accent:#4ade80;--accentg:rgba(74,222,128,0.12);--accentg2:rgba(74,222,128,0.06);
+  --fg:#ececf0;--fg2:#8888a0;--fg3:#404055;
+  --accent:#2bba8f;--accent2:#1d9e76;--accentg:rgba(43,186,143,0.12);--accentg2:rgba(43,186,143,0.06);
 }
 html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;min-height:100%;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(74,222,128,0.05),transparent 60%);}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 0%,rgba(43,186,143,0.08) 0%,transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 100%,rgba(29,158,118,0.05) 0%,transparent 55%);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);
+  background-size:60px 60px;
+}
 
-nav{position:sticky;top:0;z-index:100;background:rgba(10,10,11,0.92);backdrop-filter:blur(20px);
-    border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 40px;}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:36px;}
-.brand-mark{width:32px;height:32px;border-radius:9px;background:var(--s2);border:1px solid var(--border2);
-  display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:800;color:var(--fg);}
-.bname{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;}
-.nav-links{display:flex;gap:4px;}
-.nav-links a{color:var(--fg2);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:8px;transition:.15s;}
-.nav-links a:hover{color:var(--fg);background:rgba(255,255,255,0.05);}
-.nav-links a.active{color:var(--accent);}
-.nav-r{margin-left:auto;}
-.btn-nav{background:var(--accent);color:#000;text-decoration:none;font-size:13px;font-weight:700;padding:7px 16px;border-radius:9px;}
-.btn-nav:hover{opacity:.88;}
+/* ── Floating glass nav — matches home.html exactly ── */
+.nav-outer{position:sticky;top:0;z-index:100;padding:16px 20px 0;display:flex;justify-content:center;}
+nav{
+  width:100%;max-width:1080px;
+  background:rgba(255,255,255,0.06);
+  backdrop-filter:blur(28px) saturate(180%);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:18px;
+  height:56px;display:flex;align-items:center;padding:0 10px 0 16px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;margin-right:20px;}
+.mark{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.14);display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:800;color:var(--fg);flex-shrink:0;}
+.bname{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--fg);letter-spacing:-.01em;}
+.nav-links{
+  display:flex;gap:2px;background:rgba(0,0,0,0.2);
+  border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:3px;
+}
+.nav-links a{
+  color:var(--fg2);text-decoration:none;font-size:12.5px;font-weight:600;
+  padding:7px 14px;border-radius:9px;transition:all .18s ease;
+}
+.nav-links a:hover{color:var(--fg);}
+.nav-links a.active{
+  color:var(--fg);background:rgba(255,255,255,0.1);
+  box-shadow:0 1px 3px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.nav-r{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.btn-ghost{
+  color:var(--fg2);text-decoration:none;font-size:12.5px;font-weight:600;
+  padding:8px 15px;border-radius:11px;transition:all .18s ease;
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+}
+.btn-ghost:hover{color:var(--fg);background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.16);}
+.btn-accent{
+  background:rgba(43,186,143,0.85);color:#03150f;text-decoration:none;
+  font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:11px;
+  transition:all .18s ease;border:1px solid rgba(43,186,143,0.4);
+  box-shadow:0 2px 12px rgba(43,186,143,0.25),inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.btn-accent:hover{background:var(--accent);transform:translateY(-1px);}
 
-.page{max-width:780px;margin:0 auto;padding:60px 20px 100px;}
+/* ── Page content ── */
+.page{max-width:780px;margin:0 auto;padding:48px 20px 100px;}
 h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:center;margin-bottom:10px;}
 .sub{color:var(--fg2);text-align:center;font-size:15px;margin-bottom:48px;line-height:1.6;}
 
-.dl-card{background:var(--s1);border:1px solid var(--border2);border-radius:20px;padding:40px;
-  text-align:center;position:relative;overflow:hidden;margin-bottom:32px;}
+.dl-card{
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--border2);border-radius:20px;padding:40px;
+  text-align:center;position:relative;overflow:hidden;margin-bottom:32px;
+}
 .dl-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--accent),transparent);}
 .dl-icon{font-size:48px;margin-bottom:16px;}
 .dl-name{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:6px;}
 .dl-desc{color:var(--fg2);font-size:13px;margin-bottom:24px;line-height:1.6;}
-.btn-dl{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#000;
+
+.btn-dl{
+  display:inline-flex;align-items:center;gap:10px;
+  background:rgba(43,186,143,0.85);color:#03150f;
   text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:12px;
-  border:none;cursor:pointer;transition:.2s;box-shadow:0 0 28px rgba(74,222,128,0.2);}
-.btn-dl:hover{opacity:.88;box-shadow:0 0 40px rgba(74,222,128,0.35);transform:translateY(-1px);}
+  border:1px solid rgba(43,186,143,0.4);cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 24px rgba(43,186,143,0.3),inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.btn-dl:hover{background:var(--accent);transform:translateY(-1px);box-shadow:0 6px 32px rgba(43,186,143,0.4);}
 .btn-dl:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+
 .tags{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:20px;}
 .tag{font-size:11px;color:var(--fg3);display:flex;align-items:center;gap:4px;}
 .tag b{color:var(--accent);}
-.section-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--fg2);
-  margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em;}
+
+.section-label{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  color:var(--fg2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.1em;}
 .steps{display:grid;gap:10px;}
-.step{display:flex;gap:16px;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px 20px;}
-.step-num{width:32px;height:32px;border-radius:50%;background:var(--accentg);border:1px solid rgba(74,222,128,0.2);
-  display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;
-  font-size:13px;font-weight:800;color:var(--accent);flex-shrink:0;}
+.step{
+  display:flex;gap:16px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);border-radius:14px;padding:16px 20px;
+  transition:border-color .15s;
+}
+.step:hover{border-color:var(--border2);}
+.step-num{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--accentg);border:1px solid rgba(43,186,143,0.25);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:800;
+  color:var(--accent);flex-shrink:0;
+}
 .step h3{font-size:14px;font-weight:600;margin-bottom:3px;}
-.step p{font-size:12px;color:var(--fg2);line-height:1.5;}
+.step p{font-size:12px;color:var(--fg2);line-height:1.6;}
 </style>
 </head>
 <body>
-<nav>
-  <a href="/" class="brand"><div class="brand-mark">Z</div><span class="bname">Zevora</span></a>
-  <div class="nav-links">
-    <a href="/">Home</a>
-    <a href="/download" class="active">Download</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/terms">Terms</a>
-    <a href="/privacy">Privacy</a>
-  </div>
-  <div class="nav-r">
-    {% if user %}<a href="/auth/logout" class="btn-nav">Sign out</a>
-    {% else %}<a href="/login" class="btn-nav">Sign in</a>{% endif %}
-  </div>
-</nav>
+
+<div class="nav-outer">
+  <nav>
+    <a href="/" class="brand">
+      <div class="mark">Z</div>
+      <span class="bname">Zevora</span>
+    </a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/download" class="active">Download</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+    <div class="nav-r">
+      {% if user %}
+        <a href="/auth/logout" class="btn-ghost">Sign out</a>
+      {% else %}
+        <a href="/login" class="btn-accent">Sign in</a>
+      {% endif %}
+    </div>
+  </nav>
+</div>
 
 <div class="page">
   <h1>Download Zevora</h1>
@@ -87,9 +159,11 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
     <div class="dl-desc">
       Latest version — Windows 10/11 64-bit. Automatically requests admin privileges.<br>
       Results are sent directly to your agent — you will not see them.
-      {% if version %}<br><span style="color:var(--fg3);font-size:11px;margin-top:4px;display:inline-block">
+      {% if version %}
+      <br><span style="color:var(--fg3);font-size:11px;margin-top:4px;display:inline-block">
         {{ version }}{% if file_size %} · {{ file_size }}{% endif %}{% if updated %} · Updated {{ updated }}{% endif %}
-      </span>{% endif %}
+      </span>
+      {% endif %}
     </div>
 
     {% if has_exe %}
@@ -113,25 +187,38 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
     </div>
   </div>
 
-  <div class="section-label" style="margin-bottom:14px">How it works</div>
+  <div class="section-label" style="margin-bottom:16px">How it works</div>
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
-      <div><h3>Get a PIN</h3><p>Your screenshare agent generates a one-time PIN from the Zevora portal and gives it to you in Discord or chat.</p></div>
+      <div>
+        <h3>Get a PIN</h3>
+        <p>Your screenshare agent generates a one-time PIN from the Zevora portal and gives it to you in Discord or chat.</p>
+      </div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
-      <div><h3>Run Zevora.exe</h3><p>Double-click Zevora.exe. Windows will ask for admin permission — click Yes. This is required to read system forensic data.</p></div>
+      <div>
+        <h3>Run Zevora.exe</h3>
+        <p>Double-click Zevora.exe. Windows will ask for admin permission — click Yes. This is required to read system forensic data.</p>
+      </div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
-      <div><h3>Accept terms & enter PIN</h3><p>Read and accept both consent boxes, then enter the PIN your agent gave you and click Start Scan.</p></div>
+      <div>
+        <h3>Accept terms &amp; enter PIN</h3>
+        <p>Read and accept both consent boxes, then enter the PIN your agent gave you and click Start Scan.</p>
+      </div>
     </div>
     <div class="step">
       <div class="step-num">4</div>
-      <div><h3>Wait for completion</h3><p>The scan runs automatically (2–5 minutes). When done, results are sent directly to your agent. You'll see a confirmation screen.</p></div>
+      <div>
+        <h3>Wait for completion</h3>
+        <p>The scan runs automatically (2–5 minutes). When done, results are sent directly to your agent. You'll see a confirmation screen.</p>
+      </div>
     </div>
   </div>
 </div>
+
 </body>
 </html>
