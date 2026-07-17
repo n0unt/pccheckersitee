@@ -3,15 +3,21 @@ Zevora — Web Application
 Flask + PostgreSQL + Discord OAuth2
 """
 from flask import (Flask, render_template, request, jsonify, session,
-                   redirect, url_for, abort, Response)
+                   redirect, url_for, abort, Response, send_file)
 from functools import wraps
 import psycopg2, psycopg2.extras
 import hashlib, secrets, string, datetime, json, os, re, base64, io, ssl
 import urllib.request, urllib.error, urllib.parse
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+EXE_FILE = os.path.join(UPLOAD_DIR, "ZevoraScanner.exe")
+
+app = Flask(__name__,
+            template_folder=BASE_DIR,
+            static_folder=os.path.join(BASE_DIR, "static"))
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production")
-app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
 DATABASE_URL       = os.environ.get("DATABASE_URL", "")
 DISCORD_CLIENT_ID  = os.environ.get("DISCORD_CLIENT_ID", "")
@@ -410,6 +416,16 @@ def logout():
     return redirect(url_for("login_page"))
 
 
+@app.route("/favicon.ico")
+def favicon():
+    ico = os.path.join(BASE_DIR, "static", "zevora.ico")
+    if not os.path.exists(ico):
+        ico = os.path.join(BASE_DIR, "zevora.ico")
+    if os.path.exists(ico):
+        return send_file(ico, mimetype="image/x-icon")
+    abort(404)
+
+
 # ── Public pages ──────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -578,6 +594,9 @@ def download_report(pin):
                        ("discord_raw","Discord"),("discord_memory_raw","DC Downloads"),
                        ("network_raw","Network/VPN"),("eventlog_raw","Event Log"),
                        ("power_events_raw","Power Timeline"),("deleted_recovery_raw","Deleted Recovery"),
+                       ("deleted_int_raw","Deleted Integrity"),("mft_recovery_raw","Pre-Reset MFT Recovery"),
+                       ("cmd_history_raw","CMD History"),("memory_injection_raw","Memory Injection"),
+                       ("fastflags_raw","FastFlags"),("factory_reset_raw","Factory Reset"),
                        ("drive_info","USB Drives"),("two_pc_raw","2-PC Bypass"),("cleaners_raw","Cleaners")]:
         val=report.get(key,"")
         if val and str(val).strip() not in ("","None","No data"):
@@ -657,12 +676,24 @@ def api_submit():
         for tab in ["shellbags","bam","prefetch","appcompat","roblox","cheat","yara","unsigned",
                     "recycle","sysmain","processes","cleaners","registry_extra","discord",
                     "discord_memory","eventlog","jumplists","lnkfiles","power_events","two_pc",
-                    "deleted_recovery","deleted_int","exec_history_text","network","drive_info"]:
+                    "deleted_recovery","deleted_int","exec_history_text","network","drive_info",
+                    "mft_recovery","cmd_history","memory_injection","fastflags"]:
             if tab in data and data[tab]:
                 report[tab+"_raw"]=str(data[tab])[:30000]
+        if data.get("factory_reset"):
+            report["factory_reset_raw"] = str(data["factory_reset"])[:30000]
+        nested = data.get("report") or {}
+        if isinstance(nested, dict):
+            for k, v in nested.items():
+                if k not in report or report[k] in (None, "", {}):
+                    report[k] = v
         for field in ["cleaner_info","process_hits","cleaner_hits","eventlog_hits","jumplist_hits",
                       "lnk_hits","deleted_hits","exec_history","roblox_log_hits","vpn_detected",
-                      "power_hits","two_pc_hits","recovery_hits","discord_memory_hits","fastflags"]:
+                      "power_hits","two_pc_hits","recovery_hits","discord_memory_hits","fastflags",
+                      "mft_recovery_hits","cmd_history_hits","memory_injection_hits",
+                      "shellbag_hits","bam_hits","prefetch_hits","appcompat_hits","cheat_hits",
+                      "yara_hits","unsigned_count","sysmain_hits","sysmain_autofail","factory_resets",
+                      "drive_info","drive_warn"]:
             if field in data: report[field]=data[field]
         report.pop("vpn_info",None)
         report_str=json.dumps(report,default=str)
@@ -854,50 +885,79 @@ def api_delete_league(lid):
 @login_required
 @owner_required
 def upload_exe():
-    f=request.files.get("file")
-    ver=(request.form.get("version") or "v5.0").strip()
-    if not f: return jsonify({"error":"No file"}),400
-    data=f.read()
-    if not data: return jsonify({"error":"Empty file"}),400
-    size_mb=round(len(data)/1024/1024,1)
-    b64=base64.b64encode(data).decode("ascii")
-    meta={"version":ver,"size":f"{size_mb} MB","filename":f.filename or "ZevoraScanner.exe","updated":now()}
-    conn=get_db(); cur=conn.cursor()
-    cur.execute("INSERT INTO settings (key,value) VALUES ('exe_meta',%s) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
-                (json.dumps(meta),))
-    cur.execute("INSERT INTO settings (key,value) VALUES ('exe_data',%s) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
-                (b64,))
-    conn.commit(); cur.close(); conn.close()
+    f = request.files.get("file")
+    ver = (request.form.get("version") or "v5.0").strip()
+    if not f:
+        return jsonify({"error": "No file"}), 400
+    data = f.read()
+    if not data:
+        return jsonify({"error": "Empty file"}), 400
+    if len(data) > 180 * 1024 * 1024:
+        return jsonify({"error": "File too large (max 180 MB)"}), 413
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     try:
-        with open("/tmp/zevora.exe","wb") as fp: fp.write(data)
-        with open("/tmp/zevora_fname.txt","w") as fp: fp.write(f.filename or "ZevoraScanner.exe")
-    except Exception: pass
-    return jsonify({"ok":True,"version":ver,"size":f"{size_mb} MB"})
+        with open(EXE_FILE, "wb") as fp:
+            fp.write(data)
+    except Exception as e:
+        return jsonify({"error": f"Could not save file: {e}"}), 500
+    size_mb = round(len(data) / 1024 / 1024, 1)
+    meta = {
+        "version": ver,
+        "size": f"{size_mb} MB",
+        "filename": f.filename or "ZevoraScanner.exe",
+        "updated": now(),
+        "storage": "disk",
+        "path": EXE_FILE,
+    }
+    conn = get_db(); cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO settings (key,value) VALUES ('exe_meta',%s) "
+        "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+        (json.dumps(meta),))
+    # Drop legacy base64 blob — it breaks large uploads on Postgres
+    cur.execute("DELETE FROM settings WHERE key='exe_data'")
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({"ok": True, "version": ver, "size": f"{size_mb} MB"})
+
 
 @app.route("/download/exe")
 def download_exe():
-    from flask import send_file
-    filename="ZevoraScanner.exe"
-    if os.path.exists("/tmp/zevora.exe"):
-        try:
-            if os.path.exists("/tmp/zevora_fname.txt"):
-                filename=open("/tmp/zevora_fname.txt").read().strip()
-            return send_file("/tmp/zevora.exe",as_attachment=True,
-                             download_name=filename,mimetype="application/octet-stream")
-        except Exception: pass
+    filename = "ZevoraScanner.exe"
+    meta = {}
     try:
-        conn=get_db(); cur=conn.cursor()
-        cur.execute("SELECT value FROM settings WHERE key='exe_meta'"); mr=cur.fetchone()
-        cur.execute("SELECT value FROM settings WHERE key='exe_data'"); dr=cur.fetchone()
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key='exe_meta'")
+        row = cur.fetchone()
+        if row:
+            meta = json.loads(row[0])
+            filename = meta.get("filename", filename)
         cur.close(); conn.close()
-    except Exception: abort(404)
-    if not dr: abort(404)
-    if mr:
-        try: filename=json.loads(mr[0]).get("filename",filename)
-        except Exception: pass
-    raw=base64.b64decode(dr[0])
-    return send_file(io.BytesIO(raw),as_attachment=True,download_name=filename,
-                     mimetype="application/octet-stream")
+    except Exception:
+        pass
+    if os.path.exists(EXE_FILE):
+        return send_file(
+            EXE_FILE,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/octet-stream",
+        )
+    # Legacy fallback: old DB-stored builds
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key='exe_data'")
+        dr = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception:
+        abort(404)
+    if not dr:
+        abort(404)
+    raw = base64.b64decode(dr[0])
+    return send_file(
+        io.BytesIO(raw),
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/octet-stream",
+    )
 
 @app.route("/api/stats")
 def api_stats():
