@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Zevora — Results {{ pin.pin }}</title>
+<link rel="icon" href="/static/zevora.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -24,7 +25,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 /* ── Nav ── */
 .nav{height:var(--nav-h);background:rgba(10,10,13,0.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:12px;position:relative;z-index:200;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;}
-.mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:#fff;}
+.mark{width:26px;height:26px;border-radius:7px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.mark img{width:100%;height:100%;object-fit:cover;display:block;}
 .bname{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--fg);}
 .nav-pin{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);background:var(--accentg);border:1px solid rgba(43,186,143,0.25);border-radius:6px;padding:3px 9px;letter-spacing:.06em;}
 .nav-meta{font-size:11px;color:var(--fg3);}
@@ -142,7 +144,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
 
 <div class="nav">
   <a href="/dashboard" class="brand">
-    <div class="mark">Z</div>
+    <div class="mark"><img src="/static/zevora.ico" alt="Zevora"></div>
     <span class="bname">Zevora</span>
   </a>
   <span class="nav-pin">{{ pin.pin }}</span>
@@ -214,6 +216,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
       {% set rch = report.get('recovery_hits',0)|int %}
       <span class="hc {% if rch>0 %}r{% else %}d{% endif %}">{{ rch }}</span>
     </button>
+    <button class="tab" onclick="sw('deleted_int',this)">
+      <div class="tab-lbl"><span>DIN</span> Deleted Integrity</div>
+      {% set dih = report.get('deleted_hits',0)|int %}
+      <span class="hc {% if dih>0 %}r{% else %}d{% endif %}">{{ dih }}</span>
+    </button>
+    <button class="tab" onclick="sw('mft_recovery',this)">
+      <div class="tab-lbl"><span>MFT</span> Pre-Reset Recovery</div>
+      {% set mfh = report.get('mft_recovery_hits',0)|int %}
+      <span class="hc {% if mfh>0 %}r{% else %}d{% endif %}">{{ mfh }}</span>
+    </button>
 
     <div class="side-sect">Execution</div>
     <button class="tab" onclick="sw('bam',this)">
@@ -239,8 +251,20 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
     <button class="tab" onclick="sw('exec_history',this)">
       <div class="tab-lbl"><span>EH</span> Exec History</div>
     </button>
+    <button class="tab" onclick="sw('jumplists',this)">
+      <div class="tab-lbl"><span>JL</span> Jump Lists</div>
+      {% set jlh = report.get('jumplist_hits',0)|int %}
+      <span class="hc {% if jlh>0 %}a{% else %}d{% endif %}">{{ jlh }}</span>
+    </button>
+    <button class="tab" onclick="sw('lnkfiles',this)">
+      <div class="tab-lbl"><span>LNK</span> LNK Files</div>
+      {% set lkh = report.get('lnk_hits',0)|int %}
+      <span class="hc {% if lkh>0 %}a{% else %}d{% endif %}">{{ lkh }}</span>
+    </button>
     <button class="tab" onclick="sw('cmd_history',this)">
       <div class="tab-lbl"><span>CMD</span> CMD History</div>
+      {% set chh = report.get('cmd_history_hits',0)|int %}
+      <span class="hc {% if chh>0 %}a{% else %}d{% endif %}">{{ chh }}</span>
     </button>
 
     <div class="side-sect">System</div>
@@ -262,6 +286,15 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
     <button class="tab" onclick="sw('factory',this)">
       <div class="tab-lbl"><span>FAC</span> Factory Reset</div>
     </button>
+    <button class="tab" onclick="sw('recycle',this)">
+      <div class="tab-lbl"><span>RB</span> Recycle Bin</div>
+    </button>
+    <button class="tab" onclick="sw('sysmain',this)">
+      <div class="tab-lbl"><span>SYS</span> SysMain</div>
+    </button>
+    <button class="tab" onclick="sw('registry',this)">
+      <div class="tab-lbl"><span>REG</span> Registry</div>
+    </button>
     <button class="tab" onclick="sw('usb',this)">
       <div class="tab-lbl"><span>USB</span> USB History</div>
     </button>
@@ -277,6 +310,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
     <div class="side-sect">Memory</div>
     <button class="tab" onclick="sw('memory',this)">
       <div class="tab-lbl"><span>MEM</span> Injection Scan</div>
+      {% set mih = report.get('memory_injection_hits',0)|int %}
+      <span class="hc {% if mih>0 %}r{% else %}d{% endif %}">{{ mih }}</span>
     </button>
 
     <div class="side-sect">Raw</div>
@@ -321,6 +356,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
       {% if report.get('sysmain_autofail') %}<div class="warn r"><span class="warn-icon">!</span> SYSMAIN BYPASS — SysMain disabled and prefetch folder empty. Auto-fail.</div>{% endif %}
       {% if report.get('two_pc_hits',0)|int > 0 %}<div class="warn r"><span class="warn-icon">!</span> 2-PC BYPASS INDICATORS — See 2-PC Bypass tab.</div>{% endif %}
       {% if report.get('recovery_hits',0)|int > 0 %}<div class="warn r"><span class="warn-icon">!</span> DELETED CHEAT FILES RECOVERED — forensic evidence of deleted cheats.</div>{% endif %}
+      {% if report.get('mft_recovery_hits',0)|int > 0 %}<div class="warn r"><span class="warn-icon">!</span> PRE-RESET MFT RECOVERY — deleted file records survived factory reset / reinstall.</div>{% endif %}
+      {% if report.get('deleted_hits',0)|int > 0 %}<div class="warn a"><span class="warn-icon">!</span> DELETED INTEGRITY HITS — cheat evidence in recycle bin / prefetch metadata.</div>{% endif %}
       {% if report.get('cleaner_hits',0)|int > 0 %}<div class="warn a"><span class="warn-icon">!</span> CLEANING TOOLS DETECTED — evidence of trace wiping.</div>{% endif %}
       {% if report.get('vpn_detected') %}<div class="warn a"><span class="warn-icon">!</span> VPN DETECTED — see Network tab.</div>{% endif %}
       {% if (scan.roblox_accounts or [])|length > 1 %}<div class="warn a"><span class="warn-icon">!</span> MULTIPLE ROBLOX ACCOUNTS ({{ (scan.roblox_accounts or [])|length }}) — possible ban evasion.</div>{% endif %}
@@ -341,6 +378,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
             ('Cleaners', report.get('cleaner_hits',0)),
             ('Event Log', report.get('eventlog_hits',0)),
             ('Deleted Files', report.get('recovery_hits',0)),
+            ('Pre-Reset MFT', report.get('mft_recovery_hits',0)),
+            ('Deleted Integrity', report.get('deleted_hits',0)),
+            ('Jump Lists', report.get('jumplist_hits',0)),
+            ('LNK Files', report.get('lnk_hits',0)),
+            ('CMD History', report.get('cmd_history_hits',0)),
+            ('Memory Injection', report.get('memory_injection_hits',0)),
             ('2-PC Bypass', report.get('two_pc_hits',0)),
             ('Power Events', report.get('power_hits',0)),
             ('DC Downloads', report.get('discord_memory_hits',0)),
@@ -491,6 +534,24 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
       <div class="rpre" data-color="1">{{ report.get('deleted_recovery_raw','No data') }}</div>
     </div>
 
+    <!-- DELETED INTEGRITY -->
+    <div class="panel" id="panel-deleted_int">
+      <div class="pg-title">Deleted File Integrity</div>
+      <p class="pg-sub">Cheat-related files found in Recycle Bin metadata and Prefetch — evidence that files were deleted but traces remain.</p>
+      {% set dih = report.get('deleted_hits',0)|int %}
+      {% if dih > 0 %}<div class="warn r"><span class="warn-icon">!</span> {{ dih }} deleted integrity hit(s).</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('deleted_int_raw','No data') }}</div>
+    </div>
+
+    <!-- PRE-RESET MFT RECOVERY -->
+    <div class="panel" id="panel-mft_recovery">
+      <div class="pg-title">Pre-Reset Deleted File Recovery</div>
+      <p class="pg-sub">Raw NTFS MFT scan for orphaned/deleted file records that survive factory reset or Windows reinstall on the same partition. Finds cheat-named files even after wipe attempts.</p>
+      {% set mfh = report.get('mft_recovery_hits',0)|int %}
+      {% if mfh > 0 %}<div class="warn r"><span class="warn-icon">!</span> {{ mfh }} pre-reset deleted file record(s) recovered from MFT.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('mft_recovery_raw','No data') }}</div>
+    </div>
+
     <!-- BAM -->
     <div class="panel" id="panel-bam">
       <div class="pg-title">BAM Execution History</div>
@@ -529,14 +590,32 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
       <div class="rpre" data-color="1">{{ report.get('exec_history_text_raw','No data') }}</div>
     </div>
 
-    <!-- CMD HISTORY (NEW) -->
+    <!-- JUMP LISTS -->
+    <div class="panel" id="panel-jumplists">
+      <div class="pg-title">Jump List Analysis</div>
+      <p class="pg-sub">Recent items and automatic destinations — shows programs and files opened via taskbar/right-click history.</p>
+      {% set jlh = report.get('jumplist_hits',0)|int %}
+      {% if jlh > 0 %}<div class="warn a"><span class="warn-icon">!</span> {{ jlh }} suspicious jump list hit(s).</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('jumplists_raw','No data') }}</div>
+    </div>
+
+    <!-- LNK FILES -->
+    <div class="panel" id="panel-lnkfiles">
+      <div class="pg-title">LNK / Shortcut Files</div>
+      <p class="pg-sub">Windows shortcut files pointing to cheat executables or suspicious paths.</p>
+      {% set lkh = report.get('lnk_hits',0)|int %}
+      {% if lkh > 0 %}<div class="warn a"><span class="warn-icon">!</span> {{ lkh }} suspicious LNK file(s).</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('lnkfiles_raw','No data') }}</div>
+    </div>
+
+    <!-- CMD HISTORY -->
     <div class="panel" id="panel-cmd_history">
       <div class="pg-title">CMD / PowerShell History</div>
-      <p class="pg-sub">Shell commands detected from Prefetch, BAM, event logs, and execution history. Covers cmd.exe, powershell.exe, wscript.exe, mshta.exe, bitsadmin, and scripting hosts.</p>
-      <div id="cmd-content">
-        <div class="warn b"><span class="warn-icon">–</span> Parsing execution history for shell commands…</div>
-      </div>
-      <div class="pg-div">Raw BAM Shell Entries</div>
+      <p class="pg-sub">Shell commands and scripting host execution detected from dedicated scan output, BAM, event logs, and execution history.</p>
+      {% set chh = report.get('cmd_history_hits',0)|int %}
+      {% if chh > 0 %}<div class="warn a"><span class="warn-icon">!</span> {{ chh }} shell command indicator(s).</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('cmd_history_raw','No data') }}</div>
+      <div class="pg-div">Filtered Shell Entries</div>
       <div class="rpre" id="bam-raw-for-cmd" style="display:none">{{ report.get('bam_raw','') }}</div>
       <div class="rpre" id="eh-raw-for-cmd" style="display:none">{{ report.get('exec_history_text_raw','') }}</div>
       <div class="rpre" id="eventlog-raw-for-cmd" style="display:none">{{ report.get('eventlog_raw','') }}</div>
