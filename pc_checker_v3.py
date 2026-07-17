@@ -1,31 +1,49 @@
 """
-Comet Scanner v5 — Forensic Scanner
-Build: pyinstaller --onefile --noconsole --icon=comet.ico --name=Comet --manifest=comet.manifest comet_scanner.py
+Comet Forensic Scanner — PyQt6 UI
+Run:  python pc_checker.py
+Build: pyinstaller --onefile --noconsole --name=CometScanner --manifest=comet.manifest pc_checker.py
+       (add --icon=comet.ico if you have an icon file)
+Deps: pip install PyQt6 pyinstaller
 """
-import sys as _sys, os as _os
-import tkinter.font as _tkfont
-
+import base64 as _img_b64
+import tempfile, os as _os
+import os
+import sys
+import ctypes
+from ctypes import wintypes
+ 
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame,
+    QPushButton, QLineEdit, QTextEdit, QCheckBox, QProgressBar, QSizePolicy,
+    QGraphicsDropShadowEffect,
+)
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QSize, QRectF
+from PyQt6.QtGui import (
+    QFont, QIcon, QPixmap, QPainter, QColor, QPainterPath, QLinearGradient,
+    QRadialGradient, QBrush,
+)
+ 
 def _setup_crash_log():
     try:
         import traceback, datetime
-        desktop = _os.path.join(_os.path.expanduser("~"), "Desktop")
-        log_path = _os.path.join(desktop, "comet_error.txt")
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        log_path = os.path.join(desktop, "zevora_error.txt")
         def _excepthook(exc_type, exc_value, exc_tb):
             try:
                 with open(log_path, "w", encoding="utf-8") as f:
-                    f.write(f"Comet Scanner Error\n{datetime.datetime.now()}\n\n")
+                    f.write(f"zevora Scanner Error\n{datetime.datetime.now()}\n\n")
                     f.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
             except Exception:
                 pass
             try:
                 import tkinter as _tk, tkinter.messagebox as _mb
                 _r = _tk.Tk(); _r.withdraw()
-                _mb.showerror("Comet — Error",
-                    f"{exc_type.__name__}: {exc_value}\n\nFull error saved to Desktop\\comet_error.txt")
+                _mb.showerror("zevora — Error",
+                    f"{exc_type.__name__}: {exc_value}\n\nFull error saved to Desktop\\zevora_error.txt")
                 _r.destroy()
             except Exception:
                 pass
-        _sys.excepthook = _excepthook
+        sys.excepthook = _excepthook
     except Exception:
         pass
 _setup_crash_log()
@@ -37,20 +55,20 @@ def _is_admin():
     except Exception:
         return False
 
-if _os.name == "nt" and not _is_admin():
+if sys.platform == "win32" and not _is_admin():
     import ctypes
     try:
-        if getattr(_sys, "frozen", False):
-            exe  = _sys.executable
-            args = " ".join(f'"{a}"' for a in _sys.argv[1:])
+        if getattr(sys, "frozen", False):
+            exe  = sys.executable
+            args = " ".join(f'"{a}"' for a in sys.argv[1:])
             ret  = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args if args else None, None, 1)
         else:
-            exe    = _sys.executable
-            script = _os.path.abspath(__file__)
-            args   = f'"{script}"' + (" " + " ".join(f'"{a}"' for a in _sys.argv[1:]) if _sys.argv[1:] else "")
+            exe    = sys.executable
+            script = os.path.abspath(__file__)
+            args   = f'"{script}"' + (" " + " ".join(f'"{a}"' for a in sys.argv[1:]) if sys.argv[1:] else "")
             ret    = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args, None, 1)
         if int(ret) > 32:
-            _sys.exit(0)
+            sys.exit(0)
     except Exception:
         pass
 
@@ -104,7 +122,7 @@ WEBHOOK_UFF = _d(_WH_UFF_ENC)
 def get_webhook_for_league(league):
     return WEBHOOK_KFA if str(league).upper() == "KFA" else WEBHOOK_UFF
 
-WEBSITE_URL = "https://pccheckersitee-production.up.railway.app"
+WEBSITE_URL = "https://zevora.digital/"
 
 FALSE_POSITIVE_PATHS = [
     "microsoft","windows","edge","chrome","firefox","mozilla",
@@ -175,10 +193,8 @@ def matches_keyword(text):
         hits.append(kw)
     return hits
 
-import os, sys, re, glob, struct, hashlib, datetime, threading, time
+import re, glob, struct, hashlib, datetime, threading, time
 import urllib.request, urllib.error, json, http.client, ssl, tempfile, subprocess
-import tkinter as tk
-from tkinter import scrolledtext, messagebox, filedialog
 
 WINDOWS = sys.platform == "win32"
 if WINDOWS:
@@ -223,7 +239,7 @@ def _post_json(payload, url_override=None):
     try:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(target, data=data,
-              headers={"Content-Type":"application/json","User-Agent":"CometScanner/4.0"}, method="POST")
+              headers={"Content-Type":"application/json","User-Agent":"zevoraScanner/4.0"}, method="POST")
         with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=15) as r:
             body = r.read()
             try: body = json.loads(body)
@@ -264,7 +280,7 @@ def send_webhook(results):
         vpn_info  = results.get("vpn_info","Unknown")
         cleaner_info = results.get("cleaner_info","None detected")
         summary = {
-            "title": f"Comet Scanner — {verdict}",
+            "title": f"zevora Scanner — {verdict}",
             "color": color,
             "timestamp": datetime.datetime.utcnow().isoformat()+"Z",
             "fields":[
@@ -285,7 +301,7 @@ def send_webhook(results):
                 {"name":"Discord Accounts","value":disc_str[:512],                        "inline":False},
                 {"name":"Unsigned EXEs",  "value":us_str[:512],                           "inline":False},
             ],
-            "footer":{"text":f"Comet v4 · {now_str()} · {league}"},
+            "footer":{"text":f"zevora v4 · {now_str()} · {league}"},
         }
         ok,_,err = _post_json({"embeds":[summary]}, url_override=webhook)
         if not ok: errors.append(f"Summary: {err}")
@@ -366,7 +382,7 @@ def send_website(results, pin):
         data = raw.encode("utf-8")
         req = urllib.request.Request(
             f"{WEBSITE_URL}/api/submit", data=data,
-            headers={"Content-Type":"application/json","User-Agent":"CometScanner/5.0"},
+            headers={"Content-Type":"application/json","User-Agent":"zevoraScanner/5.0"},
             method="POST")
         try:
             with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
@@ -1426,7 +1442,7 @@ def scan_network_vpn():
             lines.append("  ✓ No VPN adapters detected")
     except Exception: pass
     try:
-        req=urllib.request.Request("https://ipinfo.io/json",headers={"User-Agent":"CometScanner/4.0"})
+        req=urllib.request.Request("https://ipinfo.io/json",headers={"User-Agent":"zevoraScanner/4.0"})
         with urllib.request.urlopen(req,context=_ssl_ctx(),timeout=5) as r:
             ip_data=json.loads(r.read().decode())
         org=ip_data.get("org","Unknown")
@@ -2024,7 +2040,7 @@ def scan_deleted_cheat_recovery():
         return section("Deleted Cheat Recovery", ["Windows only"]), 0, []
     recovered = []
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-    out_dir  = os.path.join(desktop, "CometRecovered")
+    out_dir  = os.path.join(desktop, "zevoraRecovered")
 
     rb_root = "C:\\$Recycle.Bin"
     if os.path.exists(rb_root):
@@ -2101,7 +2117,7 @@ def scan_deleted_cheat_recovery():
             os.makedirs(out_dir, exist_ok=True)
             rpt = os.path.join(out_dir, "recovery_report.txt")
             with open(rpt, "w", encoding="utf-8") as fp:
-                fp.write("COMET — DELETED CHEAT EVIDENCE\n")
+                fp.write("zevora — DELETED CHEAT EVIDENCE\n")
                 fp.write(f"Generated : {now_str()}\nPC User   : {current_user()}\n" + "=" * 60 + "\n\n")
                 for i, r in enumerate(unique_rec, 1):
                     fp.write(f"[{i}] {r['filename']}\n  Path     : {r['original_path']}\n")
@@ -2679,7 +2695,7 @@ def scan_mft_deleted_recovery(time_budget_sec=40, max_records=400000, max_recove
                                                    cluster_size, real_size))
                         if content:
                             out_dir = os.path.join(os.path.expanduser("~"), "Desktop",
-                                                    "CometRecovered", "PreReset")
+                                                    "zevoraRecovered", "PreReset")
                             os.makedirs(out_dir, exist_ok=True)
                             safe_name = re.sub(r'[\\/:*?"<>|]', "_", best_name["name"])
                             out_path = os.path.join(out_dir, f"{idx}_{safe_name}")
@@ -3088,7 +3104,7 @@ def run_full_scan(league="?"):
             "cmd_history_hits":ch_h,"memory_injection_hits":mi_h,
         },
         "full_report":"\n".join([
-            f"COMET SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}",
+            f"zevora SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}",
             "="*60,
             sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,
             pr_t,cl_t,nw_t,dc_t,dm_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,
@@ -3101,311 +3117,642 @@ def run_full_scan(league="?"):
 # ============================================================
 #  Rounded-corner widget kit (ONE definition — duplicates removed)
 # ============================================================
-def rounded_rect_points(x1, y1, x2, y2, r):
-    r = max(0, min(r, (x2-x1)/2, (y2-y1)/2))
-    return [
-        x1+r,y1, x2-r,y1, x2,y1, x2,y1+r,
-        x2,y2-r, x2,y2, x2-r,y2, x1+r,y2,
-        x1,y2, x1,y2-r, x1,y1+r, x1,y1,
-    ]
+def enable_acrylic_blur(hwnd, tint_rgba=(10, 15, 12, 140)):
+    """
+    Calls the undocumented but widely-used Windows DWM
+    SetWindowCompositionAttribute to blur whatever is behind
+    this window (desktop, other apps) — real OS-level glass.
+    Silently no-ops on non-Windows / if the call fails.
+    """
+    try:
+        class ACCENT_POLICY(ctypes.Structure):
+            _fields_ = [
+                ("AccentState", ctypes.c_int),
+                ("AccentFlags", ctypes.c_int),
+                ("GradientColor", ctypes.c_uint),
+                ("AnimationId", ctypes.c_int),
+            ]
  
-def draw_rounded_rect(canvas, x1, y1, x2, y2, r, **kw):
-    return canvas.create_polygon(rounded_rect_points(x1,y1,x2,y2,r), smooth=True, **kw)
+        class WINCOMPATTRDATA(ctypes.Structure):
+            _fields_ = [
+                ("Attribute", ctypes.c_int),
+                ("Data", ctypes.POINTER(ACCENT_POLICY)),
+                ("SizeOfData", ctypes.c_size_t),
+            ]
+ 
+        ACCENT_ENABLE_ACRYLICBLURBEHIND = 4
+        WCA_ACCENT_POLICY = 19
+ 
+        r, g, b, a = tint_rgba
+        gradient_color = (a << 24) | (b << 16) | (g << 8) | r  # ABGR packed
+ 
+        accent = ACCENT_POLICY()
+        accent.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND
+        accent.AccentFlags = 2
+        accent.GradientColor = gradient_color
+        accent.AnimationId = 0
+ 
+        data = WINCOMPATTRDATA()
+        data.Attribute = WCA_ACCENT_POLICY
+        data.Data = ctypes.pointer(accent)
+        data.SizeOfData = ctypes.sizeof(accent)
+ 
+        set_attr = ctypes.windll.user32.SetWindowCompositionAttribute
+        set_attr(int(hwnd), ctypes.pointer(data))
+        return True
+    except Exception:
+        return False
  
  
-def _mix(hex1, hex2, t):
-    """Blend two hex colors — used for the glass sheen / gradient effects."""
-    def h2rgb(h):
-        h = h.lstrip("#")
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    r1, g1, b1 = h2rgb(hex1)
-    r2, g2, b2 = h2rgb(hex2)
-    r = int(r1 + (r2 - r1) * t)
-    g = int(g1 + (g2 - g1) * t)
-    b = int(b1 + (b2 - b1) * t)
-    return f"#{r:02x}{g:02x}{b:02x}"
- 
- 
-class RoundedButton(tk.Canvas):
-    """Glass-style button — frosted dark fill with a light top highlight edge."""
-    def __init__(self, parent, text, command=None, bg="#173023", fg="#eafff2",
-                 hover_bg="#1e3d2c", disabled_bg="#141414", disabled_fg="#4a4a4a",
-                 font=("Segoe UI",10,"bold"), radius=12, padx=22, pady=11,
-                 width=None, height=None, state="normal", parent_bg=None,
-                 accent=False):
-        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
-        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, cursor="hand2")
-        self.command = command
-        # accent=True gives the solid green "primary action" look instead of glass-neutral
-        if accent:
-            bg = "#1f9d55"; hover_bg = "#22b862"; fg = "#04140a"
-        self.bg, self.fg = bg, fg
-        self.hover_bg = hover_bg
-        self.disabled_bg, self.disabled_fg = disabled_bg, disabled_fg
+# ============================================================
+#  iOS 17–inspired glass design system
+# ============================================================
+class C:
+    # Base surfaces
+    BG          = "#0b0b0d"
+    BG2         = "#141416"
+    BG3         = "#1c1c1e"
+
+    # Frosted materials (iOS dark vibrancy)
+    GLASS       = "rgba(255,255,255,0.07)"
+    GLASS2      = "rgba(255,255,255,0.11)"
+    GLASS3      = "rgba(255,255,255,0.15)"
+    GLASS_INPUT = "rgba(255,255,255,0.06)"
+    GLASS_H     = "rgba(255,255,255,0.14)"
+
+    # Specular edges — top highlight, subtle side/bottom
+    EDGE_TOP    = "rgba(255,255,255,0.32)"
+    EDGE        = "rgba(255,255,255,0.14)"
+    EDGE_DIM    = "rgba(255,255,255,0.06)"
+
+    # Typography colors (iOS label hierarchy)
+    FG          = "#ffffff"
+    FG2         = "rgba(235,235,245,0.72)"
+    FG3         = "rgba(235,235,245,0.38)"
+
+    # System green accent
+    ACCENT      = "#30d158"
+    ACCENT2     = "#28b84c"
+    ACCENT_SOFT = "rgba(48,209,88,0.18)"
+    ACCENT_GLOW = "rgba(48,209,88,0.55)"
+    RED         = "#ff453a"
+    RED_SOFT    = "rgba(255,69,58,0.16)"
+
+    MONO        = "SF Mono, Consolas, monospace"
+    UI          = "Segoe UI Variable, Segoe UI, system-ui, sans-serif"
+
+    R_L = 22
+    R_M = 16
+    R_S = 12
+    R_PILL = 22
+
+
+def _glass_shadow(widget, blur=36, y=10, alpha=70):
+    fx = QGraphicsDropShadowEffect(widget)
+    fx.setBlurRadius(blur)
+    fx.setOffset(0, y)
+    fx.setColor(QColor(0, 0, 0, alpha))
+    widget.setGraphicsEffect(fx)
+    return fx
+
+
+def _ios_checkbox_style():
+    return f"""
+        QCheckBox {{
+            color: {C.FG2};
+            font-family: {C.UI};
+            font-size: 12px;
+            spacing: 12px;
+            padding: 10px 12px;
+        }}
+        QCheckBox::indicator {{
+            width: 22px;
+            height: 22px;
+            border-radius: 7px;
+            border: 1.5px solid {C.EDGE};
+            background: {C.GLASS_INPUT};
+        }}
+        QCheckBox::indicator:hover {{
+            background: {C.GLASS2};
+            border-color: {C.EDGE_TOP};
+        }}
+        QCheckBox::indicator:checked {{
+            background: {C.ACCENT};
+            border-color: {C.ACCENT};
+        }}
+    """
+
+
+def apply_ios_app_theme(app: QApplication):
+    app.setStyle("Fusion")
+    app.setStyleSheet(f"""
+        QWidget {{
+            font-family: {C.UI};
+            color: {C.FG};
+        }}
+        QScrollBar:vertical {{
+            background: transparent;
+            width: 6px;
+            margin: 4px 2px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: rgba(255,255,255,0.18);
+            border-radius: 3px;
+            min-height: 24px;
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+        }}
+        QScrollBar:horizontal {{
+            background: transparent;
+            height: 6px;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: rgba(255,255,255,0.18);
+            border-radius: 3px;
+        }}
+    """)
+
+
+class GlassShell(QWidget):
+    """Full-window ambient wallpaper with transparent content overlay."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent;")
+        self._ambient = AmbientBackground(self)
+        self._content = QWidget(self)
+        self._content.setStyleSheet("background: transparent;")
+        self._layout = QVBoxLayout(self._content)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(0)
+
+    def layout(self):
+        return self._layout
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._ambient.setGeometry(self.rect())
+        self._content.setGeometry(self.rect())
+
+
+class AmbientBackground(QWidget):
+    """Soft iOS-style wallpaper blobs behind frosted glass."""
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.fillRect(self.rect(), QColor(C.BG))
+
+        blobs = [
+            (0.18, 0.12, 0.55, QColor(48, 209, 88, 38)),
+            (0.82, 0.08, 0.45, QColor(100, 210, 255, 28)),
+            (0.55, 0.92, 0.50, QColor(191, 90, 242, 22)),
+        ]
+        for cx, cy, r, color in blobs:
+            grad = QRadialGradient(self.width() * cx, self.height() * cy, self.width() * r)
+            grad.setColorAt(0.0, color)
+            grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+            p.setBrush(QBrush(grad))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(QRectF(
+                self.width() * cx - self.width() * r,
+                self.height() * cy - self.width() * r,
+                self.width() * r * 2,
+                self.width() * r * 2,
+            ))
+        p.end()
+
+
+def _logo_pixmap(size=32):
+    """iOS squircle app icon with gradient fill."""
+    pm = QPixmap(size, size)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    r = size * 0.225
+    path.addRoundedRect(0, 0, size, size, r, r)
+    grad = QLinearGradient(0, 0, size, size)
+    grad.setColorAt(0.0, QColor("#34d399"))
+    grad.setColorAt(0.5, QColor("#30d158"))
+    grad.setColorAt(1.0, QColor("#059669"))
+    p.fillPath(path, grad)
+    # inner highlight
+    hi = QLinearGradient(0, 0, 0, size * 0.5)
+    hi.setColorAt(0.0, QColor(255, 255, 255, 55))
+    hi.setColorAt(1.0, QColor(255, 255, 255, 0))
+    p.fillPath(path, hi)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor("#ffffff"))
+    m = size * 0.26
+    zw = size - 2 * m
+    th = max(2, int(size * 0.10))
+    p.drawRoundedRect(int(m), int(m), int(zw), th, 2, 2)
+    p.drawRoundedRect(int(m), int(size - m - th), int(zw), th, 2, 2)
+    diag = QPainterPath()
+    diag.moveTo(m + zw, m + th)
+    diag.lineTo(m + zw, m + th + th * 0.5)
+    diag.lineTo(m, size - m - th)
+    diag.lineTo(m, size - m - th - th * 0.5)
+    diag.closeSubpath()
+    p.drawPath(diag)
+    p.end()
+    return pm
+
+
+class GlassCard(QFrame):
+    """Frosted elevated panel with specular top edge."""
+    def __init__(self, radius=C.R_M, fill=C.GLASS, elevated=False, shadow=True, parent=None):
+        super().__init__(parent)
+        if elevated:
+            fill = C.GLASS2
+        self.setStyleSheet(f"""
+            GlassCard {{
+                background-color: {fill};
+                border: 1px solid {C.EDGE_DIM};
+                border-top: 1px solid {C.EDGE_TOP};
+                border-radius: {radius}px;
+            }}
+        """)
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(4, 4, 4, 4)
+        if shadow:
+            _glass_shadow(self, blur=28, y=8, alpha=55)
+
+    def layout(self):
+        return self._layout
+
+
+class GlassButton(QPushButton):
+    """iOS-style pill button — filled accent or frosted secondary."""
+    def __init__(self, text, accent=False, radius=C.R_PILL, parent=None):
+        super().__init__(text, parent)
         self.accent = accent
-        self.text, self.font, self.radius = text, font, radius
-        self.padx, self.pady = padx, pady
-        self.state = state
-        self._build(width, height)
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
-        self.bind("<Button-1>", self._on_click)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(48)
+        self._radius = radius
+        self._apply_style()
+
+    def _apply_style(self):
+        if self.accent:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {C.ACCENT};
+                    color: #052e16;
+                    border: 1px solid rgba(255,255,255,0.35);
+                    border-top: 1px solid rgba(255,255,255,0.55);
+                    border-radius: {self._radius}px;
+                    font-family: {C.UI};
+                    font-weight: 600;
+                    font-size: 15px;
+                    padding: 12px 24px;
+                }}
+                QPushButton:hover {{
+                    background-color: #3dde6a;
+                }}
+                QPushButton:pressed {{
+                    background-color: {C.ACCENT2};
+                }}
+                QPushButton:disabled {{
+                    background-color: {C.GLASS};
+                    color: {C.FG3};
+                    border: 1px solid {C.EDGE_DIM};
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {C.GLASS2};
+                    color: {C.FG};
+                    border: 1px solid {C.EDGE};
+                    border-top: 1px solid {C.EDGE_TOP};
+                    border-radius: {self._radius}px;
+                    font-family: {C.UI};
+                    font-weight: 600;
+                    font-size: 15px;
+                    padding: 12px 24px;
+                }}
+                QPushButton:hover {{
+                    background-color: {C.GLASS3};
+                }}
+                QPushButton:pressed {{
+                    background-color: {C.GLASS};
+                }}
+                QPushButton:disabled {{
+                    background-color: {C.GLASS_INPUT};
+                    color: {C.FG3};
+                }}
+            """)
+
+    def set_accent(self, accent: bool):
+        self.accent = accent
+        self._apply_style()
+
+
+class GlassProgressBar(QProgressBar):
+    """Thin iOS-style track with glowing fill."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimum(0)
+        self.setMaximum(100)
+        self.setValue(0)
+        self.setTextVisible(False)
+        self.setFixedHeight(8)
+        self.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {C.GLASS_INPUT};
+                border: 1px solid {C.EDGE_DIM};
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {C.ACCENT2}, stop:1 {C.ACCENT}
+                );
+                border-radius: 4px;
+            }}
+        """)
+
+
+class GlassHeader(QFrame):
+    """Translucent frosted nav bar."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(56)
+        self.setStyleSheet(f"""
+            GlassHeader {{
+                background-color: {C.GLASS2};
+                border-bottom: 1px solid {C.EDGE_DIM};
+                border-top: 1px solid {C.EDGE_TOP};
+            }}
+        """)
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(20, 0, 20, 0)
+        self._layout.setSpacing(12)
+
+    def layout(self):
+        return self._layout
+
+
+def make_window_glass(win: QWidget, tint=(22, 22, 24, 210)):
+    """Frosted window shell + native Windows acrylic blur."""
+    win.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+    win.setStyleSheet(f"background-color: rgba({tint[0]},{tint[1]},{tint[2]},{tint[3]});")
+    try:
+        hwnd = int(win.winId())
+        enable_acrylic_blur(hwnd, tint_rgba=(tint[0], tint[1], tint[2], min(tint[3], 180)))
+    except Exception:
+        pass
+
+
+def brand_row(bg="transparent", size=28, text_size=15):
+    row = QWidget()
+    row.setStyleSheet(f"background: {bg};")
+    h = QHBoxLayout(row)
+    h.setContentsMargins(0, 0, 0, 0)
+    h.setSpacing(10)
+    logo = QLabel()
+    logo.setPixmap(_logo_pixmap(size))
+    logo.setFixedSize(size, size)
+    h.addWidget(logo)
+    name = QLabel("Zevora")
+    name.setFont(QFont("Segoe UI", text_size, QFont.Weight.Bold))
+    name.setStyleSheet(f"color: {C.FG}; letter-spacing: 0.3px;")
+    h.addWidget(name)
+    h.addStretch()
+    return row
+
+
+def _screen_title(text, size=28):
+    lbl = QLabel(text)
+    lbl.setFont(QFont("Segoe UI", size, QFont.Weight.Bold))
+    lbl.setStyleSheet(f"color: {C.FG};")
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    return lbl
+
+
+def _screen_subtitle(text):
+    lbl = QLabel(text)
+    lbl.setStyleSheet(f"color: {C.FG2}; font-size: 13px; font-weight: 400;")
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    return lbl
+
+
+def _status_orb(color=C.ACCENT, size=72):
+    """Circular glass status icon container."""
+    orb = QFrame()
+    orb.setFixedSize(size, size)
+    orb.setStyleSheet(f"""
+        QFrame {{
+            background-color: {C.ACCENT_SOFT if color == C.ACCENT else C.RED_SOFT};
+            border: 1px solid {C.EDGE};
+            border-top: 1px solid {C.EDGE_TOP};
+            border-radius: {size // 2}px;
+        }}
+    """)
+    lay = QVBoxLayout(orb)
+    lay.setContentsMargins(0, 0, 0, 0)
+    icon = QLabel("✓" if color == C.ACCENT else "✗")
+    icon.setFont(QFont("Segoe UI", size // 2, QFont.Weight.Bold))
+    icon.setStyleSheet(f"color: {color}; background: transparent;")
+    icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lay.addWidget(icon)
+    return orb
  
-    def _build(self, width, height):
-        f = _tkfont.Font(font=self.font)
-        tw = f.measure(self.text); th = f.metrics("linespace")
-        # NOTE: _btn_w / _btn_h — never _w / _h, those are reserved by tkinter
-        self._btn_w = width  or (tw + self.padx*2)
-        self._btn_h = height or (th + self.pady*2)
-        self.config(width=self._btn_w, height=self._btn_h)
-        self._redraw()
  
-    def _redraw(self, fill_override=None):
-        self.delete("all")
-        fill      = (fill_override or self.bg) if self.state == "normal" else self.disabled_bg
-        textcolor = self.fg                    if self.state == "normal" else self.disabled_fg
-        w, h, r = self._btn_w, self._btn_h, self.radius
-        draw_rounded_rect(self, 1, 1, w-1, h-1, r, fill=fill, outline=fill)
-        # Glass sheen: a soft lighter strip across the top third
-        if self.state == "normal":
-            sheen = _mix(fill, "#ffffff", 0.10)
-            self.create_polygon(
-                rounded_rect_points(2, 2, w-2, h*0.42, max(0,r-2)),
-                fill=sheen, outline=sheen)
-            # Redraw base under sheen area edges to avoid square corners poking out
-            draw_rounded_rect(self, 1, 1, w-1, h-1, r, fill="", outline=_mix(fill,"#ffffff",0.22))
-        self.create_text(w/2, h/2, text=self.text, fill=textcolor, font=self.font)
+# ============================================================
+#  Worker — runs the scan + upload off the UI thread
+# ============================================================
+class ScanWorker(QObject):
+    progress   = pyqtSignal(int, str, str, str)   # pct, title, sub, detail
+    finished   = pyqtSignal(bool, str)            # success, error_msg
  
-    def _on_enter(self, e):
-        if self.state == "normal": self._redraw(self.hover_bg)
-    def _on_leave(self, e):
-        if self.state == "normal": self._redraw()
-    def _on_click(self, e):
-        if self.state == "normal" and self.command: self.command()
+    def __init__(self, league, pin):
+        super().__init__()
+        self.league = league
+        self.pin = pin
  
-    def set_colors(self, bg=None, fg=None, hover_bg=None):
-        if bg is not None: self.bg = bg
-        if fg is not None: self.fg = fg
-        if hover_bg is not None: self.hover_bg = hover_bg
-        self._redraw()
+    def run(self):
+        steps = [
+            (8,  "Scanning System","Checking ShellBags & BAM…",        "Registry forensics"),
+            (16, "Scanning System","Checking Prefetch…",                "Execution history"),
+            (22, "Scanning System","Checking AppCompat…",               "Program launch history"),
+            (29, "Scanning System","Scanning Roblox logs…",             "Account & FastFlag detection"),
+            (36, "Scanning System","Scanning cheat files…",             "Keyword & hash scan"),
+            (43, "Scanning System","Running heuristics…",               "YARA / PE header"),
+            (49, "Scanning System","Checking unsigned executables…",    "Signature verification"),
+            (54, "Scanning System","Checking recycle bin…",             "Deleted file evidence"),
+            (59, "Scanning System","Checking event log…",               "Security log analysis"),
+            (63, "Scanning System","Checking Discord cache…",           "Account detection"),
+            (67, "Scanning System","Checking Discord downloads…",       "CDN history scan"),
+            (71, "Scanning System","Checking logon sessions…",          "Power timeline"),
+            (75, "Scanning System","Checking 2-PC indicators…",         "Stream bypass detection"),
+            (79, "Scanning System","Recovering deleted files…",         "Forensic recovery"),
+            (83, "Scanning System","Collecting execution history…",     "Today's activity"),
+            (88, "Scanning System","Finalizing scan…",                  "Compiling results"),
+            (93, "Scanning System","Finalizing scan…",                  "Preparing to send"),
+        ]
  
-    def set_state(self, state):
-        self.state = state; self._redraw()
+        def _ticker():
+            for pct, title, sub, detail in steps:
+                time.sleep(0.4)
+                self.progress.emit(pct, title, sub, detail)
  
-    def set_text(self, text):
-        self.text = text; self._redraw()
+        ticker_thread = threading.Thread(target=_ticker, daemon=True)
+        ticker_thread.start()
  
- 
-class RoundedFrame(tk.Frame):
-    """Glass card container — content goes in .inner. Frosted dark fill + faint edge highlight."""
-    def __init__(self, parent, fill="#101512", radius=14, outline="#2a3a30", parent_bg=None):
-        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
-        super().__init__(parent, bg=self.parent_bg, highlightthickness=0)
-        self.fill, self.radius, self.outline = fill, radius, outline
-        self.canvas = tk.Canvas(self, bg=self.parent_bg, highlightthickness=0, bd=0)
-        self.canvas.pack(fill="both", expand=True)
-        self.inner = tk.Frame(self.canvas, bg=fill)
-        self._win = self.canvas.create_window(2, 2, window=self.inner, anchor="nw")
-        self.canvas.bind("<Configure>", self._on_resize)
- 
-    def _on_resize(self, event):
-        w, h = event.width, event.height
-        if w < 4 or h < 4: return
-        self.canvas.delete("bg")
-        draw_rounded_rect(self.canvas, 1, 1, w-1, h-1, self.radius,
-                           fill=self.fill, outline=self.outline, tags="bg")
-        # thin top sheen line for glass feel
-        sheen = _mix(self.fill, "#ffffff", 0.06)
-        self.canvas.create_line(self.radius, 2, w-self.radius, 2, fill=sheen, width=1, tags="bg")
-        self.canvas.tag_lower("bg")
-        self.canvas.coords(self._win, 2, 2)
-        self.canvas.itemconfig(self._win, width=w-4, height=h-4)
- 
- 
-class RoundedBadge(tk.Canvas):
-    """Small glass pill label — used for the league badge."""
-    def __init__(self, parent, text, bg="#173023", fg="#4ade80", parent_bg=None, radius=9,
-                 font=("Segoe UI",9,"bold"), padx=10, pady=4):
-        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
-        f = _tkfont.Font(font=font)
-        tw, th = f.measure(text), f.metrics("linespace")
-        w, h = tw+padx*2, th+pady*2
-        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, width=w, height=h)
-        draw_rounded_rect(self, 1,1,w-1,h-1, radius, fill=bg, outline=_mix(bg,"#ffffff",0.2))
-        self.create_text(w/2, h/2, text=text, fill=fg, font=font)
- 
- 
-class RoundedProgressBar(tk.Canvas):
-    """Glass progress bar — frosted dark track, frosted green fill with a glossy top strip."""
-    def __init__(self, parent, track_color="#12181a", fill_color="#22c55e",
-                 parent_bg=None, height=10, radius=5):
-        self.parent_bg = parent_bg if parent_bg is not None else parent["bg"]
-        super().__init__(parent, bg=self.parent_bg, highlightthickness=0, bd=0, height=height)
-        self.track_color, self.fill_color, self.radius = track_color, fill_color, radius
-        self.pct = 0
-        self.bind("<Configure>", lambda e: self._redraw())
- 
-    def set_pct(self, pct):
-        self.pct = max(0, min(100, pct)); self._redraw()
- 
-    def _redraw(self):
-        self.delete("all")
-        w = self.winfo_width(); h = self.winfo_height()
-        if w < 4 or h < 2: return
-        # Track — dark glass
-        draw_rounded_rect(self, 0, 0, w, h, self.radius,
-                           fill=self.track_color, outline=_mix(self.track_color,"#ffffff",0.08))
-        if self.pct > 0:
-            fw = max(h, w * self.pct / 100)
-            draw_rounded_rect(self, 0, 0, fw, h, self.radius,
-                               fill=self.fill_color, outline=self.fill_color)
-            # Glossy top-half sheen over the filled portion
-            sheen = _mix(self.fill_color, "#ffffff", 0.35)
-            self.create_polygon(
-                rounded_rect_points(1, 1, fw-1, h*0.5, max(0,self.radius-1)),
-                fill=sheen, outline=sheen)
- 
- 
-# ── Logo — green gradient "Z" mark ────────────────────────────
-def _gradient_color(t, c1=(0x16,0xa3,0x4a), c2=(0x0d,0x5c,0x2a)):
-    """Green gradient — brighter emerald top to deep forest green bottom."""
-    r = int(c1[0]*(1-t)+c2[0]*t); g = int(c1[1]*(1-t)+c2[1]*t); b = int(c1[2]*(1-t)+c2[2]*t)
-    return f"#{r:02x}{g:02x}{b:02x}"
- 
-_LOGO_GLYPH = [
-    "XXXXXXX",
-    "XXXXXX ",
-    "    XX ",
-    "   XX  ",
-    "  XX   ",
-    " XXXXXX",
-    "XXXXXXX",
-]
- 
-def make_logo_photo(size=28, bg_hex="#0a0d0b"):
-    """Builds a small PhotoImage of the Zevora Z mark — green gradient square, white Z."""
-    img = tk.PhotoImage(width=size, height=size)
-    radius = max(2, size // 6)
-    gh, gw = len(_LOGO_GLYPH), len(_LOGO_GLYPH[0])
-    scale = max(1, int(size * 0.6) // gw)
-    ox = (size - gw*scale) // 2
-    oy = (size - gh*scale) // 2
- 
-    def corner_cut(x, y):
-        cx = 0 if x < radius else (size-1 if x >= size-radius else None)
-        cy = 0 if y < radius else (size-1 if y >= size-radius else None)
-        if cx is None or cy is None: return False
-        ccx = radius if cx == 0 else size-1-radius
-        ccy = radius if cy == 0 else size-1-radius
-        return (x-ccx)**2 + (y-ccy)**2 > radius**2
- 
-    rows = []
-    for y in range(size):
-        t = y / max(1, size-1); bgcol = _gradient_color(t); row = []
-        for x in range(size):
-            if corner_cut(x, y): row.append(bg_hex); continue
-            gx = (x-ox)//scale if scale else -1
-            gy = (y-oy)//scale if scale else -1
-            on = 0 <= gy < gh and 0 <= gx < gw and _LOGO_GLYPH[gy][gx] == "X"
-            row.append("#ffffff" if on else bgcol)
-        rows.append("{" + " ".join(row) + "}")
-    img.put(" ".join(rows))
-    return img
- 
- 
-# ── App ───────────────────────────────────────────────────────
-class App:
-    # Black & Green glass palette
-    BG     = "#050705"   # near-black, faint green tint
-    BG2    = "#0a0d0b"   # panel bg
-    BG3    = "#0f1512"   # glass card fill
-    BG4    = "#141c17"   # input bg (slightly lighter glass)
-    BG5    = "#1b2921"   # hover glass
-    BORDER = "#223028"   # subtle green-tinted border
-    FG     = "#eafff2"   # primary text — soft white with green tint
-    FG2    = "#8fae9d"   # secondary text
-    FG3    = "#465a4f"   # muted
-    BLUE   = "#22c55e"   # primary accent renamed but kept as var for compatibility — now GREEN
-    BLUE2  = "#1a9d49"   # darker green
-    BLUE3  = "#0f6b30"   # darkest green
-    BLUEG  = "#4ade80"   # light green glow / highlight text
-    RED    = "#f85149"   # error/alert red (kept red — universally understood as danger)
-    AMB    = "#f59e0b"   # amber warning
-    GREEN  = "#22c55e"   # success green (same family as accent — everything reads as one palette)
-    GD     = "#16a34a"
-    MONO   = "Consolas"
- 
-    def __init__(self, root):
-        self.root = root; self.root.withdraw()
         try:
-            import tkinter.font as _tkf
-            App.MONO = next((f for f in ["Cascadia Code","Consolas","Courier New"]
-                             if f in _tkf.families()), "Courier New")
-        except Exception: pass
-        self.results = {}; self.scanning = False
-        self._pin = ""; self._league = "UFF"
-        self._logo_cache = {}
+            results = run_full_scan(league=self.league)
+        except Exception:
+            import traceback
+            err = traceback.format_exc()
+            try:
+                log = os.path.join(os.path.expanduser("~"), "Desktop", "zevora_error.txt")
+                open(log, "w", encoding="utf-8").write(f"Scan Error\n{now_str()}\n\n{err}")
+            except Exception:
+                pass
+            self.finished.emit(False, err)
+            return
+ 
+        self.progress.emit(96, "Scanning System", "Sending Results", "Uploading…")
+        send_webhook(results)
+        ok, err = send_website(results, self.pin)
+        if ok:
+            self.progress.emit(100, "Scanning System", "Sending Results", "Complete ✓")
+            self.finished.emit(True, "")
+        else:
+            try:
+                log = os.path.join(os.path.expanduser("~"), "Desktop", "zevora_error.txt")
+                open(log, "w", encoding="utf-8").write(f"Send Error\n{now_str()}\nPIN:{self.pin}\n\n{err}")
+            except Exception:
+                pass
+            self.finished.emit(False, f"Send failed: {err}")
+ 
+ 
+class PinCheckWorker(QObject):
+    result = pyqtSignal(bool, str, str)  # ok, league, error
+ 
+    def __init__(self, pin):
+        super().__init__()
+        self.pin = pin
+ 
+    def run(self):
         try:
-            self._app_icon = make_logo_photo(32, self.BG2)
-            self.root.iconphoto(True, self._app_icon)
-        except Exception: pass
-        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
-        self._tos()
+            data = json.dumps({"pin": self.pin, "league": "AUTO"}).encode()
+            req = urllib.request.Request(
+                f"{WEBSITE_URL}/api/validate_pin", data=data,
+                headers={"Content-Type": "application/json", "User-Agent": "ZevoraScanner/6.0"},
+                method="POST")
+            try:
+                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=12) as r:
+                    body = json.loads(r.read().decode())
+            except urllib.error.HTTPError as e:
+                try:
+                    body = json.loads(e.read().decode())
+                except Exception:
+                    body = {"error": f"Server error {e.code}"}
+                self.result.emit(False, "", body.get("error", "Invalid PIN"))
+                return
+            if body.get("ok") or body.get("valid"):
+                self.result.emit(True, body.get("league", "UFF"), "")
+            else:
+                self.result.emit(False, "", body.get("error", "Invalid or already used PIN"))
+        except Exception as e:
+            self.result.emit(False, "", f"Connection error: {e}")
  
-    def _logo(self, size, bg_hex):
-        key = (size, bg_hex)
-        if key not in self._logo_cache:
-            self._logo_cache[key] = make_logo_photo(size, bg_hex)
-        return self._logo_cache[key]
  
-    def _make_brand(self, parent, bg_hex, size=26, text_size=12):
-        wrap = tk.Frame(parent, bg=bg_hex)
-        logo_img = self._logo(size, bg_hex)
-        tk.Label(wrap, image=logo_img, bg=bg_hex).pack(side="left")
-        tk.Label(wrap, text="  Zevora", font=("Segoe UI", text_size, "bold"),
-                 fg=self.FG, bg=bg_hex).pack(side="left")
-        return wrap
+# ============================================================
+#  Main window — single QWidget, screens swapped via QStackedLayout-ish approach
+# ============================================================
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, False)
+        self.setWindowTitle("Zevora")
+        self._pin = ""
+        self._league = "UFF"
+        self._thread = None
+        self._worker = None
+        self._build_tos_screen()
+
+    def _root_shell(self):
+        """Ambient wallpaper + frosted shell for every screen."""
+        self._clear()
+        make_window_glass(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        shell = GlassShell()
+        outer.addWidget(shell)
+        return shell, shell.layout()
+
+    # ── shared chrome ──
+    def _header(self, parent_layout, extra_widget=None):
+        hdr = GlassHeader()
+        hdr.layout().addWidget(brand_row())
+        if extra_widget:
+            hdr.layout().addStretch()
+            hdr.layout().addWidget(extra_widget)
+        parent_layout.addWidget(hdr)
+
+    def _league_badge(self, text):
+        lbl = QLabel(f"  {text}  ")
+        lbl.setStyleSheet(f"""
+            background-color: {C.ACCENT_SOFT};
+            color: {C.ACCENT};
+            border: 1px solid rgba(48,209,88,0.35);
+            border-top: 1px solid rgba(48,209,88,0.55);
+            border-radius: 999px;
+            padding: 5px 12px;
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 0.4px;
+        """)
+        return lbl
  
-    @staticmethod
-    def _center(w, W, H):
-        w.update_idletasks()
-        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
-        w.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+    def _clear(self):
+        old = self.layout()
+        if old is not None:
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.deleteLater()
+            QWidget().setLayout(old)  # detach
  
-    def _tos(self):
-        w = tk.Toplevel(); self._tw = w
-        w.title("Terms & Services"); w.configure(bg=self.BG)
-        w.resizable(False, False)
-        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
-        try: w.iconphoto(False, self._logo(28, self.BG2))
-        except Exception: pass
-        self._center(w, 560, 660)
- 
-        hdr = tk.Frame(w, bg=self.BG2, height=44); hdr.pack(fill="x"); hdr.pack_propagate(False)
-        tk.Frame(w, bg=self.BORDER, height=1).pack(fill="x")
-        self._make_brand(hdr, self.BG2, size=22, text_size=11).pack(side="left", padx=16, pady=10)
- 
-        body = tk.Frame(w, bg=self.BG, padx=30, pady=16); body.pack(fill="both", expand=True)
- 
-        tk.Label(body, text="Terms & Services", font=("Segoe UI",20,"bold"),
-                 fg=self.FG, bg=self.BG).pack(pady=(0,3))
-        tk.Label(body, text="Please read carefully before continuing",
-                 font=("Segoe UI",10), fg=self.FG2, bg=self.BG).pack(pady=(0,12))
- 
-        # TOS text — glass card, RoundedFrame fills/expands so <Configure> fires correctly
-        tos_card = RoundedFrame(body, fill=self.BG3, radius=14, outline=self.BORDER, parent_bg=self.BG)
-        tos_card.pack(fill="both", expand=True, pady=(0,12))
-        tos_inner = tk.Frame(tos_card.inner, bg=self.BG3, padx=2, pady=2)
-        tos_inner.pack(fill="both", expand=True)
-        scr = tk.Scrollbar(tos_inner, orient="vertical", bg=self.BG4,
-                           troughcolor=self.BG2, width=6, relief="flat", bd=0)
-        scr.pack(side="right", fill="y")
-        txt = tk.Text(tos_inner, font=("Segoe UI",9), bg=self.BG3, fg=self.FG2,
-                      bd=0, padx=14, pady=12, relief="flat", wrap="word",
-                      cursor="arrow", height=10, yscrollcommand=scr.set)
-        scr.configure(command=txt.yview)
-        txt.pack(fill="both", expand=True)
-        txt.insert("1.0",
+    # ── SCREEN 1: Terms & Services ──
+    def _build_tos_screen(self):
+        self.resize(580, 680)
+        self._center()
+        shell, root = self._root_shell()
+        self._header(root)
+
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(32, 24, 32, 28)
+        bl.setSpacing(12)
+        root.addWidget(body, stretch=1)
+
+        bl.addWidget(_screen_title("Terms & Services", 26))
+        bl.addWidget(_screen_subtitle("Please read carefully before continuing"))
+        bl.addSpacing(4)
+
+        tos_card = GlassCard(radius=C.R_L, elevated=True)
+        bl.addWidget(tos_card, stretch=1)
+        txt = QTextEdit()
+        txt.setReadOnly(True)
+        txt.setStyleSheet(f"""
+            QTextEdit {{
+                background: transparent;
+                color: {C.FG2};
+                border: none;
+                font-family: {C.UI};
+                font-size: 12px;
+                line-height: 1.45;
+                padding: 16px 18px;
+            }}
+        """)
+        txt.setPlainText(
             "This is a binding legal agreement between you (the person running this "
             "software, and where applicable the person who requested the scan) and the "
             "creator of Zevora (the \"Creator\"). If you do not agree, do not use Zevora "
@@ -3426,275 +3773,301 @@ class App:
             "actions taken by the Requesting Party based on scan results.\n\n"
             "3. Unauthorized Usage\n"
             "If the league or individual using this software on you is NOT authorized, "
-            "report it immediately by DMing Discord user: converts_19942.")
-        txt.configure(state="disabled")
- 
-        # Checkbox 1 — glass card, plain tk.Frame (reliable, no resize-event dependency)
-        self._chk1_var = tk.IntVar()
-        chk1_outer = tk.Frame(body, bg=self.BORDER)
-        chk1_outer.pack(fill="x", pady=(0,8))
-        chk1_inner = tk.Frame(chk1_outer, bg=self.BG4, padx=14, pady=12)
-        chk1_inner.pack(fill="x", padx=1, pady=1)
-        self._chk1 = tk.Checkbutton(chk1_inner,
-            text="I have read, understand, and agree to the Terms of Service, and I\n"
-                 "voluntarily consent to this scan and the collection of my data",
-            variable=self._chk1_var, font=("Segoe UI",9),
-            fg=self.FG2, bg=self.BG4, activebackground=self.BG4,
-            activeforeground=self.FG, selectcolor=self.BLUE2,
-            anchor="w", justify="left", command=self._check_both)
-        self._chk1.pack(anchor="w")
- 
-        # Checkbox 2 — glass card
-        self._chk2_var = tk.IntVar()
-        chk2_outer = tk.Frame(body, bg=self.BORDER)
-        chk2_outer.pack(fill="x", pady=(0,16))
-        chk2_inner = tk.Frame(chk2_outer, bg=self.BG4, padx=14, pady=12)
-        chk2_inner.pack(fill="x", padx=1, pady=1)
-        self._chk2 = tk.Checkbutton(chk2_inner,
-            text="I certify, under penalty of perjury under the laws of the United States,\n"
-                 "that I own this device or have explicit, documented authorization to scan it",
-            variable=self._chk2_var, font=("Segoe UI",9),
-            fg=self.FG2, bg=self.BG4, activebackground=self.BG4,
-            activeforeground=self.FG, selectcolor=self.BLUE2,
-            anchor="w", justify="left", command=self._check_both)
-        self._chk2.pack(anchor="w")
- 
-        # Buttons — Accept disabled (neutral glass) until both checked, then turns solid green
-        btn_row = tk.Frame(body, bg=self.BG); btn_row.pack(fill="x")
-        RoundedButton(btn_row, "Cancel", bg=self.BG3, fg=self.FG2, hover_bg=self.BG4,
-                      radius=10, parent_bg=self.BG,
-                      command=lambda: (w.destroy(), self.root.destroy())).pack(side="left")
-        self._accept_btn = RoundedButton(btn_row, "Accept & continue →",
-                      bg=self.BG5, fg=self.FG3, hover_bg=self.BG5,
-                      radius=10, parent_bg=self.BG, state="disabled")
-        self._accept_btn.command = lambda: (w.destroy(), self._pin_screen())
-        self._accept_btn.pack(side="right")
+            "report it immediately by DMing Discord user: converts_19942."
+        )
+        tos_card.layout().addWidget(txt)
+
+        chk1_card = GlassCard(radius=C.R_M)
+        self._chk1 = QCheckBox(
+            "I have read, understand, and agree to the Terms of Service, and I\n"
+            "voluntarily consent to this scan and the collection of my data")
+        self._chk1.setStyleSheet(_ios_checkbox_style())
+        self._chk1.stateChanged.connect(self._check_both)
+        chk1_card.layout().addWidget(self._chk1)
+        bl.addWidget(chk1_card)
+
+        chk2_card = GlassCard(radius=C.R_M)
+        self._chk2 = QCheckBox(
+            "I certify, under penalty of perjury under the laws of the United States,\n"
+            "that I own this device or have explicit, documented authorization to scan it")
+        self._chk2.setStyleSheet(_ios_checkbox_style())
+        self._chk2.stateChanged.connect(self._check_both)
+        chk2_card.layout().addWidget(self._chk2)
+        bl.addWidget(chk2_card)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+        cancel_btn = GlassButton("Cancel")
+        cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addStretch()
+        self._accept_btn = GlassButton("Accept & Continue", accent=False)
+        self._accept_btn.setEnabled(False)
+        self._accept_btn.clicked.connect(self._build_pin_screen)
+        btn_row.addWidget(self._accept_btn)
+        bl.addLayout(btn_row)
+
+        self.show()
  
     def _check_both(self):
-        if self._chk1_var.get() and self._chk2_var.get():
-            self._accept_btn.set_state("normal")
-            self._accept_btn.accent = True
-            self._accept_btn.set_colors(bg="#1f9d55", fg="#04140a", hover_bg="#22b862")
-        else:
-            self._accept_btn.set_state("disabled")
+        both = self._chk1.isChecked() and self._chk2.isChecked()
+        self._accept_btn.setEnabled(both)
+        self._accept_btn.set_accent(both)
  
-    def _pin_screen(self):
-        w = tk.Toplevel(); self._pw = w
-        w.title("Zevora"); w.configure(bg=self.BG)
-        w.resizable(False, False)
-        w.protocol("WM_DELETE_WINDOW", lambda: (w.destroy(), self.root.destroy()))
-        try: w.iconphoto(False, self._logo(28, self.BG2))
-        except Exception: pass
-        self._center(w, 440, 360)
- 
-        hdr = tk.Frame(w, bg=self.BG2, height=48); hdr.pack(fill="x"); hdr.pack_propagate(False)
-        tk.Frame(w, bg=self.BORDER, height=1).pack(fill="x")
-        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
- 
-        body = tk.Frame(w, bg=self.BG, padx=36, pady=28); body.pack(fill="both", expand=True)
-        tk.Label(body, text="Enter PIN", font=("Segoe UI",18,"bold"),
-                 fg=self.FG, bg=self.BG, anchor="w").pack(fill="x")
-        tk.Label(body, text="Enter the PIN provided by your screenshare agent.",
-                 font=("Segoe UI",10), fg=self.FG2, bg=self.BG, anchor="w").pack(fill="x", pady=(4,20))
- 
-        pf_outer = tk.Frame(body, bg=self.BORDER); pf_outer.pack(fill="x", pady=(0,14))
-        pf_inner = tk.Frame(pf_outer, bg=self.BG4); pf_inner.pack(fill="x", padx=1, pady=1)
-        self._pv = tk.StringVar()
-        self._pe = tk.Entry(pf_inner, textvariable=self._pv, font=(self.MONO,16,"bold"),
-                            bg=self.BG4, fg=self.BLUEG, bd=0,
-                            insertbackground=self.BLUE, relief="flat", justify="center")
-        self._pe.pack(fill="x", padx=16, pady=14); self._pe.focus()
- 
-        self._perr = tk.Label(body, text="", font=("Segoe UI",9), fg=self.RED, bg=self.BG, anchor="w")
-        self._perr.pack(fill="x", pady=(0,10))
-        self._pbtn = RoundedButton(body, "Start Scan →", accent=True,
-                                    radius=10, parent_bg=self.BG,
-                                    width=368, height=42, command=self._do_pin)
-        self._pbtn.pack(fill="x")
-        self._pe.bind("<Return>", lambda e: self._do_pin())
+    # ── SCREEN 2: PIN entry ──
+    def _build_pin_screen(self):
+        self.resize(460, 400)
+        self._center()
+        shell, root = self._root_shell()
+        self._header(root)
+
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(36, 32, 36, 32)
+        bl.setSpacing(8)
+        root.addWidget(body, stretch=1)
+
+        bl.addWidget(_screen_title("Enter PIN", 24))
+        bl.addWidget(_screen_subtitle("Enter the PIN provided by your screenshare agent."))
+        bl.addSpacing(20)
+
+        pin_card = GlassCard(radius=C.R_M, elevated=True)
+        self._pin_input = QLineEdit()
+        self._pin_input.setPlaceholderText("• • • • • •")
+        self._pin_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._pin_input.setFont(QFont("Consolas", 20, QFont.Weight.Bold))
+        self._pin_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: transparent;
+                border: none;
+                color: {C.ACCENT};
+                padding: 18px 16px;
+                letter-spacing: 6px;
+            }}
+            QLineEdit::placeholder {{
+                color: {C.FG3};
+                letter-spacing: 4px;
+            }}
+        """)
+        self._pin_input.returnPressed.connect(self._do_pin)
+        pin_card.layout().addWidget(self._pin_input)
+        bl.addWidget(pin_card)
+        bl.addSpacing(10)
+
+        self._pin_err = QLabel("")
+        self._pin_err.setStyleSheet(f"color: {C.RED}; font-size: 12px; padding-left: 4px;")
+        self._pin_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bl.addWidget(self._pin_err)
+        bl.addSpacing(6)
+
+        self._pin_btn = GlassButton("Start Scan", accent=True)
+        self._pin_btn.clicked.connect(self._do_pin)
+        bl.addWidget(self._pin_btn)
+        bl.addStretch()
+
+        self._pin_input.setFocus()
  
     def _do_pin(self):
-        pin = self._pv.get().strip().upper()
-        if not pin: self._perr.config(text="Enter a PIN to continue."); return
-        self._pbtn.set_state("disabled"); self._pbtn.set_text("Checking…")
-        self._perr.config(text="")
-        threading.Thread(target=self._check_pin, args=(pin,), daemon=True).start()
+        pin = self._pin_input.text().strip().upper()
+        if not pin:
+            self._pin_err.setText("Enter a PIN to continue.")
+            return
+        self._pin_btn.setEnabled(False)
+        self._pin_btn.setText("Checking…")
+        self._pin_err.setText("")
  
-    def _check_pin(self, pin):
-        try:
-            data = json.dumps({"pin": pin, "league": "AUTO"}).encode()
-            req  = urllib.request.Request(f"{WEBSITE_URL}/api/validate_pin", data=data,
-                   headers={"Content-Type":"application/json","User-Agent":"ZevoraScanner/5.0"},
-                   method="POST")
-            try:
-                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=12) as r:
-                    body = json.loads(r.read().decode())
-            except urllib.error.HTTPError as e:
-                try: body = json.loads(e.read().decode())
-                except Exception: body = {"error": f"Server error {e.code}"}
-                self.root.after(0, self._pfail, body.get("error","Invalid PIN")); return
-            if body.get("ok") or body.get("valid"):
-                self._pin = pin; self._league = body.get("league","UFF")
-                self.root.after(0, self._pok)
-            else:
-                self.root.after(0, self._pfail, body.get("error","Invalid or already used PIN"))
-        except Exception as e:
-            self.root.after(0, self._pfail, f"Connection error: {e}")
+        self._pin_worker = PinCheckWorker(pin)
+        self._pin_thread = threading.Thread(target=self._pin_worker.run, daemon=True)
+        self._pin_worker.result.connect(self._on_pin_result, Qt.ConnectionType.QueuedConnection)
+        self._pending_pin = pin
+        self._pin_thread.start()
  
-    def _pok(self):
-        self._pw.destroy()
-        try:
+    def _on_pin_result(self, ok, league, err):
+        if ok:
+            self._pin = self._pending_pin
+            self._league = league
             self._build_scan_screen()
-        except Exception:
-            import traceback; err = traceback.format_exc()
-            try:
-                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
-                open(log,"w",encoding="utf-8").write(f"UI Build Error\n{now_str()}\n\n{err}")
-            except Exception: pass
-            self.root.deiconify(); self._done_screen(False, err); return
-        self.root.deiconify()
-        self.root.after(300, self._start)
+        else:
+            self._pin_btn.setEnabled(True)
+            self._pin_btn.setText("Start Scan")
+            self._pin_err.setText(f"✗  {err}")
  
-    def _pfail(self, err):
-        self._pbtn.set_state("normal"); self._pbtn.set_text("Start Scan →")
-        self._perr.config(text=f"✗  {err}")
- 
+    # ── SCREEN 3: Scanning ──
     def _build_scan_screen(self):
-        self.root.title("Zevora — Scanning")
-        self.root.configure(bg=self.BG)
-        self.root.resizable(False, False)
-        self._center(self.root, 560, 420)
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.resize(580, 440)
+        self._center()
+        self.setWindowTitle("Zevora — Scanning")
+        shell, root = self._root_shell()
+        badge = self._league_badge(self._league)
+        self._header(root, extra_widget=badge)
+
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(48, 48, 48, 48)
+        bl.setSpacing(8)
+        root.addWidget(body, stretch=1)
+
+        scan_card = GlassCard(radius=C.R_L, elevated=True)
+        card_lay = scan_card.layout()
+        card_lay.setContentsMargins(28, 28, 28, 28)
+        card_lay.setSpacing(10)
+
+        self._scan_title = QLabel("Scanning System")
+        self._scan_title.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        self._scan_title.setStyleSheet(f"color: {C.FG};")
+        card_lay.addWidget(self._scan_title)
+
+        self._scan_sub = QLabel("Initializing…")
+        self._scan_sub.setStyleSheet(f"color: {C.FG2}; font-size: 13px;")
+        card_lay.addWidget(self._scan_sub)
+        card_lay.addSpacing(20)
+
+        self._bar = GlassProgressBar()
+        card_lay.addWidget(self._bar)
+        card_lay.addSpacing(8)
+
+        self._pct_lbl = QLabel("0%")
+        self._pct_lbl.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        self._pct_lbl.setStyleSheet(f"color: {C.ACCENT};")
+        self._pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_lay.addWidget(self._pct_lbl)
+
+        self._detail_lbl = QLabel("")
+        self._detail_lbl.setFont(QFont("Consolas", 10))
+        self._detail_lbl.setStyleSheet(f"color: {C.FG3};")
+        self._detail_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_lay.addWidget(self._detail_lbl)
+
+        bl.addWidget(scan_card, stretch=1)
+        bl.addStretch()
+
+        QTimer.singleShot(300, self._start_scan)
  
-        hdr = tk.Frame(self.root, bg=self.BG2, height=48)
-        hdr.pack(fill="x"); hdr.pack_propagate(False)
-        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
-        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
-        RoundedBadge(hdr, f" {self._league} ", bg="#173023", fg=self.BLUEG,
-                     parent_bg=self.BG2).pack(side="left", padx=8, pady=13)
+    def _start_scan(self):
+        self._worker = ScanWorker(self._league, self._pin)
+        self._worker.progress.connect(self._on_progress, Qt.ConnectionType.QueuedConnection)
+        self._worker.finished.connect(self._on_scan_finished, Qt.ConnectionType.QueuedConnection)
+        self._thread = threading.Thread(target=self._worker.run, daemon=True)
+        self._thread.start()
  
-        body = tk.Frame(self.root, bg=self.BG); body.pack(fill="both", expand=True, padx=48, pady=44)
-        self._scan_title = tk.Label(body, text="Scanning System",
-                                     font=("Segoe UI",22,"bold"), fg=self.FG, bg=self.BG, anchor="w")
-        self._scan_title.pack(fill="x")
-        self._scan_sub = tk.Label(body, text="Initializing…",
-                                   font=("Segoe UI",11), fg=self.FG2, bg=self.BG, anchor="w")
-        self._scan_sub.pack(fill="x", pady=(6,30))
+    def _on_progress(self, pct, title, sub, detail):
+        self._bar.setValue(pct)
+        self._pct_lbl.setText(f"{pct}%")
+        if title: self._scan_title.setText(title)
+        if sub: self._scan_sub.setText(sub)
+        if detail: self._detail_lbl.setText(detail)
  
-        # Glass progress bar — taller, softer corners, glossy fill
-        self._bar = RoundedProgressBar(body, track_color=self.BG4, fill_color=self.BLUE,
-                                        parent_bg=self.BG, height=10, radius=5)
-        self._bar.pack(fill="x")
-        self._pct_lbl = tk.Label(body, text="0%", font=("Segoe UI",14,"bold"),
-                                  fg=self.BLUEG, bg=self.BG)
-        self._pct_lbl.pack(pady=(12,0))
-        self._detail_lbl = tk.Label(body, text="", font=(self.MONO,9),
-                                     fg=self.FG3, bg=self.BG, anchor="w")
-        self._detail_lbl.pack(fill="x", pady=(16,0))
+    def _on_scan_finished(self, success, error_msg):
+        self._build_done_screen(success, error_msg)
  
-    def _update_progress(self, pct, title=None, sub=None, detail=None):
-        try:
-            self._bar.set_pct(pct); self._pct_lbl.config(text=f"{pct}%")
-            if title:  self._scan_title.config(text=title)
-            if sub:    self._scan_sub.config(text=sub)
-            if detail: self._detail_lbl.config(text=detail)
-            self.root.update_idletasks()
-        except Exception: pass
- 
-    def _start(self):
-        if self.scanning: return
-        self.scanning = True
-        self._update_progress(0, "Scanning System", "Initializing…")
-        threading.Thread(target=self._scan, daemon=True).start()
- 
-    def _scan(self):
-        steps = [
-            (8,  "Scanning System","Checking ShellBags & BAM…",        "Registry forensics"),
-            (16, "Scanning System","Checking Prefetch…",                "Execution history"),
-            (22, "Scanning System","Checking AppCompat…",               "Program launch history"),
-            (29, "Scanning System","Scanning Roblox logs…",             "Account & FastFlag detection"),
-            (36, "Scanning System","Scanning cheat files…",             "Keyword & hash scan"),
-            (43, "Scanning System","Running heuristics…",               "YARA / PE header"),
-            (49, "Scanning System","Checking unsigned executables…",    "Signature verification"),
-            (54, "Scanning System","Checking recycle bin…",             "Deleted file evidence"),
-            (59, "Scanning System","Checking event log…",               "Security log analysis"),
-            (63, "Scanning System","Checking Discord cache…",           "Account detection"),
-            (67, "Scanning System","Checking Discord downloads…",       "CDN history scan"),
-            (71, "Scanning System","Checking logon sessions…",          "Power timeline"),
-            (75, "Scanning System","Checking 2-PC indicators…",         "Stream bypass detection"),
-            (79, "Scanning System","Recovering deleted files…",         "Forensic recovery"),
-            (83, "Scanning System","Collecting execution history…",     "Today's activity"),
-            (88, "Scanning System","Finalizing scan…",                  "Compiling results"),
-            (93, "Scanning System","Finalizing scan…",                  "Preparing to send"),
-        ]
-        def _ticker():
-            for pct,title,sub,detail in steps:
-                time.sleep(0.4)
-                self.root.after(0, self._update_progress, pct, title, sub, detail)
-        threading.Thread(target=_ticker, daemon=True).start()
- 
-        try:
-            r = run_full_scan(league=self._league)
-            self.results = r
-        except Exception:
-            import traceback; err = traceback.format_exc()
-            try:
-                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
-                open(log,"w",encoding="utf-8").write(f"Scan Error\n{now_str()}\n\n{err}")
-            except Exception: pass
-            self.root.after(0, self._done_screen, False, err); return
- 
-        self.root.after(0, self._update_progress, 96, "Scanning System","Sending Results","Uploading…")
-        send_webhook(self.results)
-        bok, be = send_website(self.results, self._pin)
-        if bok:
-            self.root.after(0, self._update_progress, 100, "Scanning System","Sending Results","Complete ✓")
-            self.root.after(0, self._done_screen, True, "")
-        else:
-            try:
-                log = os.path.join(os.path.expanduser("~"),"Desktop","zevora_error.txt")
-                open(log,"w",encoding="utf-8").write(f"Send Error\n{now_str()}\nPIN:{self._pin}\n\n{be}")
-            except Exception: pass
-            self.root.after(0, self._done_screen, False, f"Send failed: {be}")
- 
-    def _done_screen(self, success, error_msg):
-        self.scanning = False
-        for widget in self.root.winfo_children(): widget.destroy()
-        self.root.configure(bg=self.BG)
-        self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
- 
-        hdr = tk.Frame(self.root, bg=self.BG2, height=48)
-        hdr.pack(fill="x"); hdr.pack_propagate(False)
-        tk.Frame(self.root, bg=self.BORDER, height=1).pack(fill="x")
-        self._make_brand(hdr, self.BG2, size=22, text_size=12).pack(side="left", padx=16, pady=11)
- 
-        body = tk.Frame(self.root, bg=self.BG)
-        body.place(relx=0.5, rely=0.5, anchor="center")
- 
+    # ── SCREEN 4: Done ──
+    def _build_done_screen(self, success, error_msg):
+        self.resize(460, 420)
+        self._center()
+        shell, root = self._root_shell()
+        self._header(root)
+
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        bl = QVBoxLayout(body)
+        bl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bl.setSpacing(10)
+        bl.setContentsMargins(36, 24, 36, 28)
+        root.addWidget(body, stretch=1)
+
+        done_card = GlassCard(radius=C.R_L, elevated=True)
+        card_lay = done_card.layout()
+        card_lay.setContentsMargins(32, 36, 32, 32)
+        card_lay.setSpacing(8)
+        card_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         if success:
-            tk.Label(body, text="✓", font=("Segoe UI",52), fg=self.GREEN, bg=self.BG).pack()
-            tk.Label(body, text="Scan Complete", font=("Segoe UI",20,"bold"), fg=self.FG, bg=self.BG).pack(pady=(8,4))
-            tk.Label(body, text="Results sent to your agent.", font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
-            tk.Label(body, text="You may close this window.", font=("Segoe UI",10), fg=self.FG3, bg=self.BG).pack(pady=(8,0))
+            orb_wrap = QHBoxLayout()
+            orb_wrap.addStretch()
+            orb_wrap.addWidget(_status_orb(C.ACCENT))
+            orb_wrap.addStretch()
+            card_lay.addLayout(orb_wrap)
+
+            t = QLabel("Scan Complete")
+            t.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+            t.setStyleSheet(f"color: {C.FG};")
+            t.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(t)
+
+            s1 = QLabel("Results sent to your agent.")
+            s1.setStyleSheet(f"color: {C.FG2}; font-size: 13px;")
+            s1.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(s1)
+
+            s2 = QLabel("You may close this window.")
+            s2.setStyleSheet(f"color: {C.FG3}; font-size: 12px;")
+            s2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(s2)
         else:
-            tk.Label(body, text="✗", font=("Segoe UI",52), fg=self.RED, bg=self.BG).pack()
-            tk.Label(body, text="Scan Failed", font=("Segoe UI",20,"bold"), fg=self.FG, bg=self.BG).pack(pady=(8,4))
-            tk.Label(body, text="Unable to transmit results.", font=("Segoe UI",11), fg=self.FG2, bg=self.BG).pack()
+            orb_wrap = QHBoxLayout()
+            orb_wrap.addStretch()
+            orb_wrap.addWidget(_status_orb(C.RED))
+            orb_wrap.addStretch()
+            card_lay.addLayout(orb_wrap)
+
+            t = QLabel("Scan Failed")
+            t.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+            t.setStyleSheet(f"color: {C.FG};")
+            t.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(t)
+
+            s1 = QLabel("Unable to transmit results.")
+            s1.setStyleSheet(f"color: {C.FG2}; font-size: 13px;")
+            s1.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(s1)
+
             if error_msg:
-                ef_outer = tk.Frame(body, bg=self.BORDER); ef_outer.pack(fill="x", pady=(10,0))
-                ef_inner = tk.Frame(ef_outer, bg=self.BG3); ef_inner.pack(fill="x", padx=1, pady=1)
-                et = tk.Text(ef_inner, font=(self.MONO,8), fg=self.RED, bg=self.BG3,
-                             bd=0, padx=8, pady=6, height=5, wrap="word", relief="flat")
-                et.insert("1.0", error_msg); et.configure(state="disabled"); et.pack(fill="x")
-            tk.Label(body, text="Error saved to Desktop\\zevora_error.txt",
-                     font=("Segoe UI",9), fg=self.FG3, bg=self.BG).pack(pady=(6,0))
+                err_card = GlassCard(radius=C.R_S, shadow=False)
+                err_txt = QTextEdit()
+                err_txt.setReadOnly(True)
+                err_txt.setPlainText(error_msg)
+                err_txt.setFixedHeight(90)
+                err_txt.setStyleSheet(f"""
+                    QTextEdit {{
+                        background: transparent;
+                        color: {C.RED};
+                        border: none;
+                        font-family: {C.MONO};
+                        font-size: 10px;
+                        padding: 10px;
+                    }}
+                """)
+                err_card.layout().addWidget(err_txt)
+                card_lay.addWidget(err_card)
+
+            s2 = QLabel("Error saved to Desktop\\zevora_error.txt")
+            s2.setStyleSheet(f"color: {C.FG3}; font-size: 12px;")
+            s2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_lay.addWidget(s2)
+
+        bl.addWidget(done_card)
+        bl.addSpacing(16)
+        close_btn = GlassButton("Close")
+        close_btn.clicked.connect(self.close)
+        close_wrap = QHBoxLayout()
+        close_wrap.addStretch()
+        close_wrap.addWidget(close_btn)
+        close_wrap.addStretch()
+        bl.addLayout(close_wrap)
  
-        RoundedButton(body, "Close", bg=self.BG3, fg=self.FG2, hover_bg=self.BG4,
-                      radius=10, parent_bg=self.BG,
-                      command=self.root.destroy).pack(pady=(20,0))
+    # ── helpers ──
+    def _center(self):
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
  
  
 if __name__ == "__main__":
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    apply_ios_app_theme(app)
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
