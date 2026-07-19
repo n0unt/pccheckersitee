@@ -16,6 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # that's fine; meta is stored in the DB so the user just re-uploads after a deploy.
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/tmp/zevora_uploads")
 EXE_FILE   = os.path.join(UPLOAD_DIR, "ZevoraScanner.exe")
+MAC_FILE   = os.path.join(UPLOAD_DIR, "ZevoraScanner.dmg")
 
 # Support templates either in root or in a templates/ subfolder
 _tmpl_sub = os.path.join(BASE_DIR, "templates")
@@ -437,20 +438,26 @@ def terms(): return render_template("terms.html", user=get_user())
 
 @app.route("/download")
 def download_page():
-    meta = {}
+    win_meta = {}; mac_meta = {}
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT value FROM settings WHERE key='exe_meta'")
-        row = cur.fetchone(); meta = json.loads(row[0]) if row else {}
+        cur.execute("SELECT key,value FROM settings WHERE key IN ('exe_meta','mac_meta')")
+        for key, val in cur.fetchall():
+            if key == "exe_meta": win_meta = json.loads(val)
+            if key == "mac_meta": mac_meta = json.loads(val)
         cur.close(); conn.close()
     except Exception: pass
-    # Exe is available if file exists on disk OR meta says it was uploaded
-    has_exe = os.path.exists(EXE_FILE) or bool(meta.get("version"))
+    has_win = os.path.exists(EXE_FILE) or bool(win_meta.get("version"))
+    has_mac = os.path.exists(MAC_FILE) or bool(mac_meta.get("version"))
     return render_template("download.html", user=get_user(),
-                           has_exe=has_exe,
-                           version=meta.get("version","v5.0"),
-                           file_size=meta.get("size",""),
-                           updated=meta.get("updated",""))
+                           has_exe=has_win,
+                           version=win_meta.get("version","v5.0"),
+                           file_size=win_meta.get("size",""),
+                           updated=win_meta.get("updated",""),
+                           has_mac=has_mac,
+                           mac_version=mac_meta.get("version","v5.0"),
+                           mac_file_size=mac_meta.get("size",""),
+                           mac_updated=mac_meta.get("updated",""))
 
 
 # ── Dashboard ─────────────────────────────────────────────────
@@ -1122,6 +1129,91 @@ def download_exe():
                              mimetype="application/octet-stream")
     except Exception: pass
 
+    abort(404)
+
+
+# ── Mac Upload (streaming — same pattern as Windows) ─────────
+@app.route("/api/admin/upload-mac", methods=["POST"])
+@login_required
+@owner_required
+def upload_mac():
+    f   = request.files.get("file")
+    ver = (request.form.get("version") or "v5.0").strip()
+    if not f:
+        return jsonify({"error":"No file"}), 400
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    # Accept .dmg, .pkg, or .app.zip — store whatever they upload as MAC_FILE
+    original_name = f.filename or "ZevoraScanner.dmg"
+    tmp_path = MAC_FILE + ".tmp"
+    size = 0
+    MAX  = 300 * 1024 * 1024  # 300 MB — Mac apps tend to be larger
+
+    try:
+        with open(tmp_path, "wb") as fp:
+            while True:
+                chunk = f.stream.read(512 * 1024)
+                if not chunk: break
+                size += len(chunk)
+                if size > MAX:
+                    fp.close()
+                    try: os.unlink(tmp_path)
+                    except Exception: pass
+                    return jsonify({"error":"File too large (max 300 MB)"}), 413
+                fp.write(chunk)
+
+        if size == 0:
+            try: os.unlink(tmp_path)
+            except Exception: pass
+            return jsonify({"error":"Empty file"}), 400
+
+        os.replace(tmp_path, MAC_FILE)
+
+    except Exception as e:
+        try: os.unlink(tmp_path)
+        except Exception: pass
+        return jsonify({"error":f"Could not save file: {e}"}), 500
+
+    size_mb = round(size / 1024 / 1024, 1)
+    meta = {
+        "version":  ver,
+        "size":     f"{size_mb} MB",
+        "filename": original_name,
+        "updated":  now(),
+        "storage":  "disk",
+        "path":     MAC_FILE,
+    }
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO settings (key,value) VALUES ('mac_meta',%s) "
+            "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+            (json.dumps(meta),))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f"[upload_mac] DB meta save failed: {e}")
+
+    return jsonify({"ok":True,"version":ver,"size":f"{size_mb} MB"})
+
+
+# ── Mac Download ──────────────────────────────────────────────
+@app.route("/download/mac")
+def download_mac():
+    filename = "ZevoraScanner.dmg"
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key='mac_meta'")
+        row = cur.fetchone()
+        if row:
+            meta     = json.loads(row[0])
+            filename = meta.get("filename", filename)
+        cur.close(); conn.close()
+    except Exception: pass
+
+    if os.path.exists(MAC_FILE):
+        return send_file(MAC_FILE, as_attachment=True,
+                         download_name=filename,
+                         mimetype="application/octet-stream")
     abort(404)
 
 
