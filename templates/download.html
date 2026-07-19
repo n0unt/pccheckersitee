@@ -11,7 +11,8 @@
   --bg:#0a0a0d;--s1:#111116;--s2:#18181d;--s3:#1e1e24;--s4:#27272e;
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --fg:#ececf0;--fg2:#8888a0;--fg3:#404055;
-  --accent:#2bba8f;--accent2:#1d9e76;--accentg:rgba(43,186,143,0.12);--accentg2:rgba(43,186,143,0.06);
+  --accent:#2bba8f;--accent2:#1d9e76;
+  --accentg:rgba(43,186,143,0.12);--accentg2:rgba(43,186,143,0.06);
 }
 html,body{background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;min-height:100%;}
 body::before{
@@ -27,7 +28,7 @@ body::after{
   background-size:60px 60px;
 }
 
-/* ── Floating glass nav — matches home.html exactly ── */
+/* ── Floating glass nav ── */
 .nav-outer{position:sticky;top:0;z-index:100;padding:16px 20px 0;display:flex;justify-content:center;}
 nav{
   width:100%;max-width:1080px;
@@ -64,31 +65,74 @@ nav{
   background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
 }
 .btn-ghost:hover{color:var(--fg);background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.16);}
-.btn-accent{
+.btn-accent-nav{
   background:rgba(43,186,143,0.85);color:#03150f;text-decoration:none;
   font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:11px;
   transition:all .18s ease;border:1px solid rgba(43,186,143,0.4);
   box-shadow:0 2px 12px rgba(43,186,143,0.25),inset 0 1px 0 rgba(255,255,255,0.25);
 }
-.btn-accent:hover{background:var(--accent);transform:translateY(-1px);}
+.btn-accent-nav:hover{background:var(--accent);transform:translateY(-1px);}
 
-/* ── Page content ── */
-.page{max-width:780px;margin:0 auto;padding:48px 20px 100px;}
+/* ── Page ── */
+.page{max-width:860px;margin:0 auto;padding:52px 20px 100px;}
 h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:center;margin-bottom:10px;}
-.sub{color:var(--fg2);text-align:center;font-size:15px;margin-bottom:48px;line-height:1.6;}
+.hero-sub{color:var(--fg2);text-align:center;font-size:15px;margin-bottom:48px;line-height:1.6;}
 
+/* ── OS auto-detect banner ── */
+.os-banner{
+  display:flex;align-items:center;gap:10px;
+  background:var(--accentg);border:1px solid rgba(43,186,143,0.2);
+  border-radius:12px;padding:12px 18px;margin-bottom:28px;font-size:13px;color:var(--accent);
+}
+.os-banner svg{flex-shrink:0;}
+
+/* ── OS Picker ── */
+.os-picker{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;}
+.os-card{
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--border2);border-radius:20px;
+  padding:32px 28px;text-align:center;
+  cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+}
+.os-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:0;transition:opacity .2s;
+}
+.os-card:hover{border-color:rgba(43,186,143,0.35);transform:translateY(-2px);}
+.os-card:hover::before{opacity:1;}
+.os-card.selected{
+  border-color:rgba(43,186,143,0.5);
+  background:rgba(43,186,143,0.06);
+  box-shadow:0 0 32px rgba(43,186,143,0.12),inset 0 1px 0 rgba(43,186,143,0.1);
+}
+.os-card.selected::before{opacity:1;}
+.os-icon{font-size:52px;margin-bottom:14px;display:block;}
+.os-name{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:6px;}
+.os-desc{font-size:12px;color:var(--fg2);line-height:1.5;}
+.os-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:10px;font-size:10px;font-weight:700;
+  padding:3px 10px;border-radius:20px;
+  background:var(--accentg);color:var(--accent);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.os-badge.unavail{background:rgba(255,255,255,0.05);color:var(--fg3);}
+
+/* ── Download card (shown after selection) ── */
 .dl-card{
   background:rgba(255,255,255,0.04);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border:1px solid var(--border2);border-radius:20px;padding:40px;
+  border:1px solid var(--border2);border-radius:20px;padding:36px 40px;
   text-align:center;position:relative;overflow:hidden;margin-bottom:32px;
+  display:none;
 }
 .dl-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--accent),transparent);}
-.dl-icon{font-size:48px;margin-bottom:16px;}
-.dl-name{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:6px;}
+.dl-card.visible{display:block;}
+.dl-name{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:6px;}
 .dl-desc{color:var(--fg2);font-size:13px;margin-bottom:24px;line-height:1.6;}
-
 .btn-dl{
   display:inline-flex;align-items:center;gap:10px;
   background:rgba(43,186,143,0.85);color:#03150f;
@@ -97,31 +141,47 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
   box-shadow:0 4px 24px rgba(43,186,143,0.3),inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .btn-dl:hover{background:var(--accent);transform:translateY(-1px);box-shadow:0 6px 32px rgba(43,186,143,0.4);}
-.btn-dl:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-dl:disabled,.btn-dl.disabled{
+  opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;
+  pointer-events:none;
+}
+.dl-tags{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:20px;}
+.dl-tag{font-size:11px;color:var(--fg3);display:flex;align-items:center;gap:4px;}
+.dl-tag b{color:var(--accent);}
+.dl-meta{font-size:11px;color:var(--fg3);margin-top:8px;}
 
-.tags{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:20px;}
-.tag{font-size:11px;color:var(--fg3);display:flex;align-items:center;gap:4px;}
-.tag b{color:var(--accent);}
+/* ── Unavailable message ── */
+.unavail-msg{
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:12px;padding:20px 24px;text-align:center;margin-bottom:32px;
+  display:none;
+}
+.unavail-msg.visible{display:block;}
+.unavail-msg p{color:var(--fg2);font-size:14px;line-height:1.6;}
+.unavail-msg b{color:var(--fg);}
 
+/* ── Steps ── */
 .section-label{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
   color:var(--fg2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.1em;}
 .steps{display:grid;gap:10px;}
 .step{
-  display:flex;gap:16px;
-  background:rgba(255,255,255,0.03);
-  border:1px solid var(--border);border-radius:14px;padding:16px 20px;
-  transition:border-color .15s;
+  display:flex;gap:16px;background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);border-radius:14px;padding:16px 20px;transition:border-color .15s;
 }
 .step:hover{border-color:var(--border2);}
 .step-num{
   width:32px;height:32px;border-radius:50%;
   background:var(--accentg);border:1px solid rgba(43,186,143,0.25);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Syne',sans-serif;font-size:13px;font-weight:800;
-  color:var(--accent);flex-shrink:0;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--accent);flex-shrink:0;
 }
 .step h3{font-size:14px;font-weight:600;margin-bottom:3px;}
 .step p{font-size:12px;color:var(--fg2);line-height:1.6;}
+
+/* Platform-specific steps */
+.steps-win{display:none;}
+.steps-mac{display:none;}
+.steps-win.visible,.steps-mac.visible{display:grid;gap:10px;}
 </style>
 </head>
 <body>
@@ -143,7 +203,7 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
       {% if user %}
         <a href="/auth/logout" class="btn-ghost">Sign out</a>
       {% else %}
-        <a href="/login" class="btn-accent">Sign in</a>
+        <a href="/login" class="btn-accent-nav">Sign in</a>
       {% endif %}
     </div>
   </nav>
@@ -151,73 +211,197 @@ h1{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;text-align:cen
 
 <div class="page">
   <h1>Download Zevora</h1>
-  <p class="sub">Run as admin when prompted. You'll need a PIN from your agent before the scan will start — the scanner won't do anything without one.</p>
+  <p class="hero-sub">Select your platform below. You'll need a PIN from your agent before the scan will start.</p>
 
-  <div class="dl-card">
-    <div class="dl-name">Zevora Scanner</div>
+  <!-- Auto-detect banner -->
+  <div class="os-banner" id="os-banner" style="display:none">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+    <span id="os-banner-text"></span>
+  </div>
+
+  <!-- Platform picker -->
+  <div class="os-picker">
+    <div class="os-card" id="card-win" onclick="selectOS('win')">
+      <div class="os-name">Windows</div>
+      <div class="os-desc">Windows 10 / 11 · 64-bit<br>Auto admin elevation · No install needed</div>
+      {% if has_exe %}
+      <span class="os-badge">✓ Available</span>
+      {% else %}
+      <span class="os-badge unavail">Coming soon</span>
+      {% endif %}
+    </div>
+    <div class="os-card" id="card-mac" onclick="selectOS('mac')">
+      <div class="os-name">macOS</div>
+      <div class="os-desc">macOS 12 Monterey and later<br>Apple Silicon &amp; Intel · Requires admin</div>
+      {% if has_mac %}
+      <span class="os-badge">✓ Available</span>
+      {% else %}
+      <span class="os-badge unavail">Coming soon</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Windows download card -->
+  <div class="dl-card" id="dl-win">
+    <div class="dl-name">Zevora Scanner — Windows</div>
     <div class="dl-desc">
-      Latest version — Windows 10/11 64-bit. Automatically requests admin privileges.<br>
+      64-bit · Windows 10 / 11 · Automatically requests admin privileges.<br>
       Results are sent directly to your agent — you will not see them.
-      {% if version %}
-      <br><span style="color:var(--fg3);font-size:11px;margin-top:4px;display:inline-block">
-        {{ version }}{% if file_size %} · {{ file_size }}{% endif %}{% if updated %} · Updated {{ updated }}{% endif %}
+      {% if version or file_size or updated %}
+      <br><span class="dl-meta">
+        {% if version %}{{ version }}{% endif %}
+        {% if file_size %} · {{ file_size }}{% endif %}
+        {% if updated %} · Updated {{ updated }}{% endif %}
       </span>
       {% endif %}
     </div>
-
     {% if has_exe %}
     <a href="/download/exe" class="btn-dl">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download Zevora.exe
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download ZevoraScanner.exe
     </a>
     {% else %}
-    <button class="btn-dl" disabled>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      No file uploaded yet
-    </button>
+    <span class="btn-dl disabled">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Not yet available
+    </span>
     {% endif %}
-
-    <div class="tags">
-      <div class="tag"><b>✓</b> Windows 10 / 11</div>
-      <div class="tag"><b>✓</b> Auto admin elevation</div>
-      <div class="tag"><b>✓</b> PIN required</div>
-      <div class="tag"><b>✓</b> Results auto-sent</div>
-      <div class="tag"><b>✓</b> No install needed</div>
+    <div class="dl-tags">
+      <div class="dl-tag"><b>✓</b> Windows 10 / 11</div>
+      <div class="dl-tag"><b>✓</b> Auto admin elevation</div>
+      <div class="dl-tag"><b>✓</b> PIN required</div>
+      <div class="dl-tag"><b>✓</b> Results auto-sent</div>
+      <div class="dl-tag"><b>✓</b> No install needed</div>
     </div>
   </div>
 
-  <div class="section-label" style="margin-bottom:16px">How it works</div>
-  <div class="steps">
+  <!-- Mac download card -->
+  <div class="dl-card" id="dl-mac">
+    <div class="dl-name">Zevora Scanner — macOS</div>
+    <div class="dl-desc">
+      macOS 12 Monterey+ · Apple Silicon &amp; Intel.<br>
+      Results are sent directly to your agent — you will not see them.
+      {% if mac_version or mac_file_size or mac_updated %}
+      <br><span class="dl-meta">
+        {% if mac_version %}{{ mac_version }}{% endif %}
+        {% if mac_file_size %} · {{ mac_file_size }}{% endif %}
+        {% if mac_updated %} · Updated {{ mac_updated }}{% endif %}
+      </span>
+      {% endif %}
+    </div>
+    {% if has_mac %}
+    <a href="/download/mac" class="btn-dl">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download ZevoraScanner.dmg
+    </a>
+    {% else %}
+    <span class="btn-dl disabled">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Not yet available
+    </span>
+    {% endif %}
+    <div class="dl-tags">
+      <div class="dl-tag"><b>✓</b> macOS 12+</div>
+      <div class="dl-tag"><b>✓</b> Apple Silicon &amp; Intel</div>
+      <div class="dl-tag"><b>✓</b> PIN required</div>
+      <div class="dl-tag"><b>✓</b> Results auto-sent</div>
+    </div>
+  </div>
+
+  <!-- How it works — Windows -->
+  <div class="steps-win" id="steps-win">
+    <div class="section-label" style="margin-bottom:14px">How it works — Windows</div>
     <div class="step">
       <div class="step-num">1</div>
-      <div>
-        <h3>Get a PIN</h3>
-        <p>Your screenshare agent generates a one-time PIN from the Zevora portal and gives it to you in Discord or chat.</p>
-      </div>
+      <div><h3>Get a PIN</h3><p>Your screenshare agent generates a one-time PIN from the Zevora portal and sends it to you in Discord.</p></div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
-      <div>
-        <h3>Run Zevora.exe</h3>
-        <p>Double-click Zevora.exe. Windows will ask for admin permission — click Yes. This is required to read system forensic data.</p>
-      </div>
+      <div><h3>Run ZevoraScanner.exe</h3><p>Double-click the file. Windows will ask for admin permission — click Yes. This is required to read system forensic data.</p></div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
-      <div>
-        <h3>Accept terms &amp; enter PIN</h3>
-        <p>Read and accept both consent boxes, then enter the PIN your agent gave you and click Start Scan.</p>
-      </div>
+      <div><h3>Accept terms &amp; enter PIN</h3><p>Read and accept both consent boxes, enter your PIN, then click Start Scan.</p></div>
     </div>
     <div class="step">
       <div class="step-num">4</div>
-      <div>
-        <h3>Wait for completion</h3>
-        <p>The scan runs automatically (2–5 minutes). When done, results are sent directly to your agent. You'll see a confirmation screen.</p>
-      </div>
+      <div><h3>Wait for completion</h3><p>The scan runs automatically (2–5 minutes). Results are sent directly to your agent when done.</p></div>
     </div>
   </div>
+
+  <!-- How it works — Mac -->
+  <div class="steps-mac" id="steps-mac">
+    <div class="section-label" style="margin-bottom:14px">How it works — macOS</div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div><h3>Get a PIN</h3><p>Your screenshare agent generates a one-time PIN from the Zevora portal and sends it to you in Discord.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div><h3>Open ZevoraScanner.dmg</h3><p>Double-click the .dmg to mount it, then drag Zevora to your Applications folder. Right-click → Open on first launch if macOS shows a security warning.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div><h3>Grant permissions when asked</h3><p>macOS will ask for Full Disk Access or Accessibility permissions. These are required for the forensic scan — grant them in System Settings.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div><h3>Accept terms &amp; enter PIN</h3><p>Read and accept both consent boxes, enter your PIN, then click Start Scan. Results are sent directly to your agent when done.</p></div>
+    </div>
+  </div>
+
 </div>
 
+<script>
+// Auto-detect OS
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgentData?.platform || "");
+const isWin = /Win/.test(navigator.platform || "");
+
+const banner     = document.getElementById("os-banner");
+const bannerText = document.getElementById("os-banner-text");
+
+if (isMac) {
+  bannerText.textContent = "We detected you're on macOS — the Mac version is pre-selected below.";
+  banner.style.display = "flex";
+  selectOS("mac");
+} else if (isWin) {
+  bannerText.textContent = "We detected you're on Windows — the Windows version is pre-selected below.";
+  banner.style.display = "flex";
+  selectOS("win");
+} else {
+  // Unknown OS — just show Windows by default
+  selectOS("win");
+}
+
+function selectOS(os) {
+  // Cards
+  document.getElementById("card-win").classList.toggle("selected", os === "win");
+  document.getElementById("card-mac").classList.toggle("selected", os === "mac");
+
+  // Download cards
+  document.getElementById("dl-win").classList.toggle("visible", os === "win");
+  document.getElementById("dl-mac").classList.toggle("visible", os === "mac");
+
+  // Steps
+  document.getElementById("steps-win").classList.toggle("visible", os === "win");
+  document.getElementById("steps-mac").classList.toggle("visible", os === "mac");
+}
+</script>
 </body>
 </html>
