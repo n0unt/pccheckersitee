@@ -646,26 +646,61 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:ra
         <!-- Scanner Upload (owner only) -->
         {% if user.role == 'owner' %}
         <div class="admin-page" id="admin-scanner">
-          <div class="card">
-            <div class="card-hdr"><span class="card-title">Scanner Upload (ZevoraScanner.exe)</span></div>
-            <div class="card-body">
-              <p style="font-size:12px;color:var(--fg2);margin-bottom:16px;">Upload the scanner exe — immediately replaces what players download at <code style="background:var(--s3);padding:1px 5px;border-radius:4px">/download</code>.</p>
-              <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-                <div class="field-group" style="max-width:160px">
+          <p style="font-size:12px;color:var(--fg2);margin-bottom:16px;">
+            Upload scanner files — each replaces what players download at
+            <code style="background:var(--s3);padding:1px 5px;border-radius:4px">/download</code>.
+            Files are stored until the next deploy; re-upload after any Railway redeploy.
+          </p>
+
+          <!-- Two upload cards side by side -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+            <!-- Windows -->
+            <div class="card">
+              <div class="card-hdr">
+                <span style="font-size:18px;margin-right:6px">🪟</span>
+                <span class="card-title">Windows Scanner (.exe)</span>
+              </div>
+              <div class="card-body">
+                <div class="field-group" style="margin-bottom:10px">
                   <div class="field-label">Version Label</div>
                   <div class="field-input"><input id="exe-version" type="text" placeholder="v5.0"></div>
                 </div>
-                <div class="field-group" style="flex:1;min-width:200px">
-                  <div class="field-label">Scanner .exe</div>
+                <div class="field-group" style="margin-bottom:12px">
+                  <div class="field-label">ZevoraScanner.exe</div>
                   <div class="field-input"><input id="exe-file" type="file" accept=".exe" style="padding:8px 12px"></div>
                 </div>
-                <button class="btn-accent" onclick="uploadExe()">Upload &amp; Publish</button>
+                <button class="btn-accent" onclick="uploadExe()" style="width:100%">Upload &amp; Publish Windows</button>
+                <div class="progress-wrap" id="exe-progress-wrap" style="margin-top:10px">
+                  <div class="progress-track"><div class="progress-fill" id="exe-progress-fill"></div></div>
+                </div>
+                <div class="msg-out" id="exe-msg"></div>
               </div>
-              <div class="progress-wrap" id="exe-progress-wrap">
-                <div class="progress-track"><div class="progress-fill" id="exe-progress-fill"></div></div>
-              </div>
-              <div class="msg-out" id="exe-msg"></div>
             </div>
+
+            <!-- Mac -->
+            <div class="card">
+              <div class="card-hdr">
+                <span style="font-size:18px;margin-right:6px">🍎</span>
+                <span class="card-title">macOS Scanner (.dmg)</span>
+              </div>
+              <div class="card-body">
+                <div class="field-group" style="margin-bottom:10px">
+                  <div class="field-label">Version Label</div>
+                  <div class="field-input"><input id="mac-version" type="text" placeholder="v5.0"></div>
+                </div>
+                <div class="field-group" style="margin-bottom:12px">
+                  <div class="field-label">ZevoraScanner.dmg</div>
+                  <div class="field-input"><input id="mac-file" type="file" accept=".dmg,.pkg,.zip" style="padding:8px 12px"></div>
+                </div>
+                <button class="btn-accent" onclick="uploadMac()" style="width:100%">Upload &amp; Publish Mac</button>
+                <div class="progress-wrap" id="mac-progress-wrap" style="margin-top:10px">
+                  <div class="progress-track"><div class="progress-fill" id="mac-progress-fill"></div></div>
+                </div>
+                <div class="msg-out" id="mac-msg"></div>
+              </div>
+            </div>
+
           </div>
         </div>
         {% endif %}
@@ -932,6 +967,34 @@ async function uploadExe() {
     } catch { msg.className='msg-out err'; msg.textContent='Unexpected response.'; }
   };
   xhr.onerror = () => { pw.style.display='none'; msg.className='msg-out err'; msg.textContent='Network error.'; };
+  xhr.send(fd);
+}
+
+async function uploadMac() {
+  const fileInput = document.getElementById('mac-file');
+  const version   = document.getElementById('mac-version').value.trim() || 'v5.0';
+  const msg = document.getElementById('mac-msg');
+  const pw  = document.getElementById('mac-progress-wrap');
+  const pf  = document.getElementById('mac-progress-fill');
+  if (!fileInput.files?.[0]) { msg.className = 'msg-out err'; msg.textContent = 'Choose a .dmg file first.'; return; }
+  const file = fileInput.files[0];
+  const fd = new FormData();
+  fd.append('file', file); fd.append('version', version);
+  msg.className = 'msg-out';
+  msg.textContent = `Uploading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)… Mac files can be large, please wait.`;
+  pw.style.display = 'block'; pf.style.width = '0%';
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/admin/upload-mac');
+  xhr.upload.onprogress = e => { if (e.lengthComputable) pf.style.width = Math.round(e.loaded/e.total*100)+'%'; };
+  xhr.onload = () => {
+    pw.style.display = 'none';
+    try {
+      const d = JSON.parse(xhr.responseText);
+      if (xhr.status === 200 && d.ok) { msg.className='msg-out ok'; msg.textContent=`Uploaded ${d.version} (${d.size}). Mac scanner live at /download.`; }
+      else { msg.className='msg-out err'; msg.textContent=d.error||'Upload failed.'; }
+    } catch { msg.className='msg-out err'; msg.textContent='Unexpected response.'; }
+  };
+  xhr.onerror = () => { pw.style.display='none'; msg.className='msg-out err'; msg.textContent='Network error — check file size and try again.'; };
   xhr.send(fd);
 }
 
