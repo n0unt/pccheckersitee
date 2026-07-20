@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Zevora — Results {{ pin.pin }} (macOS)</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d0b;--s1:#111612;--s2:#161e18;--s3:#1c261f;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --fg:#eafff2;--fg2:#93ab9f;--fg3:#54685c;
+  --accent:#22c55e;--accentg:rgba(34,197,94,0.14);--accentg2:rgba(34,197,94,0.07);
+  --red:#f85149;--redg:rgba(248,81,73,0.08);--redg2:rgba(248,81,73,0.15);
+  --amb:#d29922;--ambg:rgba(210,153,34,0.1);
+  --green:#22c55e;--greeng:rgba(34,197,94,0.1);
+  --nav-h:52px;--side-w:210px;
+}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 50% 30% at 50% 0%,rgba(34,197,94,0.05),transparent);}
+
+/* Nav */
+.nav{height:var(--nav-h);background:rgba(10,13,11,0.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:12px;position:relative;z-index:200;flex-shrink:0;}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#0f6b30);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:#04140a;}
+.bname{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--fg);}
+.nav-pin{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);background:var(--accentg);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:3px 9px;letter-spacing:.06em;}
+.nav-meta{font-size:11px;color:var(--fg3);}
+.platform-badge{font-size:10px;font-weight:700;color:#93c5fd;background:rgba(147,197,253,0.12);border:1px solid rgba(147,197,253,0.3);border-radius:6px;padding:3px 9px;text-transform:uppercase;letter-spacing:.05em;}
+.nav-r{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.nav-btn{font-size:11px;color:var(--fg3);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:6px;transition:.15s;background:none;cursor:pointer;}
+.nav-btn:hover{color:var(--fg2);border-color:var(--border2);}
+.nav-dl{font-size:11px;color:#04140a;background:var(--accent);text-decoration:none;padding:5px 12px;border-radius:6px;font-weight:600;transition:.15s;border:none;cursor:pointer;}
+.nav-dl:hover{background:#2fdb70;}
+
+/* Layout */
+.shell{display:flex;height:calc(100vh - var(--nav-h));}
+
+/* Sidebar */
+.side{width:var(--side-w);background:var(--s1);border-right:1px solid var(--border);padding:10px 8px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:1px;}
+.side::-webkit-scrollbar{width:4px;}
+.side::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.side-sect{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);padding:10px 8px 4px;margin-top:4px;}
+.side-sect:first-child{margin-top:0;}
+.tab{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--fg2);transition:.12s;border:none;background:none;width:100%;text-align:left;gap:6px;}
+.tab:hover{background:rgba(255,255,255,0.04);color:var(--fg);}
+.tab.active{background:var(--accentg);color:var(--accent);border-left:2px solid var(--accent);padding-left:6px;}
+.tab-lbl{display:flex;align-items:center;gap:7px;min-width:0;}
+.tab-lbl span{font-family:'DM Mono',monospace;font-size:9px;font-weight:700;background:var(--s3);color:var(--fg3);padding:2px 4px;border-radius:3px;flex-shrink:0;letter-spacing:.03em;}
+.tab.active .tab-lbl span{background:var(--accentg);color:var(--accent);}
+.hc{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;min-width:16px;text-align:center;flex-shrink:0;}
+.hc.r{background:var(--redg2);color:var(--red);}
+.hc.a{background:var(--ambg);color:var(--amb);}
+.hc.g{background:var(--greeng);color:var(--green);}
+.hc.d{background:var(--s3);color:var(--fg3);}
+
+/* Main */
+.main{flex:1;overflow-y:auto;padding:0;}
+.main::-webkit-scrollbar{width:5px;}
+.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+.panel{display:none;padding:22px 26px;}
+.panel.active{display:block;}
+
+.pg-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:3px;}
+.pg-sub{font-size:12px;color:var(--fg2);margin-bottom:18px;line-height:1.5;}
+.pg-div{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--fg3);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);padding-bottom:6px;}
+
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.sum-card{background:var(--s1);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+.sum-n{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;}
+.sum-n.r{color:var(--red);}
+.sum-n.a{color:var(--amb);}
+.sum-n.g{color:var(--green);}
+.sum-n.b{color:var(--accent);}
+.sum-l{font-size:10px;color:var(--fg3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+
+.warn{border-radius:9px;padding:9px 13px;font-size:12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.warn.r{background:var(--redg);border:1px solid rgba(248,81,73,0.2);color:var(--red);}
+.warn.a{background:var(--ambg);border:1px solid rgba(210,153,34,0.2);color:var(--amb);}
+.warn.g{background:var(--greeng);border:1px solid rgba(34,197,94,0.2);color:var(--green);}
+.warn.b{background:rgba(255,255,255,0.04);border:1px solid var(--border2);color:var(--fg2);}
+.warn-icon{font-size:13px;flex-shrink:0;margin-top:1px;}
+
+.dc-card{background:var(--s1);border:1px solid var(--border);border-radius:11px;padding:14px 16px;margin-bottom:8px;}
+.dc-top{display:flex;align-items:center;gap:10px;}
+.dc-av{width:34px;height:34px;border-radius:50%;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--fg3);flex-shrink:0;}
+.dc-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;}
+.dc-id{font-size:11px;color:var(--fg3);margin-top:1px;}
+
+.rb-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:8px;}
+.rb-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
+.rb-meta{font-size:11px;color:var(--fg3);margin-top:6px;}
+
+.rpre{font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;color:var(--fg2);white-space:pre-wrap;word-break:break-all;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;max-height:580px;overflow-y:auto;}
+.rpre .hr{color:var(--red);}
+.rpre .ha{color:var(--amb);}
+.rpre .hg{color:var(--green);}
+
+.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.03em;}
+.pill.g{background:var(--greeng);color:var(--green);}
+.pill.r{background:var(--redg);color:var(--red);}
+.pill.d{background:var(--s3);color:var(--fg3);}
+
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);padding:0 12px 8px;text-align:left;}
+.tbl td{padding:9px 12px;border-top:1px solid var(--border);color:var(--fg2);vertical-align:middle;}
+.tbl tr:hover td{background:rgba(255,255,255,0.02);}
+.mac-note{font-size:11px;color:var(--fg3);background:rgba(147,197,253,0.06);border:1px solid rgba(147,197,253,0.15);border-radius:8px;padding:8px 12px;margin-bottom:14px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <a href="/dashboard" class="brand">
+    <div class="mark">Z</div>
+    <span class="bname">Zevora</span>
+  </a>
+  <span class="nav-pin">{{ pin.pin }}</span>
+  <span class="platform-badge">macOS</span>
+  <span class="nav-meta">{{ scan.pc_user or 'Unknown' }} &nbsp;·&nbsp; {{ scan.league }}</span>
+  <div class="nav-r">
+    <a href="/dashboard" class="nav-btn">Back</a>
+    {% if has_scan %}
+    <a href="/results/{{ pin.pin }}/download" class="nav-dl">Download Report</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not has_scan %}
+<div style="padding:60px;text-align:center;color:var(--fg2);">
+  <div class="pg-title" style="margin-bottom:8px;">Awaiting scan…</div>
+  <p style="font-size:13px;">This PIN has not received a submitted scan yet.</p>
+</div>
+{% else %}
+
+<div class="shell">
+
+  <!-- Sidebar — macOS-specific sections only -->
+  <aside class="side">
+    <div class="side-sect">Overview</div>
+    <button class="tab active" onclick="sw('summary',this)">
+      <div class="tab-lbl"><span>SUM</span> Summary</div>
+    </button>
+
+    <div class="side-sect">Identity</div>
+    <button class="tab" onclick="sw('roblox',this)">
+      <div class="tab-lbl"><span>RBX</span> Roblox</div>
+      {% set rh = report.get('roblox_hits',0)|int %}
+      <span class="hc {% if rh>0 %}r{% else %}d{% endif %}">{{ rh }}</span>
+    </button>
+    <button class="tab" onclick="sw('discord',this)">
+      <div class="tab-lbl"><span>DC</span> Discord</div>
+      {% set dh = report.get('discord_accounts',[])|length %}
+      <span class="hc {% if dh>1 %}a{% else %}d{% endif %}">{{ dh }}</span>
+    </button>
+
+    <div class="side-sect">Cheats</div>
+    <button class="tab" onclick="sw('cheat',this)">
+      <div class="tab-lbl"><span>CHT</span> Cheat Files</div>
+      {% set ch = report.get('cheat_hits',0)|int %}
+      <span class="hc {% if ch>0 %}r{% else %}d{% endif %}">{{ ch }}</span>
+    </button>
+    <button class="tab" onclick="sw('trash',this)">
+      <div class="tab-lbl"><span>DEL</span> Trash</div>
+      {% set trh = report.get('recycle_hits',0)|int %}
+      <span class="hc {% if trh>0 %}r{% else %}d{% endif %}">{{ trh }}</span>
+    </button>
+
+    <div class="side-sect">Execution</div>
+    <button class="tab" onclick="sw('processes',this)">
+      <div class="tab-lbl"><span>PRC</span> Processes / Injection</div>
+      {% set ph = report.get('process_hits',0)|int %}
+      <span class="hc {% if ph>0 %}r{% else %}d{% endif %}">{{ ph }}</span>
+    </button>
+
+    <div class="side-sect">System</div>
+    <button class="tab" onclick="sw('factory',this)">
+      <div class="tab-lbl"><span>FAC</span> Factory Reset</div>
+      {% if report.get('drive_warn') %}<span class="hc a">!</span>{% endif %}
+    </button>
+    <button class="tab" onclick="sw('usb',this)">
+      <div class="tab-lbl"><span>USB</span> USB History</div>
+    </button>
+    <button class="tab" onclick="sw('network',this)">
+      <div class="tab-lbl"><span>NET</span> Network / VPN</div>
+      {% set nh = report.get('network_hits',0)|int %}
+      <span class="hc {% if nh>0 %}a{% else %}d{% endif %}">{{ nh }}</span>
+    </button>
+    <button class="tab" onclick="sw('eventlog',this)">
+      <div class="tab-lbl"><span>LOG</span> Unified Log</div>
+      {% set eh = report.get('eventlog_hits',0)|int %}
+      <span class="hc {% if eh>0 %}a{% else %}d{% endif %}">{{ eh }}</span>
+    </button>
+
+    <div class="side-sect">Raw</div>
+    <button class="tab" onclick="sw('raw',this)">
+      <div class="tab-lbl"><span>RAW</span> Raw Report</div>
+    </button>
+  </aside>
+
+  <!-- Panels -->
+  <main class="main">
+
+    <!-- SUMMARY -->
+    <div class="panel active" id="panel-summary">
+      <div class="pg-title">Scan Summary</div>
+      <p class="pg-sub">Submitted {{ scan.submitted }} &nbsp;·&nbsp; Mac User: {{ scan.pc_user }} &nbsp;·&nbsp; League: {{ scan.league }}</p>
+      <div class="mac-note">
+        This is a macOS scan. Detection coverage differs from Windows scans — Prefetch, BAM, ShellBags,
+        AppCompat, and registry-based artifacts don't exist on macOS, so this report uses Mac-native
+        equivalents (Trash, IORegistry USB history, install receipts, unified log, dylib injection checks).
+      </div>
+
+      <div class="sum-grid">
+        {% set t = scan.total_hits|int %}
+        <div class="sum-card">
+          <div class="sum-n {% if t>15 %}r{% elif t>4 %}a{% else %}g{% endif %}">{{ t }}</div>
+          <div class="sum-l">Total Hits</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n {% if report.get('cheat_hits',0)|int>0 %}r{% else %}b{% endif %}">{{ report.get('cheat_hits',0) }}</div>
+          <div class="sum-l">Cheat Files</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n b">{{ (scan.roblox_accounts or [])|length }}</div>
+          <div class="sum-l">Roblox Accounts</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-n b">{{ report.get('discord_accounts',[])|length }}</div>
+          <div class="sum-l">Discord Accounts</div>
+        </div>
+      </div>
+
+      {% set t = scan.total_hits|int %}
+      {% if t > 15 %}<div class="warn r"><span class="warn-icon">!</span> HIGH RISK — {{ t }} hits. Review cheat files and process injection immediately.</div>
+      {% elif t > 4 %}<div class="warn a"><span class="warn-icon">!</span> SUSPICIOUS — {{ t }} hits detected. Manual review recommended.</div>
+      {% else %}<div class="warn g"><span class="warn-icon">✓</span> LOW RISK — {{ t }} hits detected.</div>{% endif %}
+
+      {% if report.get('drive_warn') %}<div class="warn a"><span class="warn-icon">!</span> System age flagged — possible recent reinstall. See Factory Reset tab.</div>{% endif %}
+      {% if (scan.roblox_accounts or [])|length > 1 %}<div class="warn a"><span class="warn-icon">!</span> MULTIPLE ROBLOX ACCOUNTS — possible ban evasion.</div>{% endif %}
+    </div>
+
+    <!-- ROBLOX -->
+    <div class="panel" id="panel-roblox">
+      <div class="pg-title">Roblox Account Detection</div>
+      <p class="pg-sub">Accounts found in ~/Library/Logs/Roblox.</p>
+      {% set accs = scan.roblox_accounts if scan.roblox_accounts else [] %}
+      {% if accs %}
+        {% for acc in accs %}
+        <div class="rb-card">
+          <div class="rb-name">{{ acc.username or 'Unknown' }}</div>
+          {% if acc.userid %}<a href="https://www.roblox.com/users/{{ acc.userid }}/profile" target="_blank" style="color:var(--accent);font-size:11px;text-decoration:none;">Profile &rarr; (ID: {{ acc.userid }})</a>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}<div class="warn b"><span class="warn-icon">–</span> No Roblox accounts detected.</div>{% endif %}
+      <div class="pg-div">Raw Log Data</div>
+      <div class="rpre" data-color="1">{{ report.get('roblox', 'No data') }}</div>
+    </div>
+
+    <!-- DISCORD -->
+    <div class="panel" id="panel-discord">
+      <div class="pg-title">Discord Account Detection</div>
+      <p class="pg-sub">Accounts found in ~/Library/Application Support/discord.</p>
+      {% set daccs = report.get('discord_accounts',[]) %}
+      {% if daccs|length > 1 %}<div class="warn a"><span class="warn-icon">!</span> {{ daccs|length }} Discord accounts detected — possible alt accounts.</div>{% endif %}
+      {% for acc in daccs %}
+      <div class="dc-card">
+        <div class="dc-top">
+          <div class="dc-av">DC</div>
+          <div>
+            <div class="dc-name">@{{ acc.username or 'Unknown' }}</div>
+            <div class="dc-id">ID: {{ acc.id or 'Unknown' }} &nbsp;·&nbsp; {{ acc.source or '' }}</div>
+          </div>
+        </div>
+        {% if acc.has_token %}<div class="warn r" style="margin-top:8px;padding:6px 10px;"><span class="warn-icon">!</span> Discord token cached — session active</div>{% endif %}
+      </div>
+      {% else %}<div class="warn b"><span class="warn-icon">–</span> No Discord accounts detected.</div>{% endfor %}
+      <div class="pg-div">Raw Cache</div>
+      <div class="rpre" data-color="1">{{ report.get('discord', 'No data') }}</div>
+    </div>
+
+    <!-- CHEAT FILES -->
+    <div class="panel" id="panel-cheat">
+      <div class="pg-title">Cheat File Detection</div>
+      <p class="pg-sub">Scanned ~/Downloads, ~/Desktop, ~/Documents, ~/Library/Application Support, /Applications.</p>
+      {% set ch = report.get('cheat_hits',0)|int %}
+      {% if ch > 0 %}<div class="warn r"><span class="warn-icon">!</span> {{ ch }} cheat file hit(s) detected.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('cheat', 'No data') }}</div>
+    </div>
+
+    <!-- TRASH -->
+    <div class="panel" id="panel-trash">
+      <div class="pg-title">Trash (~/.Trash)</div>
+      <p class="pg-sub">macOS equivalent of the Recycle Bin — cheat files moved to Trash still show here.</p>
+      {% set trh = report.get('recycle_hits',0)|int %}
+      {% if trh > 0 %}<div class="warn r"><span class="warn-icon">!</span> {{ trh }} cheat-related file(s) found in Trash.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('recycle', 'No data') }}</div>
+    </div>
+
+    <!-- PROCESSES / INJECTION -->
+    <div class="panel" id="panel-processes">
+      <div class="pg-title">Running Processes / Injection Check</div>
+      <p class="pg-sub">Checks running processes for known cheat binaries, and scans loaded dylibs in the Roblox process (via vmmap) for injected libraries.</p>
+      {% set ph = report.get('process_hits',0)|int %}
+      {% if ph > 0 %}<div class="warn r"><span class="warn-icon">!</span> {{ ph }} suspicious process/dylib indicator(s) found.</div>
+      {% else %}<div class="warn g"><span class="warn-icon">✓</span> No suspicious processes or injected libraries detected.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('processes', 'No data') }}</div>
+    </div>
+
+    <!-- FACTORY RESET -->
+    <div class="panel" id="panel-factory">
+      <div class="pg-title">Factory Reset / System Age</div>
+      <p class="pg-sub">Uses the macOS install receipt (/var/db/receipts) as the primary install-date marker, falling back to home folder creation date if unavailable.</p>
+      {% if report.get('drive_warn') %}<div class="warn a"><span class="warn-icon">!</span> System age flagged as recently installed/reset.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('factory_resets', 'No data') }}</div>
+    </div>
+
+    <!-- USB -->
+    <div class="panel" id="panel-usb">
+      <div class="pg-title">USB / External Drive History</div>
+      <p class="pg-sub">macOS has no persistent USB history registry like Windows USBSTOR — this shows currently attached USB storage devices plus recent unified-log mount events (past 7 days).</p>
+      <div class="rpre">{{ report.get('drive_info', 'No data') }}</div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="panel" id="panel-network">
+      <div class="pg-title">Network / VPN Detection</div>
+      {% if report.get('vpn_detected') %}<div class="warn a"><span class="warn-icon">!</span> VPN-style interface or hosting-provider ISP detected.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('network', 'No data') }}</div>
+    </div>
+
+    <!-- EVENT LOG -->
+    <div class="panel" id="panel-eventlog">
+      <div class="pg-title">Unified Log Analysis</div>
+      <p class="pg-sub">Checks for login-related unified log entries in the past 24 hours. An empty result can indicate logging was disabled or cleared.</p>
+      {% set eh = report.get('eventlog_hits',0)|int %}
+      {% if eh > 0 %}<div class="warn a"><span class="warn-icon">!</span> No login log entries found — possible log tampering.</div>{% endif %}
+      <div class="rpre" data-color="1">{{ report.get('eventlog', 'No data') }}</div>
+    </div>
+
+    <!-- RAW -->
+    <div class="panel" id="panel-raw">
+      <div class="pg-title">Raw Report</div>
+      <p class="pg-sub">Full unprocessed scan output.</p>
+      <div class="rpre">{{ scan.full_report or '' }}</div>
+    </div>
+
+  </main>
+</div>
+{% endif %}
+
+<script>
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function sw(name, el){
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  var p = document.getElementById('panel-'+name);
+  if(p){p.classList.add('active'); colorPre(p);}
+  if(el) el.classList.add('active');
+}
+
+function colorPre(scope){
+  (scope||document).querySelectorAll('.rpre[data-color="1"]').forEach(function(el){
+    if(el.dataset.colored) return;
+    el.dataset.colored = '1';
+    el.innerHTML = el.textContent.split('\n').map(function(l){
+      var ll = l.toLowerCase();
+      if(/critical|cleared|executor|cheat|bypass|deleted|inject|detected|✗/.test(ll))
+        return '<span class="hr">'+esc(l)+'</span>';
+      if(/suspicious|warning|unusual|⚠|possible/.test(ll))
+        return '<span class="ha">'+esc(l)+'</span>';
+      if(/✓|clean|normal|no hits|no data/.test(ll))
+        return '<span class="hg">'+esc(l)+'</span>';
+      return esc(l);
+    }).join('\n');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  colorPre(document.querySelector('.panel.active'));
+});
+</script>
+</body>
+</html>
