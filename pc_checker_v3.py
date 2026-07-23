@@ -12,13 +12,13 @@ import sys
 import ctypes
 from ctypes import wintypes
  
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame,
     QPushButton, QLineEdit, QTextEdit, QCheckBox, QProgressBar, QSizePolicy,
     QGraphicsDropShadowEffect,
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QSize, QRectF
-from PyQt6.QtGui import (
+from PySide6.QtCore import Qt, QObject, Signal, QTimer, QSize, QRectF
+from PySide6.QtGui import (
     QFont, QIcon, QPixmap, QPainter, QColor, QPainterPath, QLinearGradient,
     QRadialGradient, QBrush,
 )
@@ -55,9 +55,30 @@ def _is_admin():
     except Exception:
         return False
 
+def _show_elevation_notice():
+    """Shows a visible dialog explaining why admin rights are being requested,
+    BEFORE the UAC prompt fires. Silent/automatic self-elevation with no
+    user-facing explanation is one of the strongest heuristics AV engines
+    use to flag droppers — showing this dialog first breaks that pattern
+    and is also just more honest to the person running the scanner."""
+    try:
+        import tkinter as _tk, tkinter.messagebox as _mb
+        _r = _tk.Tk(); _r.withdraw()
+        _mb.showinfo(
+            "Zevora — Administrator Access Required",
+            "Zevora needs administrator access to read system forensic "
+            "artifacts (event logs, registry, prefetch).\n\n"
+            "Windows will now show a permission prompt (UAC). "
+            "Click Yes to continue."
+        )
+        _r.destroy()
+    except Exception:
+        pass
+
 if sys.platform == "win32" and not _is_admin():
     import ctypes
     try:
+        _show_elevation_notice()
         if getattr(sys, "frozen", False):
             exe  = sys.executable
             args = " ".join(f'"{a}"' for a in sys.argv[1:])
@@ -114,10 +135,14 @@ KEYWORDS = [_d(k) for k in _KW_ENC] + [
 
 KNOWN_CHEAT_HASHES = set()
 
-_WH_KFA_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NTkyNjY1ODU1MTgwOS9Ua09kVEk2QldWQW0tUzBZbEpLTE5TQm9WQkZZRHZMYmlidVlhZWlPYmxIZ2tWZDB6aHJRdHBMUWdpV3VmWjRPVkYwRA=="
-_WH_UFF_ENC = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ3NTM1NjE3NjE1MjY1ODA0MS85WnlCamgtX1hjZmN3TllXLVBWam9tNC1lVDhFWWRIdHVRQm10NnpxQVN4cDBsREFJY1FJYklMdDhmam9laENmNE9WXw=="
-WEBHOOK_KFA = _d(_WH_KFA_ENC)
-WEBHOOK_UFF = _d(_WH_UFF_ENC)
+# Plain, un-obfuscated Discord webhook URLs. These were previously
+# base64-wrapped, which added zero real secrecy (anyone can decode
+# base64 instantly) while making the binary look like it hides its
+# network destination — a classic C2/dropper signature to static
+# analysis. Being upfront about the destination is both more honest
+# and less likely to trip AV heuristics.
+WEBHOOK_KFA = "https://discord.com/api/webhooks/1475355926658551809/TkOdTI6BWVAm-S0YlJKLNSBoVBFYDvLbibuYaeiOblHgkVd0zhrQtpLQgiWufZ4OVF0D"
+WEBHOOK_UFF = "https://discord.com/api/webhooks/1475356176152658041/9ZyBjh-_XcfcwNYW-PVjom4-eT8EYdHtuQBmt6zqASxp0lDAIcQIbILt8fjoehCf4OV_"
 
 def get_webhook_for_league(league):
     return WEBHOOK_KFA if str(league).upper() == "KFA" else WEBHOOK_UFF
@@ -230,27 +255,40 @@ def section(title, lines):
     return header + "\n".join(str(l) for l in lines) + "\n"
 
 def _ssl_ctx():
-    ctx = ssl._create_unverified_context()
-    ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    return ctx
+    # Real certificate verification, using the system's default trust
+    # store. Discord's and your own website's certs are properly signed,
+    # so there's no legitimate reason to disable verification — doing so
+    # was both a security hole (MITM-able) and a network-behavior
+    # heuristic flag on several AV engines.
+    return ssl.create_default_context()
 
-def _post_json(payload, url_override=None):
+def _post_json(payload, url_override=None, max_retries=3, base_delay=1.5):
+    """POST with retry + exponential backoff. Network calls (especially
+    on flaky Wi-Fi during a screenshare) can fail transiently — retrying
+    a couple times before giving up avoids losing an entire scan to one
+    dropped packet. Only retries on network-level failures / 5xx server
+    errors; a 4xx (bad request, invalid webhook, etc.) fails fast since
+    retrying won't fix it."""
     target = url_override or WEBHOOK_UFF
-    try:
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(target, data=data,
-              headers={"Content-Type":"application/json","User-Agent":"zevoraScanner/4.0"}, method="POST")
-        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=15) as r:
-            body = r.read()
-            try: body = json.loads(body)
-            except Exception: body = {}
-            return True, r.status, ""
-    except urllib.error.HTTPError as e:
-        try: err = e.read().decode()[:120]
-        except Exception: err = str(e)
-        return False, e.code, err
-    except Exception as e:
-        return False, 0, str(e)
+    last_err = ""; last_code = 0
+    for attempt in range(max_retries):
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(target, data=data,
+                  headers={"Content-Type":"application/json","User-Agent":"ZevoraScanner/5.0"}, method="POST")
+            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=15) as r:
+                return True, r.status, ""
+        except urllib.error.HTTPError as e:
+            try: last_err = e.read().decode()[:120]
+            except Exception: last_err = str(e)
+            last_code = e.code
+            if 400 <= e.code < 500:
+                return False, e.code, last_err  # client error — retrying won't help
+        except Exception as e:
+            last_err = str(e); last_code = 0
+        if attempt < max_retries - 1:
+            time.sleep(base_delay * (2 ** attempt))
+    return False, last_code, last_err
 
 def _chunk(text, max_len=1900):
     lines = text.split("\n"); chunks = []; cur = ""
@@ -382,18 +420,34 @@ def send_website(results, pin):
         data = raw.encode("utf-8")
         req = urllib.request.Request(
             f"{WEBSITE_URL}/api/submit", data=data,
-            headers={"Content-Type":"application/json","User-Agent":"zevoraScanner/5.0"},
+            headers={"Content-Type":"application/json","User-Agent":"ZevoraScanner/5.0"},
             method="POST")
-        try:
-            with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
-                body = json.loads(r.read().decode())
-                status = r.status
-            if status == 200: return True, ""
-            else: return False, f"HTTP {status}: {body.get('error', str(body)[:120])}"
-        except urllib.error.HTTPError as e:
-            try: err_body = json.loads(e.read().decode())
-            except Exception: err_body = {}
-            return False, f"HTTP {e.code}: {err_body.get('error', str(e))[:120]}"
+
+        # Retry with exponential backoff on transient network failures /
+        # 5xx server errors. A 4xx fails fast since retrying won't fix it.
+        max_retries = 3
+        last_err = "Unknown error"
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as r:
+                    body = json.loads(r.read().decode())
+                    status = r.status
+                if status == 200:
+                    return True, ""
+                last_err = f"HTTP {status}: {body.get('error', str(body)[:120])}"
+                if 400 <= status < 500:
+                    return False, last_err  # client error — retrying won't help
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {}
+                last_err = f"HTTP {e.code}: {err_body.get('error', str(e))[:120]}"
+                if 400 <= e.code < 500:
+                    return False, last_err
+            except Exception as e:
+                last_err = f"{type(e).__name__}: {str(e)[:120]}"
+            if attempt < max_retries - 1:
+                time.sleep(1.5 * (2 ** attempt))
+        return False, last_err
     except Exception as e:
         return False, f"{type(e).__name__}: {str(e)[:120]}"
 
@@ -1415,6 +1469,78 @@ def scan_cleaners():
     return section("Cleaner / Bypass Detection", lines), hit_count, summary
 
 
+def scan_browser_extensions():
+    """
+    Checks installed browser extensions for known Roblox-exploit
+    companion extensions — some executors ship a browser-side helper
+    extension used to bypass web-based checks or auto-inject on page
+    load. This only reads extension manifest names/IDs from each
+    browser's profile folder; it never touches cookies, tokens, or
+    any credential data, so it carries none of the risk profile that
+    Discord-token matching did.
+    """
+    if not WINDOWS:
+        return section("Browser Extensions", ["Windows only"]), 0, []
+
+    EXT_KEYWORDS = [
+        "exploit", "executor", "roblox bypass", "script injector",
+        "roblox unlock", "anticheat bypass", "bypass detector",
+    ]
+
+    profile_dirs = [
+        (os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data"), "Chrome"),
+        (os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data"), "Edge"),
+        (os.path.expandvars(r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data"), "Brave"),
+    ]
+
+    hits = []
+    for base, browser_label in profile_dirs:
+        if not os.path.exists(base):
+            continue
+        try:
+            for profile in os.listdir(base):
+                ext_dir = os.path.join(base, profile, "Extensions")
+                if not os.path.isdir(ext_dir):
+                    continue
+                for ext_id in os.listdir(ext_dir):
+                    ext_path = os.path.join(ext_dir, ext_id)
+                    if not os.path.isdir(ext_path):
+                        continue
+                    try:
+                        versions = os.listdir(ext_path)
+                        if not versions:
+                            continue
+                        manifest_path = os.path.join(ext_path, versions[0], "manifest.json")
+                        if not os.path.exists(manifest_path):
+                            continue
+                        with open(manifest_path, "r", encoding="utf-8", errors="ignore") as f:
+                            manifest_raw = f.read(4096)
+                        manifest_lower = manifest_raw.lower()
+                        matched = [kw for kw in EXT_KEYWORDS if kw in manifest_lower]
+                        if matched:
+                            name_match = re.search(r'"name"\s*:\s*"([^"]{1,60})"', manifest_raw)
+                            ext_name = name_match.group(1) if name_match else ext_id
+                            hits.append({
+                                "browser": browser_label, "id": ext_id,
+                                "name": ext_name, "keywords": matched,
+                            })
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    lines = [f"\n  Extension folders scanned across Chrome/Edge/Brave"]
+    if hits:
+        lines.append(f"  ⚠ {len(hits)} suspicious extension(s) found:\n")
+        for h in hits:
+            lines.append(f"  ✗ [{h['browser']}] {h['name']}  (ID: {h['id']})")
+            lines.append(f"    Matched: {', '.join(h['keywords'])}")
+    else:
+        lines.append("  ✓ No suspicious browser extensions detected")
+
+    return section("Browser Extension Check", lines), len(hits), hits
+
+
 def scan_network_vpn():
     if not WINDOWS:
         return section("Network / VPN",["Windows only"]),0,"Unknown"
@@ -1442,7 +1568,7 @@ def scan_network_vpn():
             lines.append("  ✓ No VPN adapters detected")
     except Exception: pass
     try:
-        req=urllib.request.Request("https://ipinfo.io/json",headers={"User-Agent":"zevoraScanner/4.0"})
+        req=urllib.request.Request("https://ipinfo.io/json",headers={"User-Agent":"ZevoraScanner/4.0"})
         with urllib.request.urlopen(req,context=_ssl_ctx(),timeout=5) as r:
             ip_data=json.loads(r.read().decode())
         org=ip_data.get("org","Unknown")
@@ -1482,7 +1608,13 @@ def scan_discord_cache():
     ID_RE    = re.compile(r'"id"\s*:\s*"(\d{17,19})"')
     NAME_RE  = re.compile(r'"username"\s*:\s*"([^"]{2,32})"')
     SWITCH_RE= re.compile(r'"lastSwitched"\s*:\s*"?(\d+)"?')
-    TOKEN_RE = re.compile(r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}')
+    # NOTE: token/credential regex matching was intentionally removed here.
+    # Pattern-matching JWT/MFA auth token formats in another application's
+    # local storage is functionally identical to what a credential stealer
+    # does, regardless of intent — it's the single hardest thing to defend
+    # to an AV engine or to anyone reading the source, and it isn't needed
+    # for the legitimate forensic goal (identifying which Discord accounts
+    # have been used on this PC), which only needs the account ID/username.
 
     def parse_leveldb(base_path, source_label):
         if not os.path.exists(base_path): return
@@ -1493,7 +1625,6 @@ def scan_discord_cache():
                 with open(fpath,"rb") as f: raw = f.read().decode("utf-8",errors="ignore")
                 ids    = ID_RE.findall(raw)
                 names  = NAME_RE.findall(raw)
-                tokens = TOKEN_RE.findall(raw)
                 switches = SWITCH_RE.findall(raw)
                 for i, uid in enumerate(ids):
                     if uid in seen_ids: continue
@@ -1508,7 +1639,6 @@ def scan_discord_cache():
                         except Exception: pass
                     accounts.append({
                         "id":uid, "username":uname,
-                        "has_token": bool(tokens),
                         "last_switched": last_sw,
                         "source": source_label,
                         "email": None,
@@ -1540,7 +1670,6 @@ def scan_discord_cache():
         lines.append(f"  @{acc['username']}")
         lines.append(f"  ID           : {acc['id']}")
         lines.append(f"  Last Switched: {acc['last_switched']}")
-        lines.append(f"  Token cached : {'⚠ YES' if acc['has_token'] else 'No'}")
         lines.append(f"  Found in     : {acc['source']}")
         lines.append("  "+"─"*32)
     if len(real_accounts)>1:
@@ -3056,9 +3185,10 @@ def run_full_scan(league="?"):
     mr_t,mr_h,mr_list   = scan_mft_deleted_recovery()
     ch_t,ch_h,_         = scan_cmd_history()
     mi_t,mi_h,_         = scan_memory_injection()
+    be_t,be_h,_         = scan_browser_extensions()
 
     total = (sb_h+bm_h+pf_h+ac_h+cs_h+yr_h+us_h+rb_h+sm_h+
-             ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+tp_h+dr_h+mr_h+ch_h+mi_h)
+             ff_h+pr_h+cl_h+ev_h+jl_h+lk_h+di_h+tp_h+dr_h+mr_h+ch_h+mi_h+be_h)
 
     roblox_list = []
     if isinstance(accs, list):
@@ -3075,6 +3205,7 @@ def run_full_scan(league="?"):
         "power_events":pw_t,"two_pc":tp_t,"deleted_recovery":dr_t,
         "exec_history_text":eh_t,"exec_history":eh_list,
         "mft_recovery":mr_t,"cmd_history":ch_t,"memory_injection":mi_t,
+        "browser_extensions":be_t,
         "shellbag_hits":sb_h,"bam_hits":bm_h,"prefetch_hits":pf_h,
         "appcompat_hits":ac_h,"cheat_hits":cs_h,"yara_hits":yr_h,
         "unsigned_hits":us_l,"sysmain_hits":sm_h,"sysmain_autofail":auto_fail,
@@ -3084,6 +3215,7 @@ def run_full_scan(league="?"):
         "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
         "discord_memory_hits":dm_h,"mft_recovery_hits":mr_h,
         "cmd_history_hits":ch_h,"memory_injection_hits":mi_h,
+        "browser_extension_hits":be_h,
         "roblox_accounts":roblox_list,"discord_accounts":dc_accs,
         "total_hits":total,"verdict":"REVIEW","league":league,
         "vpn_detected":bool(vpn_info and "vpn" in str(vpn_info).lower()),
@@ -3102,13 +3234,14 @@ def run_full_scan(league="?"):
             "power_hits":pw_h,"two_pc_hits":tp_h,"recovery_hits":dr_h,
             "discord_memory_hits":dm_h,"mft_recovery_hits":mr_h,
             "cmd_history_hits":ch_h,"memory_injection_hits":mi_h,
+            "browser_extension_hits":be_h,
         },
         "full_report":"\n".join([
-            f"zevora SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}",
+            f"ZEVORA SCANNER v5  |  {now_str()}  |  User: {current_user()}  |  League: {league}",
             "="*60,
             sb_t,bm_t,pf_t,ac_t,rl_t,al_t,cs_t,yr_t,us_t,rb_t,sm_t,
             pr_t,cl_t,nw_t,dc_t,dm_t,fr_t,ff_t,dv_t,ev_t,jl_t,lk_t,
-            di_t,pw_t,tp_t,dr_t,eh_t,mr_t,ch_t,mi_t,
+            di_t,pw_t,tp_t,dr_t,eh_t,mr_t,ch_t,mi_t,be_t,
             f"\nHITS: {total}",
         ]),
     }
